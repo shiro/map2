@@ -1,0 +1,4 @@
+- JOB: "intercept -g $DEVNODE | ./target/debug/key-mods-rs | uinput -d $DEVNODE"
+  DEVICE:
+    EVENTS:
+      EV_KEY: [KEY_X, KEY_Y]
