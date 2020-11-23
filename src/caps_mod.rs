@@ -1,4 +1,4 @@
-use crate::{input_event, State, TAB_DOWN, TAB_REPEAT, TAB_UP, ALT_UP, SHIFT_UP, META_UP, SYN, ALT_DOWN, SHIFT_DOWN, META_DOWN, CAPSLOCK_DOWN, CAPSLOCK_REPEAT, CAPSLOCK_UP, equal, is_modifier_down, print_event, LEFTCTRL_DOWN, ESC_DOWN, ESC_UP, H_DOWN, J_DOWN, K_DOWN, L_DOWN, LEFTCTRL_UP};
+use crate::{input_event, State, TAB_DOWN, TAB_REPEAT, TAB_UP, LEFTALT_UP, SHIFT_UP, META_UP, SYN, LEFTALT_DOWN, SHIFT_DOWN, META_DOWN, CAPSLOCK_DOWN, CAPSLOCK_REPEAT, CAPSLOCK_UP, equal, is_modifier_down, print_event, LEFTCTRL_DOWN, ESC_DOWN, ESC_UP, H_DOWN, J_DOWN, K_DOWN, L_DOWN, LEFTCTRL_UP};
 use std::{thread, time};
 
 pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
@@ -39,7 +39,7 @@ pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
                     equal(ev, &K_DOWN) ||
                     equal(ev, &L_DOWN)) {
                 print_event(&META_DOWN);
-                print_event(&ALT_DOWN);
+                print_event(&LEFTALT_DOWN);
                 print_event(&LEFTCTRL_DOWN);
                 print_event(&SHIFT_DOWN);
                 print_event(ev);
@@ -48,7 +48,7 @@ pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
                 thread::sleep(time::Duration::from_micros(20000));
 
                 print_event(&META_UP);
-                print_event(&ALT_UP);
+                print_event(&LEFTALT_UP);
                 print_event(&LEFTCTRL_UP);
                 print_event(&SHIFT_UP);
 

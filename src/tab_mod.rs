@@ -1,4 +1,4 @@
-use crate::{input_event, State, TAB_DOWN, TAB_REPEAT, TAB_UP, ALT_UP, SHIFT_UP, META_UP, SYN, ALT_DOWN, SHIFT_DOWN, META_DOWN};
+use crate::{input_event, State, TAB_DOWN, TAB_REPEAT, TAB_UP, LEFTALT_UP, SHIFT_UP, META_UP, SYN, LEFTALT_DOWN, SHIFT_DOWN, META_DOWN};
 use std::{thread, time};
 
 pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
@@ -15,7 +15,7 @@ pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
             // tab up was handled before, just release all mods
             if crate::ev_ignored(&TAB_DOWN, &mut state.ignore_list) {
                 crate::unignore_ev(&TAB_DOWN, &mut state.ignore_list);
-                crate::print_event(&ALT_UP);
+                crate::print_event(&LEFTALT_UP);
                 crate::print_event(&SHIFT_UP);
                 crate::print_event(&META_UP);
                 return true;
@@ -31,7 +31,7 @@ pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
         // tab + [key down]
         if ev.value == 1 {
             crate::ignore_ev(&TAB_DOWN, &mut state.ignore_list);
-            crate::print_event(&ALT_DOWN);
+            crate::print_event(&LEFTALT_DOWN);
             crate::print_event(&SHIFT_DOWN);
             crate::print_event(&META_DOWN);
             crate::print_event(&SYN);
