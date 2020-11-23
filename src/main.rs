@@ -1,19 +1,12 @@
-// use input_linux_sys::input_event;
-// use input_linux_sys::__u16;
-// use input_linux_sys::__s32;
+mod tab_mod;
+mod caps_mod;
 
-// use nom::{
-//     IResult,
-//     bytes::complete::{tag, take_while_m_n},
-//     combinator::map_res,
-//     sequence::tuple,
-// };
 use std::process::exit;
 use std::{io, mem, slice, thread, time};
 use std::io::{Read, stdout, Write};
 
 use anyhow::Result;
-use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN};
+use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L};
 use std::borrow::{BorrowMut, Borrow};
 
 pub type time_t = i64;
@@ -35,8 +28,17 @@ pub struct input_event {
     pub value: i32,
 }
 
-struct State {
+pub struct State {
     tab_is_down: bool,
+    capslock_is_down: bool,
+    control_is_down: bool,
+    shift_is_down: bool,
+    meta_is_down: bool,
+    alt_is_down: bool,
+    right_alt_is_down: bool,
+
+    disable_alt_mod: bool,
+
     ignore_list: Vec<input_event>,
 }
 
@@ -89,8 +91,37 @@ static ALT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTA
 static ALT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTALT as u16, value: 1, time: DUMMY_TIME };
 static ALT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTALT as u16, value: 2, time: DUMMY_TIME };
 
+static CAPSLOCK_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 0, time: DUMMY_TIME };
+static CAPSLOCK_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 1, time: DUMMY_TIME };
+static CAPSLOCK_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 2, time: DUMMY_TIME };
+
+static LEFTCTRL_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 0, time: DUMMY_TIME };
+static LEFTCTRL_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 1, time: DUMMY_TIME };
+static LEFTCTRL_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 2, time: DUMMY_TIME };
+
+static ESC_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 0, time: DUMMY_TIME };
+static ESC_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 1, time: DUMMY_TIME };
+static ESC_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 2, time: DUMMY_TIME };
+
+static H_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 0, time: DUMMY_TIME };
+static H_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 1, time: DUMMY_TIME };
+static H_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 2, time: DUMMY_TIME };
+static J_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 0, time: DUMMY_TIME };
+static J_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 1, time: DUMMY_TIME };
+static J_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 2, time: DUMMY_TIME };
+static K_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 0, time: DUMMY_TIME };
+static K_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 1, time: DUMMY_TIME };
+static K_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 2, time: DUMMY_TIME };
+static L_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 0, time: DUMMY_TIME };
+static L_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 1, time: DUMMY_TIME };
+static L_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 2, time: DUMMY_TIME };
+
 static SYN: input_event = input_event { type_: EV_SYN as u16, code: SYN_REPORT as u16, value: 0, time: DUMMY_TIME };
 
+
+fn is_modifier_down(state: &State) -> bool {
+    return state.alt_is_down || state.control_is_down || state.shift_is_down || state.meta_is_down;
+}
 
 fn ev_ignored(ev: &input_event, ignore_list: &mut Vec<input_event>) -> bool {
     match ignore_list.iter().position(|x: &input_event| equal(x, ev)) {
@@ -111,50 +142,6 @@ fn ignore_ev(ev: &input_event, ignore_list: &mut Vec<input_event>) {
     }
 }
 
-fn tab_mod(ev: &input_event, state: &mut State) -> bool {
-    if state.tab_is_down {
-        // tab repeat
-        if equal(&ev, &TAB_DOWN) || equal(&ev, &TAB_REPEAT) {
-            return true;
-        }
-
-        // tab up
-        if equal(&ev, &TAB_UP) {
-            state.tab_is_down = false;
-
-            // tab up was handled before, just release all mods
-            if ev_ignored(&TAB_DOWN, &mut state.ignore_list) {
-                unignore_ev(&TAB_DOWN, &mut state.ignore_list);
-                print_event(&ALT_UP);
-                print_event(&SHIFT_UP);
-                print_event(&META_UP);
-                return true;
-            }
-
-            print_event(&TAB_DOWN);
-            print_event(&SYN);
-            thread::sleep(time::Duration::from_micros(20000));
-            print_event(&TAB_UP);
-            return true;
-        }
-
-        // tab + [key down]
-        if ev.value == 1 {
-            ignore_ev(&TAB_DOWN, &mut state.ignore_list);
-            print_event(&ALT_DOWN);
-            print_event(&SHIFT_DOWN);
-            print_event(&META_DOWN);
-            print_event(&SYN);
-            thread::sleep(time::Duration::from_micros(20000));
-        }
-    } else if equal(&ev, &TAB_DOWN) {
-        state.tab_is_down = true;
-        return true;
-    }
-
-    false
-}
-
 fn main() -> Result<()> {
     let mut stdin = io::stdin();
 
@@ -162,6 +149,13 @@ fn main() -> Result<()> {
 
     let mut state = State {
         tab_is_down: false,
+        capslock_is_down: false,
+        control_is_down: false,
+        shift_is_down: false,
+        meta_is_down: false,
+        alt_is_down: false,
+        right_alt_is_down: false,
+        disable_alt_mod: false,
         ignore_list: vec!(),
     };
 
@@ -182,7 +176,11 @@ fn main() -> Result<()> {
             continue;
         }
 
-        if tab_mod(&ev, &mut state) {
+        if crate::tab_mod::tab_mod(&ev, &mut state) {
+            continue;
+        }
+
+        if crate::caps_mod::caps_mod(&ev, &mut state) {
             continue;
         }
 
