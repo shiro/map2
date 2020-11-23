@@ -11,6 +11,7 @@
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/libc-80cb69e2eeb8c767/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/nix-90d8ce966751eeaf/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/byteorder-a9241c8456704207/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/anyhow-4e0c40b310af3cc0/out" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
