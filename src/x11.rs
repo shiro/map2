@@ -1,7 +1,6 @@
 use anyhow::Result;
 use tokio::prelude::*;
 use futures::future::{Future, lazy};
-use tokio_threadpool::ThreadPool;
 
 use x11rb::protocol::xproto::{GetPropertyReply, ConnectionExt, Atom, Window, intern_atom, AtomEnum, Screen, ChangeWindowAttributesAux, EventMask};
 use x11rb::connection::Connection;

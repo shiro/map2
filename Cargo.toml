@@ -12,6 +12,5 @@ input-linux-sys = "0.3.1"
 libc = "0.2.71"
 anyhow = "1.0"
 x11rb = "0.7.0"
-tokio = { version = "0.3.2", features = ["full"] }
-tokio-threadpool = "0.1.18"
+tokio = { version = "0.3.4", features = ["full"] }
 futures = "0.3"

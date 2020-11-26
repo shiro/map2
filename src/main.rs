@@ -3,7 +3,6 @@
 
 use tokio::prelude::*;
 use futures::future::{Future, lazy, select};
-use tokio_threadpool::ThreadPool;
 
 mod tab_mod;
 mod caps_mod;
@@ -21,7 +20,8 @@ use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LE
 use std::borrow::{BorrowMut, Borrow};
 use crate::x11::{x11_get_active_window, x11_test, x11_test_async};
 use tokio::task;
-use std::error::Error;
+// use std::error::Error;
+use anyhow::Result;
 use tokio::sync::oneshot;
 use tokio::time::Duration;
 use tokio::stream::StreamExt;
@@ -79,10 +79,10 @@ fn print_event(ev: &input_event) {
     unsafe {
         // stdout().write_all(any_as_u8_slice(ev));
         if ev.type_ == EV_KEY as u16 {
-            // println!("{:?}", ev);
+            println!("{:?}", ev);
 
-            let res = x11_get_active_window().unwrap();
-            println!("class: {}", res.class);
+            // let res = x11_get_active_window().unwrap();
+            // println!("class: {}", res.class);
 
             stdout().flush();
         }
@@ -223,155 +223,127 @@ async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
 // async fn main() -> () {
     // x11_test()?;
     // x11_test_async().await?;
 
     let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
 
-    tokio::spawn(async move {
-        println!("start cpu work");
-        // let res = tokio::task::spawn_blocking(async || {
-        //     std::thread::sleep(std::time::Duration::from_secs(5));
-        // }).await;
-        // delay_for(4).await.unwrap();
-
+    let task1 = tokio::spawn(async move {
         loop {
             let res = task::spawn_blocking(move || {
-                // thread::sleep(Duration::from_secs(4));
-                x11_test().unwrap()
-            }).await.unwrap();
+                x11_test().ok()?
+            }).await;
 
-            if let Some(val) = res {
-                println!("eee: {}", val.class);
+            if let Ok(Some(val)) = res {
                 tx1.send(val).await;
+                // println!("class: {}", val.class);
             }
         }
-
-        //
-        // if let Err(e) = res{
-        //     println!("noo");
-        // }
-
-        // println!("done cpu work");
-
-        // for i in 0..10 {
-        //     tx1.send("wow").await.unwrap();
-        // }
     });
 
+
+    let mut state = State {
+        tab_is_down: false,
+        capslock_is_down: false,
+        leftcontrol_is_down: false,
+        shift_is_down: false,
+        meta_is_down: false,
+        leftalt_is_down: false,
+        right_alt_is_down: false,
+        disable_alt_mod: false,
+        ignore_list: vec!(),
+    };
+
     loop {
-        println!("loop");
         tokio::select! {
             Some(v) = rx1.recv() => {
-                println!("Got {:?} from rx1", v.class);
+                println!("class: {}", v.class);
             }
-            else => {
-                println!("Both channels closed");
-                break
-            }
+            _ = handle_stdin_ev(&mut state) => {}
+            else => { break }
         }
     }
 
     Ok(())
-
-
-    // println!("{}", res);
-
-    // Ok(())
 }
 
-// fn main2() -> Result<()> {
-//     let mut stdin = io::stdin();
-//
-//     let mut ev: input_event = unsafe { mem::zeroed() };
-//
-//     let mut state = State {
-//         tab_is_down: false,
-//         capslock_is_down: false,
-//         leftcontrol_is_down: false,
-//         shift_is_down: false,
-//         meta_is_down: false,
-//         leftalt_is_down: false,
-//         right_alt_is_down: false,
-//         disable_alt_mod: false,
-//         ignore_list: vec!(),
-//     };
-//
-//     loop {
-//         unsafe {
-//             let slice = any_as_u8_slice_mut(&mut ev);
-//             match stdin.read_exact(slice) {
-//                 Ok(()) => (),
-//                 Err(e) => {
-//                     ::std::mem::forget(slice);
-//                     panic!();
-//                 }
-//             }
-//         }
-//
-//         if ev.type_ == EV_SYN as u16 || ev.type_ == EV_MSC as u16 && ev.code == MSC_SCAN as u16 {
-//             print_event(&ev);
-//             continue;
-//         }
-//
-//         if equal(&ev, &F8_DOWN) {
-//             state.disable_alt_mod = !state.disable_alt_mod;
-//         }
-//
-//         if equal(&ev, &LEFTCTRL_DOWN) {
-//             state.leftcontrol_is_down = true;
-//         } else if equal(&ev, &LEFTCTRL_UP) {
-//             state.leftcontrol_is_down = false;
-//         }
-//
-//         if equal(&ev, &SHIFT_DOWN) {
-//             state.shift_is_down = true;
-//         } else if equal(&ev, &SHIFT_UP) {
-//             state.shift_is_down = false;
-//         }
-//
-//         // if ev.type_ == EV_REL as u16 && ev.code == REL_X as u16 {
-//         //     println!("{}", ev.value);
-//         // }
-//
-//         if crate::tab_mod::tab_mod(&ev, &mut state) {
-//             continue;
-//         }
-//
-//         if !state.leftcontrol_is_down {
-//             if crate::caps_mod::caps_mod(&ev, &mut state) {
-//                 continue;
-//             }
-//         }
-//
-//         if !state.disable_alt_mod {
-//             if crate::leftalt_mod::leftalt_mod(&ev, &mut state) {
-//                 continue;
-//             }
-//         }
-//
-//         if !state.disable_alt_mod {
-//             if crate::rightalt_mod::rightalt_mod(&ev, &mut state) {
-//                 continue;
-//             }
-//         }
-//
-//         if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_DOWN.code as u16 {
-//             print_event(&META_DOWN);
-//             continue;
-//         }
-//         if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_REPEAT.code as u16 {
-//             continue;
-//         }
-//         if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_UP.code as u16 {
-//             print_event(&META_UP);
-//             continue;
-//         }
-//
-//         print_event(&ev);
-//     }
-//
-//     Ok(())
-// }
+async fn handle_stdin_ev(state: &mut State) -> Result<()> {
+    let mut stdin = tokio::io::stdin();
+    let mut ev: input_event = unsafe { mem::zeroed() };
+
+    unsafe {
+        let slice = any_as_u8_slice_mut(&mut ev);
+        match stdin.read_exact(slice).await {
+            Ok(_) => (),
+            Err(e) => {
+                ::std::mem::forget(slice);
+                panic!();
+            }
+        }
+    }
+
+    if ev.type_ == EV_SYN as u16 || ev.type_ == EV_MSC as u16 && ev.code == MSC_SCAN as u16 {
+        print_event(&ev);
+        return Ok(());
+    }
+
+    if equal(&ev, &F8_DOWN) {
+        state.disable_alt_mod = !state.disable_alt_mod;
+    }
+
+    if equal(&ev, &LEFTCTRL_DOWN) {
+        state.leftcontrol_is_down = true;
+    } else if equal(&ev, &LEFTCTRL_UP) {
+        state.leftcontrol_is_down = false;
+    }
+
+    if equal(&ev, &SHIFT_DOWN) {
+        state.shift_is_down = true;
+    } else if equal(&ev, &SHIFT_UP) {
+        state.shift_is_down = false;
+    }
+
+    // if ev.type_ == EV_REL as u16 && ev.code == REL_X as u16 {
+    //     println!("{}", ev.value);
+    // }
+
+    if crate::tab_mod::tab_mod(&ev, state) {
+        return Ok(());
+    }
+
+    if !state.leftcontrol_is_down {
+        if crate::caps_mod::caps_mod(&ev, state) {
+            return Ok(());
+        }
+    }
+
+    if !state.disable_alt_mod {
+        if crate::leftalt_mod::leftalt_mod(&ev, state) {
+            return Ok(());
+        }
+    }
+
+    if !state.disable_alt_mod {
+        if crate::rightalt_mod::rightalt_mod(&ev, state) {
+            return Ok(());
+        }
+    }
+
+    if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_DOWN.code as u16 {
+        print_event(&META_DOWN);
+        return Ok(());
+    }
+    if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_REPEAT.code as u16 {
+        return Ok(());
+    }
+    if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_UP.code as u16 {
+        print_event(&META_UP);
+        return Ok(());
+    }
+
+    print_event(&ev);
+
+    Ok(())
+}
