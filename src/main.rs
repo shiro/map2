@@ -1,15 +1,30 @@
+#![feature(type_ascription)]
+#![feature(async_closure)]
+
+use tokio::prelude::*;
+use futures::future::{Future, lazy, select};
+use tokio_threadpool::ThreadPool;
+
 mod tab_mod;
 mod caps_mod;
 mod leftalt_mod;
 mod rightalt_mod;
+mod x11;
 
+use tokio::prelude::*;
 use std::process::exit;
 use std::{io, mem, slice, thread, time};
 use std::io::{Read, stdout, Write};
 
-use anyhow::Result;
-use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8};
+// use anyhow::Result;
+use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL};
 use std::borrow::{BorrowMut, Borrow};
+use crate::x11::{x11_get_active_window, x11_test, x11_test_async};
+use tokio::task;
+use std::error::Error;
+use tokio::sync::oneshot;
+use tokio::time::Duration;
+use tokio::stream::StreamExt;
 
 pub type time_t = i64;
 pub type suseconds_t = i64;
@@ -62,9 +77,15 @@ static EV_SIZE: usize = mem::size_of::<input_event>();
 
 fn print_event(ev: &input_event) {
     unsafe {
-        stdout().write_all(any_as_u8_slice(ev));
-        // println!("{:?}", ev);
-        stdout().flush();
+        // stdout().write_all(any_as_u8_slice(ev));
+        if ev.type_ == EV_KEY as u16 {
+            // println!("{:?}", ev);
+
+            let res = x11_get_active_window().unwrap();
+            println!("class: {}", res.class);
+
+            stdout().flush();
+        }
     }
 }
 
@@ -75,6 +96,7 @@ fn equal(ev1: &input_event, ev2: &input_event) -> bool {
 }
 
 
+// region key codes
 static DUMMY_TIME: timeval = timeval { tv_sec: 0, tv_usec: 0 };
 
 static TAB_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_TAB as u16, value: 0, time: DUMMY_TIME };
@@ -139,7 +161,33 @@ static F8_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as 
 static F8_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as u16, value: 1, time: DUMMY_TIME };
 static F8_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as u16, value: 2, time: DUMMY_TIME };
 
+static MOUSE5_UP: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 0, time: DUMMY_TIME };
+static MOUSE5_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 1, time: DUMMY_TIME };
+static MOUSE5_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 2, time: DUMMY_TIME };
+static MOUSE6_UP: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 0, time: DUMMY_TIME };
+static MOUSE6_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 1, time: DUMMY_TIME };
+static MOUSE6_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 2, time: DUMMY_TIME };
+static MOUSE7_UP: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 0, time: DUMMY_TIME };
+static MOUSE7_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 1, time: DUMMY_TIME };
+static MOUSE7_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 2, time: DUMMY_TIME };
+static MOUSE8_UP: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 0, time: DUMMY_TIME };
+static MOUSE8_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 1, time: DUMMY_TIME };
+static MOUSE8_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 2, time: DUMMY_TIME };
+static MOUSE9_UP: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 0, time: DUMMY_TIME };
+static MOUSE9_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 1, time: DUMMY_TIME };
+static MOUSE9_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 2, time: DUMMY_TIME };
+static MOUSE10_UP: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 0, time: DUMMY_TIME };
+static MOUSE10_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 1, time: DUMMY_TIME };
+static MOUSE10_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 2, time: DUMMY_TIME };
+static MOUSE11_UP: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 0, time: DUMMY_TIME };
+static MOUSE11_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 1, time: DUMMY_TIME };
+static MOUSE11_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 2, time: DUMMY_TIME };
+static MOUSE12_UP: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 0, time: DUMMY_TIME };
+static MOUSE12_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 1, time: DUMMY_TIME };
+static MOUSE12_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 2, time: DUMMY_TIME };
+
 static SYN: input_event = input_event { type_: EV_SYN as u16, code: SYN_REPORT as u16, value: 0, time: DUMMY_TIME };
+// endregion
 
 
 fn is_modifier_down(state: &State) -> bool {
@@ -165,81 +213,165 @@ fn ignore_ev(ev: &input_event, ignore_list: &mut Vec<input_event>) {
     }
 }
 
-fn main() -> Result<()> {
-    let mut stdin = io::stdin();
 
-    let mut ev: input_event = unsafe { mem::zeroed() };
+async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
+    task::spawn_blocking(move || {
+        thread::sleep(Duration::from_secs(seconds));
+    })
+        .await?;
+    Ok(seconds)
+}
 
-    let mut state = State {
-        tab_is_down: false,
-        capslock_is_down: false,
-        leftcontrol_is_down: false,
-        shift_is_down: false,
-        meta_is_down: false,
-        leftalt_is_down: false,
-        right_alt_is_down: false,
-        disable_alt_mod: false,
-        ignore_list: vec!(),
-    };
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+// async fn main() -> () {
+    // x11_test()?;
+    // x11_test_async().await?;
+
+    let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
+
+    tokio::spawn(async move {
+        println!("start cpu work");
+        // let res = tokio::task::spawn_blocking(async || {
+        //     std::thread::sleep(std::time::Duration::from_secs(5));
+        // }).await;
+        // delay_for(4).await.unwrap();
+
+        loop {
+            let res = task::spawn_blocking(move || {
+                // thread::sleep(Duration::from_secs(4));
+                x11_test().unwrap()
+            }).await.unwrap();
+
+            if let Some(val) = res {
+                println!("eee: {}", val.class);
+                tx1.send(val).await;
+            }
+        }
+
+        //
+        // if let Err(e) = res{
+        //     println!("noo");
+        // }
+
+        // println!("done cpu work");
+
+        // for i in 0..10 {
+        //     tx1.send("wow").await.unwrap();
+        // }
+    });
 
     loop {
-        unsafe {
-            let slice = any_as_u8_slice_mut(&mut ev);
-            match stdin.read_exact(slice) {
-                Ok(()) => (),
-                Err(e) => {
-                    ::std::mem::forget(slice);
-                    panic!();
-                }
+        println!("loop");
+        tokio::select! {
+            Some(v) = rx1.recv() => {
+                println!("Got {:?} from rx1", v.class);
+            }
+            else => {
+                println!("Both channels closed");
+                break
             }
         }
-
-        if ev.type_ == EV_SYN as u16 || ev.type_ == EV_MSC as u16 && ev.code == MSC_SCAN as u16 {
-            print_event(&ev);
-            continue;
-        }
-
-        if equal(&ev, &F8_DOWN) {
-            state.disable_alt_mod = !state.disable_alt_mod;
-        }
-
-        if equal(&ev, &LEFTCTRL_DOWN) {
-            state.leftcontrol_is_down = true;
-        } else if equal(&ev, &LEFTCTRL_UP) {
-            state.leftcontrol_is_down = false;
-        }
-
-        if equal(&ev, &SHIFT_DOWN) {
-            state.shift_is_down = true;
-        } else if equal(&ev, &SHIFT_UP) {
-            state.shift_is_down = false;
-        }
-
-
-        if crate::tab_mod::tab_mod(&ev, &mut state) {
-            continue;
-        }
-
-        if !state.leftcontrol_is_down {
-            if crate::caps_mod::caps_mod(&ev, &mut state) {
-                continue;
-            }
-        }
-
-        if !state.disable_alt_mod {
-            if crate::leftalt_mod::leftalt_mod(&ev, &mut state) {
-                continue;
-            }
-        }
-
-        if !state.disable_alt_mod {
-            if crate::rightalt_mod::rightalt_mod(&ev, &mut state) {
-                continue;
-            }
-        }
-
-        print_event(&ev);
     }
 
     Ok(())
+
+
+    // println!("{}", res);
+
+    // Ok(())
 }
+
+// fn main2() -> Result<()> {
+//     let mut stdin = io::stdin();
+//
+//     let mut ev: input_event = unsafe { mem::zeroed() };
+//
+//     let mut state = State {
+//         tab_is_down: false,
+//         capslock_is_down: false,
+//         leftcontrol_is_down: false,
+//         shift_is_down: false,
+//         meta_is_down: false,
+//         leftalt_is_down: false,
+//         right_alt_is_down: false,
+//         disable_alt_mod: false,
+//         ignore_list: vec!(),
+//     };
+//
+//     loop {
+//         unsafe {
+//             let slice = any_as_u8_slice_mut(&mut ev);
+//             match stdin.read_exact(slice) {
+//                 Ok(()) => (),
+//                 Err(e) => {
+//                     ::std::mem::forget(slice);
+//                     panic!();
+//                 }
+//             }
+//         }
+//
+//         if ev.type_ == EV_SYN as u16 || ev.type_ == EV_MSC as u16 && ev.code == MSC_SCAN as u16 {
+//             print_event(&ev);
+//             continue;
+//         }
+//
+//         if equal(&ev, &F8_DOWN) {
+//             state.disable_alt_mod = !state.disable_alt_mod;
+//         }
+//
+//         if equal(&ev, &LEFTCTRL_DOWN) {
+//             state.leftcontrol_is_down = true;
+//         } else if equal(&ev, &LEFTCTRL_UP) {
+//             state.leftcontrol_is_down = false;
+//         }
+//
+//         if equal(&ev, &SHIFT_DOWN) {
+//             state.shift_is_down = true;
+//         } else if equal(&ev, &SHIFT_UP) {
+//             state.shift_is_down = false;
+//         }
+//
+//         // if ev.type_ == EV_REL as u16 && ev.code == REL_X as u16 {
+//         //     println!("{}", ev.value);
+//         // }
+//
+//         if crate::tab_mod::tab_mod(&ev, &mut state) {
+//             continue;
+//         }
+//
+//         if !state.leftcontrol_is_down {
+//             if crate::caps_mod::caps_mod(&ev, &mut state) {
+//                 continue;
+//             }
+//         }
+//
+//         if !state.disable_alt_mod {
+//             if crate::leftalt_mod::leftalt_mod(&ev, &mut state) {
+//                 continue;
+//             }
+//         }
+//
+//         if !state.disable_alt_mod {
+//             if crate::rightalt_mod::rightalt_mod(&ev, &mut state) {
+//                 continue;
+//             }
+//         }
+//
+//         if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_DOWN.code as u16 {
+//             print_event(&META_DOWN);
+//             continue;
+//         }
+//         if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_REPEAT.code as u16 {
+//             continue;
+//         }
+//         if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_UP.code as u16 {
+//             print_event(&META_UP);
+//             continue;
+//         }
+//
+//         print_event(&ev);
+//     }
+//
+//     Ok(())
+// }
