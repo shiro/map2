@@ -1,17 +1,22 @@
 #!/bin/bash
 
-device='/dev/input/by-path/pci-0000:03:00.0-usb-0:4:1.1-event-mouse'
+device='/dev/input/by-id/usb-Logitech_G700s_Rechargeable_Gaming_Mouse_017DF9570007-event-mouse'
 
-sudo intercept -g "$device" | target/debug/key-mods-rs | sudo uinput -d "$device" &
-# sudo intercept -g "$device" | sudo uinput -d "$device" &
-# sudo intercept -g "$device" | ./key-mods-rs &
-# sudo intercept -g "$device" &
+sudo systemctl stop udevmon.service
+sleep 1
+echo start
+
+sudo intercept -g "$device" | target/debug/key-mods-rs | sudo uinput -d "$device" -c keyboard.yaml &
 
 proc_pid=$?
 
-sleep 15
+sleep 10
 
-sudo kill $proc_pid
+echo stop
+
 sudo killall -9 intercept
 
-exit 0
+sleep 1
+
+sudo systemctl restart udevmon.service
+echo restarted udevmon

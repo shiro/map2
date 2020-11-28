@@ -57,6 +57,8 @@ pub struct State {
     disable_alt_mod: bool,
 
     ignore_list: Vec<input_event>,
+
+    active_window_class: Option<String>,
 }
 
 unsafe fn any_as_u8_slice_mut<T: Sized>(p: &mut T) -> &mut [u8] {
@@ -77,15 +79,11 @@ static EV_SIZE: usize = mem::size_of::<input_event>();
 
 fn print_event(ev: &input_event) {
     unsafe {
-        // stdout().write_all(any_as_u8_slice(ev));
-        if ev.type_ == EV_KEY as u16 {
-            println!("{:?}", ev);
-
-            // let res = x11_get_active_window().unwrap();
-            // println!("class: {}", res.class);
-
-            stdout().flush();
-        }
+        stdout().write_all(any_as_u8_slice(ev));
+        // if ev.type_ == EV_KEY as u16 {
+        //     println!("{:?}", ev);
+        // }
+        stdout().flush();
     }
 }
 
@@ -224,13 +222,9 @@ async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-// async fn main() -> () {
-    // x11_test()?;
-    // x11_test_async().await?;
-
     let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
 
-    let task1 = tokio::spawn(async move {
+    tokio::spawn(async move {
         loop {
             let res = task::spawn_blocking(move || {
                 x11_test().ok()?
@@ -238,7 +232,6 @@ async fn main() -> Result<()> {
 
             if let Ok(Some(val)) = res {
                 tx1.send(val).await;
-                // println!("class: {}", val.class);
             }
         }
     });
@@ -254,12 +247,13 @@ async fn main() -> Result<()> {
         right_alt_is_down: false,
         disable_alt_mod: false,
         ignore_list: vec!(),
+        active_window_class: None,
     };
 
     loop {
         tokio::select! {
             Some(v) = rx1.recv() => {
-                println!("class: {}", v.class);
+                state.active_window_class = Some(v.class);
             }
             _ = handle_stdin_ev(&mut state) => {}
             else => { break }
@@ -277,9 +271,9 @@ async fn handle_stdin_ev(state: &mut State) -> Result<()> {
         let slice = any_as_u8_slice_mut(&mut ev);
         match stdin.read_exact(slice).await {
             Ok(_) => (),
-            Err(e) => {
+            Err(_) => {
                 ::std::mem::forget(slice);
-                panic!();
+                panic!("error reading stdin");
             }
         }
     }
@@ -305,10 +299,6 @@ async fn handle_stdin_ev(state: &mut State) -> Result<()> {
         state.shift_is_down = false;
     }
 
-    // if ev.type_ == EV_REL as u16 && ev.code == REL_X as u16 {
-    //     println!("{}", ev.value);
-    // }
-
     if crate::tab_mod::tab_mod(&ev, state) {
         return Ok(());
     }
@@ -331,16 +321,27 @@ async fn handle_stdin_ev(state: &mut State) -> Result<()> {
         }
     }
 
-    if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_DOWN.code as u16 {
-        print_event(&META_DOWN);
-        return Ok(());
-    }
-    if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_REPEAT.code as u16 {
-        return Ok(());
-    }
-    if ev.type_ == EV_KEY as u16 && ev.code == MOUSE7_UP.code as u16 {
-        print_event(&META_UP);
-        return Ok(());
+    if state.active_window_class == Some("firefox".to_string()) {
+        if ev.type_ == EV_KEY as u16 && ev.code == MOUSE5_DOWN.code {
+            if ev.value == MOUSE5_DOWN.value {
+                print_event(&LEFTCTRL_DOWN);
+                print_event(&SYN);
+                thread::sleep(time::Duration::from_micros(20000));
+                print_event(&TAB_DOWN);
+
+                return Ok(());
+            } else if ev.value == MOUSE5_REPEAT.value {
+                print_event(&TAB_REPEAT);
+                return Ok(());
+            } else if ev.value == MOUSE5_UP.value {
+                print_event(&LEFTCTRL_UP);
+                print_event(&SYN);
+                thread::sleep(time::Duration::from_micros(20000));
+                print_event(&TAB_UP);
+
+                return Ok(());
+            }
+        }
     }
 
     print_event(&ev);

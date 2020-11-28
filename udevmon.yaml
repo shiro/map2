@@ -1,0 +1,11 @@
+- JOB: "intercept -g $DEVNODE | /home/shiro/project/key-mods-rs/target/release/key-mods-rs | uinput -d $DEVNODE"
+  DEVICE:
+    NAME: "Asus Keyboard"
+    EVENTS:
+      EV_KEY: [KEY_CAPSLOCK, KEY_ESC, KEY_TAB]
+
+- JOB: "intercept -g $DEVNODE | /home/shiro/project/key-mods-rs/target/release/key-mods-rs | uinput -d $DEVNODE -c /home/shiro/project/key-mods-rs/keyboard.yaml"
+  DEVICE:
+    NAME: "Logitech.*"
+    EVENTS:
+      EV_REL: [REL_X,REL_Y]

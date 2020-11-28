@@ -15,7 +15,10 @@
 # platform-AMDI0010:03-mouse
 # platform-pcspkr-event-spkr
 
-device='/dev/input/by-path/pci-0000:03:00.0-usb-0:4:1.1-event-mouse'
+sudo systemctl stop udevmon.service
+sleep 2
+
+device='/dev/input/by-id/usb-Logitech_G700s_Rechargeable_Gaming_Mouse_017DF9570007-event-mouse'
 
 sudo intercept -g "$device" | target/debug/key-mods-rs &
 
@@ -26,4 +29,6 @@ sleep 8
 sudo kill $proc_pid
 sudo killall -9 intercept
 
-exit 0
+sleep 1
+
+sudo systemctl restart udevmon.service
