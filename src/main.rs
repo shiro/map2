@@ -222,19 +222,19 @@ async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
-
-    tokio::spawn(async move {
-        loop {
-            let res = task::spawn_blocking(move || {
-                x11_test().ok()?
-            }).await;
-
-            if let Ok(Some(val)) = res {
-                tx1.send(val).await;
-            }
-        }
-    });
+    // let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
+    //
+    // tokio::spawn(async move {
+    //     loop {
+    //         let res = task::spawn_blocking(move || {
+    //             x11_test().ok()?
+    //         }).await;
+    //
+    //         if let Ok(Some(val)) = res {
+    //             tx1.send(val).await;
+    //         }
+    //     }
+    // });
 
 
     let mut state = State {
@@ -252,9 +252,9 @@ async fn main() -> Result<()> {
 
     loop {
         tokio::select! {
-            Some(v) = rx1.recv() => {
-                state.active_window_class = Some(v.class);
-            }
+            // Some(v) = rx1.recv() => {
+            //     state.active_window_class = Some(v.class);
+            // }
             _ = handle_stdin_ev(&mut state) => {}
             else => { break }
         }

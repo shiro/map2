@@ -50,6 +50,8 @@ pub fn x11_test() -> Result<Option<ActiveWindowResult>> {
 
     let mut NET_ACTIVE_WINDOW: Atom = intern_atom(&conn, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
 
+    return Ok(None);
+
 
     loop {
         let event = conn.wait_for_event()?;
