@@ -13,65 +13,39 @@ pub struct ActiveWindowResult {
     pub(crate) name: String,
 }
 
-pub async fn x11_test_async() -> Result<()> {
-    // tokio::spawn(
-    //     move || {
-    //         // tokio::tokio_threadpool::blocking(|| {
-    //         std::thread::sleep(std::time::Duration::from_secs(7));
-    //         println!("done");
-    //         Ok(2)
-    //         // })
-    //     }
-    // );
-
-    // let thread_pool = ThreadPool::new();
-    //
-    // thread_pool.spawn(lazy(|_| -> i32 {
-    //     // println!("called from a worker thread");
-    //     33
-    // }));
-    //
-    // // Gracefully shutdown the threadpool
-    // thread_pool.shutdown().wait().unwrap();
-
-    Ok(())
+pub struct X11State<S: Connection + Send + Sync> {
+    con: S,
+    NET_ACTIVE_WINDOW: Atom,
 }
 
-
-pub fn x11_test() -> Result<Option<ActiveWindowResult>> {
-    let (conn, screen_id) = x11rb::connect(None)?;
-    let screen: &Screen = &conn.setup().roots[screen_id];
+pub fn x11_initialize() -> Result<X11State<impl Connection + Send + Sync>> {
+    let (con, screen_id) = x11rb::connect(None)?;
+    let screen: &Screen = &con.setup().roots[screen_id];
     let root: Window = screen.root;
 
-    conn.change_window_attributes(root, &ChangeWindowAttributesAux::new()
+    con.change_window_attributes(root, &ChangeWindowAttributesAux::new()
         .event_mask(Some(EventMask::SubstructureNotify | EventMask::PropertyChange)))?;
 
-    // println!("screen: {}x{}", screen.width_in_pixels, screen.height_in_pixels);
+    let NET_ACTIVE_WINDOW: Atom = intern_atom(&con, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
 
-    let mut NET_ACTIVE_WINDOW: Atom = intern_atom(&conn, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
+    Ok(X11State {
+        con,
+        NET_ACTIVE_WINDOW,
+    })
+}
 
-    return Ok(None);
-
-
+pub fn x11_test<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Option<ActiveWindowResult>> {
     loop {
-        let event = conn.wait_for_event()?;
+        let event = state.con.wait_for_event()?;
 
         if let PropertyNotify(ev) = event {
-            if ev.atom == NET_ACTIVE_WINDOW {
+            if ev.atom == state.NET_ACTIVE_WINDOW {
                 let res = x11_get_active_window()?;
                 // println!("class: {}", res.class);
                 return Ok(Some(res));
             }
         }
     }
-    // else {
-    //     return Ok(None);
-    // }
-
-    // Ok(None)
-    // }
-
-    // Err(anyhow::Error::msg("noes"))
 }
 
 pub fn x11_get_active_window() -> Result<ActiveWindowResult> {

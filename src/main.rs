@@ -18,13 +18,14 @@ use std::io::{Read, stdout, Write};
 // use anyhow::Result;
 use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL};
 use std::borrow::{BorrowMut, Borrow};
-use crate::x11::{x11_get_active_window, x11_test, x11_test_async};
+use crate::x11::{x11_get_active_window, x11_test, x11_test_async, x11_initialize};
 use tokio::task;
 // use std::error::Error;
 use anyhow::Result;
 use tokio::sync::oneshot;
 use tokio::time::Duration;
 use tokio::stream::StreamExt;
+use std::sync::Arc;
 
 pub type time_t = i64;
 pub type suseconds_t = i64;
@@ -222,19 +223,22 @@ async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
-    //
-    // tokio::spawn(async move {
-    //     loop {
-    //         let res = task::spawn_blocking(move || {
-    //             x11_test().ok()?
-    //         }).await;
-    //
-    //         if let Ok(Some(val)) = res {
-    //             tx1.send(val).await;
-    //         }
-    //     }
-    // });
+    let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
+
+    tokio::spawn(async move {
+        let x11_state = Arc::new(x11_initialize().unwrap());
+
+        loop {
+            let x11_state_clone = x11_state.clone();
+            let res = task::spawn_blocking(move || {
+                x11_test(&x11_state_clone)
+            }).await.unwrap();
+
+            if let Ok(Some(val)) = res {
+                tx1.send(val).await;
+            }
+        }
+    });
 
 
     let mut state = State {
@@ -252,9 +256,9 @@ async fn main() -> Result<()> {
 
     loop {
         tokio::select! {
-            // Some(v) = rx1.recv() => {
-            //     state.active_window_class = Some(v.class);
-            // }
+            Some(v) = rx1.recv() => {
+                state.active_window_class = Some(v.class);
+            }
             _ = handle_stdin_ev(&mut state) => {}
             else => { break }
         }
