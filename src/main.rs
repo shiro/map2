@@ -16,9 +16,9 @@ use std::{io, mem, slice, thread, time};
 use std::io::{Read, stdout, Write};
 
 // use anyhow::Result;
-use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL};
+use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL, KEY_F13, KEY_A, KEY_F14, KEY_F15, KEY_F16, KEY_F17, KEY_NUMERIC_0, KEY_NUMERIC_1, KEY_NUMERIC_3, KEY_NUMERIC_4, KEY_NUMERIC_5, KEY_NUMERIC_6, KEY_NUMERIC_7, KEY_NUMERIC_8, KEY_KP0, KEY_KP1, KEY_KP2, KEY_KP3, KEY_KP4, KEY_KP5, KEY_KP6, KEY_KP7};
 use std::borrow::{BorrowMut, Borrow};
-use crate::x11::{x11_get_active_window, x11_test, x11_test_async, x11_initialize};
+use crate::x11::{x11_get_active_window, x11_test, x11_initialize};
 use tokio::task;
 // use std::error::Error;
 use anyhow::Result;
@@ -26,6 +26,7 @@ use tokio::sync::oneshot;
 use tokio::time::Duration;
 use tokio::stream::StreamExt;
 use std::sync::Arc;
+use nom::lib::std::collections::HashMap;
 
 pub type time_t = i64;
 pub type suseconds_t = i64;
@@ -267,6 +268,26 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+fn make_event(type_: u16, code: u16, value: i32) -> input_event {
+    input_event { type_, code, value, time: DUMMY_TIME }
+}
+
+fn replace_key_simple(ev: &input_event, type_: u16, code: u16, replacement_type: u16, replacement_code: u16) -> Option<()> {
+    if ev.type_ == type_ && ev.code == code {
+        if ev.value == 0 {
+            print_event(&make_event(replacement_type, replacement_code, 0));
+            return Some(());
+        } else if ev.value == 1 {
+            print_event(&make_event(replacement_type, replacement_code, 1));
+            return Some(());
+        } else if ev.value == 2 {
+            print_event(&make_event(replacement_type, replacement_code, 2));
+            return Some(());
+        }
+    }
+    None
+}
+
 async fn handle_stdin_ev(state: &mut State) -> Result<()> {
     let mut stdin = tokio::io::stdin();
     let mut ev: input_event = unsafe { mem::zeroed() };
@@ -346,6 +367,35 @@ async fn handle_stdin_ev(state: &mut State) -> Result<()> {
                 return Ok(());
             }
         }
+    }
+
+    // let foo: HashMap<_, _> = [
+    //     (1, 2)
+    // ].iter().cloned().collect();
+
+    if let Some(_) = replace_key_simple(&ev, MOUSE5_DOWN.type_, MOUSE5_DOWN.code, EV_KEY as u16, KEY_KP0 as u16) {
+        return Ok(());
+    }
+    if let Some(_) = replace_key_simple(&ev, MOUSE6_DOWN.type_, MOUSE6_DOWN.code, EV_KEY as u16, KEY_KP1 as u16) {
+        return Ok(());
+    }
+    if let Some(_) = replace_key_simple(&ev, MOUSE7_DOWN.type_, MOUSE7_DOWN.code, EV_KEY as u16, KEY_KP2 as u16) {
+        return Ok(());
+    }
+    if let Some(_) = replace_key_simple(&ev, MOUSE8_DOWN.type_, MOUSE8_DOWN.code, EV_KEY as u16, KEY_KP3 as u16) {
+        return Ok(());
+    }
+    if let Some(_) = replace_key_simple(&ev, MOUSE9_DOWN.type_, MOUSE9_DOWN.code, EV_KEY as u16, KEY_KP4 as u16) {
+        return Ok(());
+    }
+    if let Some(_) = replace_key_simple(&ev, MOUSE10_DOWN.type_, MOUSE10_DOWN.code, EV_KEY as u16, KEY_KP5 as u16) {
+        return Ok(());
+    }
+    if let Some(_) = replace_key_simple(&ev, MOUSE11_DOWN.type_, MOUSE11_DOWN.code, EV_KEY as u16, KEY_KP6 as u16) {
+        return Ok(());
+    }
+    if let Some(_) = replace_key_simple(&ev, MOUSE12_DOWN.type_, MOUSE12_DOWN.code, EV_KEY as u16, KEY_KP7 as u16) {
+        return Ok(());
     }
 
     print_event(&ev);
