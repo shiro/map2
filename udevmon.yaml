@@ -6,6 +6,6 @@
 
 - JOB: "intercept -g $DEVNODE | /home/shiro/bin/runinx /home/shiro/project/key-mods-rs/target/release/key-mods-rs | uinput -d $DEVNODE -c /home/shiro/project/key-mods-rs/keyboard.yaml"
   DEVICE:
-    NAME: "Logitech G700s Rechargeable Gaming Mouse"
+    NAME: "Logitech G700s.*"
     EVENTS:
       EV_REL: [REL_X,REL_Y]

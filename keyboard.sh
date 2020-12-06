@@ -3,7 +3,8 @@
 device='/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd'
 
 sudo systemctl stop udevmon.service
-sleep 2
+sleep 1
+echo start
 
 sudo intercept -g "$device" | target/debug/key-mods-rs | sudo uinput -d "$device" &
 # sudo intercept -g "$device" | sudo uinput -d "$device" &
@@ -12,11 +13,13 @@ sudo intercept -g "$device" | target/debug/key-mods-rs | sudo uinput -d "$device
 
 proc_pid=$?
 
-sleep 20
+sleep 10
 
-sudo kill $proc_pid
+echo stop
+
 sudo killall -9 intercept
 
-sudo systemctl start udevmon.service
+sleep 1
 
-exit 0
+sudo systemctl restart udevmon.service
+echo restarted udevmon

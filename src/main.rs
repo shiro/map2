@@ -27,6 +27,7 @@ use tokio::time::Duration;
 use tokio::stream::StreamExt;
 use std::sync::Arc;
 use nom::lib::std::collections::HashMap;
+use tokio::sync::mpsc::Sender;
 
 pub type time_t = i64;
 pub type suseconds_t = i64;
@@ -225,7 +226,9 @@ async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
+    let (mut tx2, mut rx2) = tokio::sync::mpsc::channel(128);
 
+    // x11 thread
     tokio::spawn(async move {
         let x11_state = Arc::new(x11_initialize().unwrap());
 
@@ -238,6 +241,14 @@ async fn main() -> Result<()> {
             if let Ok(Some(val)) = res {
                 tx1.send(val).await;
             }
+        }
+    });
+
+    // input ev thread
+    tokio::spawn(async move {
+        loop {
+            let ev = listen_to_key_events().await;
+            tx2.send(ev).await;
         }
     });
 
@@ -260,7 +271,9 @@ async fn main() -> Result<()> {
             Some(v) = rx1.recv() => {
                 state.active_window_class = Some(v.class);
             }
-            _ = handle_stdin_ev(&mut state) => {}
+            Some(ev) = rx2.recv() => {
+                handle_stdin_ev(&mut state, &ev);
+            }
             else => { break }
         }
     }
@@ -288,7 +301,7 @@ fn replace_key_simple(ev: &input_event, type_: u16, code: u16, replacement_type:
     None
 }
 
-async fn handle_stdin_ev(state: &mut State) -> Result<()> {
+async fn listen_to_key_events() -> input_event {
     let mut stdin = tokio::io::stdin();
     let mut ev: input_event = unsafe { mem::zeroed() };
 
@@ -302,7 +315,10 @@ async fn handle_stdin_ev(state: &mut State) -> Result<()> {
             }
         }
     }
+    ev
+}
 
+fn handle_stdin_ev(state: &mut State, ev: &input_event) -> Result<()> {
     if ev.type_ == EV_SYN as u16 || ev.type_ == EV_MSC as u16 && ev.code == MSC_SCAN as u16 {
         print_event(&ev);
         return Ok(());
