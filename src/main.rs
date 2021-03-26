@@ -28,6 +28,8 @@ use tokio::stream::StreamExt;
 use std::sync::Arc;
 use nom::lib::std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
+use std::path::Path;
+use tokio::fs::File;
 
 pub type time_t = i64;
 pub type suseconds_t = i64;
@@ -223,8 +225,19 @@ async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
     Ok(seconds)
 }
 
+async fn log_msg(msg: &str) {
+    let mut out_msg = format!("[DEBUG] {}\n", msg);
+
+    tokio::io::stderr().write_all(out_msg.as_bytes()).await.unwrap();
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    log_msg("hi").await;
+
+    let mut stdin = tokio::io::stdin();
+    let mut read_ev: input_event = unsafe { mem::zeroed() };
+
     let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
     let (mut tx2, mut rx2) = tokio::sync::mpsc::channel(128);
 
@@ -247,8 +260,8 @@ async fn main() -> Result<()> {
     // input ev thread
     tokio::spawn(async move {
         loop {
-            let ev = listen_to_key_events().await;
-            tx2.send(ev).await;
+            listen_to_key_events(&mut read_ev, &mut stdin).await;
+            tx2.send(read_ev).await;
         }
     });
 
@@ -301,13 +314,10 @@ fn replace_key_simple(ev: &input_event, type_: u16, code: u16, replacement_type:
     None
 }
 
-async fn listen_to_key_events() -> input_event {
-    let mut stdin = tokio::io::stdin();
-    let mut ev: input_event = unsafe { mem::zeroed() };
-
+async fn listen_to_key_events(ev: &mut input_event, input: &mut tokio::io::Stdin) {
     unsafe {
-        let slice = any_as_u8_slice_mut(&mut ev);
-        match stdin.read_exact(slice).await {
+        let slice = any_as_u8_slice_mut(ev);
+        match input.read_exact(slice).await {
             Ok(_) => (),
             Err(_) => {
                 ::std::mem::forget(slice);
@@ -315,7 +325,6 @@ async fn listen_to_key_events() -> input_event {
             }
         }
     }
-    ev
 }
 
 fn handle_stdin_ev(state: &mut State, ev: &input_event) -> Result<()> {

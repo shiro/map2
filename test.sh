@@ -1,12 +1,12 @@
 #!/bin/bash
 
-device='/dev/input/mice'
-
 sudo systemctl stop udevmon.service
 sleep 1
 echo start
 
-sudo intercept -g "$device" | sudo nice -n -20 target/debug/key-mods-rs | sudo uinput -d "$device" -c /home/shiro/project/key-mods-rs/keyboard.yaml &
+export RUST_BACKTRACE=1
+
+sudo -E udevmon -c udevmon.yaml &
 
 proc_pid=$?
 
