@@ -1,5 +1,8 @@
 #![feature(type_ascription)]
 #![feature(async_closure)]
+#![feature(impl_trait_in_bindings)]
+#![feature(unboxed_closures)]
+#![feature(trait_alias)]
 
 use tokio::prelude::*;
 use futures::future::{Future, lazy, select};
@@ -15,7 +18,6 @@ use std::process::exit;
 use std::{io, mem, slice, thread, time};
 use std::io::{Read, stdout, Write};
 
-// use anyhow::Result;
 use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL, KEY_F13, KEY_A, KEY_F14, KEY_F15, KEY_F16, KEY_F17, KEY_NUMERIC_0, KEY_NUMERIC_1, KEY_NUMERIC_3, KEY_NUMERIC_4, KEY_NUMERIC_5, KEY_NUMERIC_6, KEY_NUMERIC_7, KEY_NUMERIC_8, KEY_KP0, KEY_KP1, KEY_KP2, KEY_KP3, KEY_KP4, KEY_KP5, KEY_KP6, KEY_KP7};
 use std::borrow::{BorrowMut, Borrow};
 use crate::x11::{x11_get_active_window, x11_test, x11_initialize};
@@ -327,7 +329,32 @@ async fn listen_to_key_events(ev: &mut input_event, input: &mut tokio::io::Stdin
     }
 }
 
-fn handle_stdin_ev(state: &mut State, ev: &input_event) -> Result<()> {
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+struct key { key_type: i32, code: i32 }
+
+static MOUSE5: key = key { key_type: EV_KEY, code: 277 };
+static MOUSE6: key = key { key_type: EV_KEY, code: 278 };
+static MOUSE7: key = key { key_type: EV_KEY, code: 279 };
+static MOUSE8: key = key { key_type: EV_KEY, code: 280 };
+static MOUSE9: key = key { key_type: EV_KEY, code: 281 };
+static MOUSE10: key = key { key_type: EV_KEY, code: 282 };
+static MOUSE11: key = key { key_type: EV_KEY, code: 283 };
+static MOUSE12: key = key { key_type: EV_KEY, code: 284 };
+static KPD0: key = key { key_type: EV_KEY, code: KEY_KP0 };
+static KPD1: key = key { key_type: EV_KEY, code: KEY_KP1 };
+static KPD2: key = key { key_type: EV_KEY, code: KEY_KP2 };
+static KPD3: key = key { key_type: EV_KEY, code: KEY_KP3 };
+static KPD4: key = key { key_type: EV_KEY, code: KEY_KP4 };
+static KPD5: key = key { key_type: EV_KEY, code: KEY_KP5 };
+static KPD6: key = key { key_type: EV_KEY, code: KEY_KP6 };
+static KPD7: key = key { key_type: EV_KEY, code: KEY_KP7 };
+
+static TYPE_UP: i32 = 0;
+static TYPE_DOWN: i32 = 1;
+static TYPE_REPEAT: i32 = 2;
+
+fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
     if ev.type_ == EV_SYN as u16 || ev.type_ == EV_MSC as u16 && ev.code == MSC_SCAN as u16 {
         print_event(&ev);
         return Ok(());
@@ -371,57 +398,85 @@ fn handle_stdin_ev(state: &mut State, ev: &input_event) -> Result<()> {
         }
     }
 
-    if state.active_window_class == Some("firefox".to_string()) {
-        if ev.type_ == EV_KEY as u16 && ev.code == MOUSE5_DOWN.code {
-            if ev.value == MOUSE5_DOWN.value {
-                print_event(&LEFTCTRL_DOWN);
-                print_event(&SYN);
-                thread::sleep(time::Duration::from_micros(20000));
-                print_event(&TAB_DOWN);
 
-                return Ok(());
-            } else if ev.value == MOUSE5_REPEAT.value {
-                print_event(&TAB_REPEAT);
-                return Ok(());
-            } else if ev.value == MOUSE5_UP.value {
-                print_event(&LEFTCTRL_UP);
-                print_event(&SYN);
-                thread::sleep(time::Duration::from_micros(20000));
-                print_event(&TAB_UP);
 
-                return Ok(());
-            }
+    type key_state = i32;
+    struct key_mappings(HashMap<(key, key_state), (key, key_state)>);
+    let mut mappings = key_mappings(HashMap::new());
+
+    impl key_mappings {
+        fn replace_key_click(&mut self, from: key, to: key) {
+            self.0.insert((from, TYPE_DOWN), (to, TYPE_DOWN));
+            self.0.insert((from, TYPE_UP), (to, TYPE_UP));
+            self.0.insert((from, TYPE_REPEAT), (to, TYPE_REPEAT));
         }
     }
 
-    // let foo: HashMap<_, _> = [
-    //     (1, 2)
-    // ].iter().cloned().collect();
+    mappings.replace_key_click(MOUSE5, KPD0);
+    mappings.replace_key_click(MOUSE6, KPD1);
+    mappings.replace_key_click(MOUSE7, KPD2);
+    mappings.replace_key_click(MOUSE8, KPD3);
+    mappings.replace_key_click(MOUSE9, KPD4);
+    mappings.replace_key_click(MOUSE10, KPD5);
+    mappings.replace_key_click(MOUSE11, KPD6);
+    mappings.replace_key_click(MOUSE12, KPD7);
 
-    if let Some(_) = replace_key_simple(&ev, MOUSE5_DOWN.type_, MOUSE5_DOWN.code, EV_KEY as u16, KEY_KP0 as u16) {
+
+
+    trait AppHandler<'a> = Fn<(&'a mut State, &'a input_event), Output=Option<()>> + 'static;
+    type Callback<'a> = Box<(AppHandler<'a>)>;
+    fn mk_callback<'a, F>(f: F) -> Callback<'a>
+        where F: AppHandler<'a> {
+        Box::new(f) as Callback
+    }
+
+    let mut app_handlers = HashMap::new();
+    app_handlers.insert("firefox",
+                        mk_callback(|state, ev: &input_event| -> Option<()> {
+                            if ev.type_ == EV_KEY as u16 && ev.code == MOUSE5_DOWN.code {
+                                if ev.value == MOUSE5_DOWN.value {
+                                    print_event(&LEFTCTRL_DOWN);
+                                    print_event(&SYN);
+                                    thread::sleep(time::Duration::from_micros(20000));
+                                    print_event(&TAB_DOWN);
+
+                                    return Some(());
+                                } else if ev.value == MOUSE5_REPEAT.value {
+                                    print_event(&TAB_REPEAT);
+                                    return Some(());
+                                } else if ev.value == MOUSE5_UP.value {
+                                    print_event(&LEFTCTRL_UP);
+                                    print_event(&SYN);
+                                    thread::sleep(time::Duration::from_micros(20000));
+                                    print_event(&TAB_UP);
+
+                                    return Some(());
+                                }
+                            }
+                            None
+                        }));
+
+    if state.active_window_class.as_ref()
+        .and_then(|v| app_handlers.get(v.as_str()))
+        .and_then(|cb| cb(&mut state, &ev))
+        .is_some() {
         return Ok(());
     }
-    if let Some(_) = replace_key_simple(&ev, MOUSE6_DOWN.type_, MOUSE6_DOWN.code, EV_KEY as u16, KEY_KP1 as u16) {
-        return Ok(());
+
+
+
+
+    let from_key = key { key_type: ev.type_ as i32, code: ev.code as i32 };
+    let from_val = ev.value;
+    if let Some(to) = mappings.0.get(&(from_key, from_val)) {
+        let (to_key, to_val) = to;
+
+        print_event(&make_event(
+            to_key.key_type as u16,
+            to_key.code as u16,
+            *to_val));
     }
-    if let Some(_) = replace_key_simple(&ev, MOUSE7_DOWN.type_, MOUSE7_DOWN.code, EV_KEY as u16, KEY_KP2 as u16) {
-        return Ok(());
-    }
-    if let Some(_) = replace_key_simple(&ev, MOUSE8_DOWN.type_, MOUSE8_DOWN.code, EV_KEY as u16, KEY_KP3 as u16) {
-        return Ok(());
-    }
-    if let Some(_) = replace_key_simple(&ev, MOUSE9_DOWN.type_, MOUSE9_DOWN.code, EV_KEY as u16, KEY_KP4 as u16) {
-        return Ok(());
-    }
-    if let Some(_) = replace_key_simple(&ev, MOUSE10_DOWN.type_, MOUSE10_DOWN.code, EV_KEY as u16, KEY_KP5 as u16) {
-        return Ok(());
-    }
-    if let Some(_) = replace_key_simple(&ev, MOUSE11_DOWN.type_, MOUSE11_DOWN.code, EV_KEY as u16, KEY_KP6 as u16) {
-        return Ok(());
-    }
-    if let Some(_) = replace_key_simple(&ev, MOUSE12_DOWN.type_, MOUSE12_DOWN.code, EV_KEY as u16, KEY_KP7 as u16) {
-        return Ok(());
-    }
+
 
     print_event(&ev);
 
