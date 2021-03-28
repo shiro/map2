@@ -3,6 +3,7 @@
 #![feature(impl_trait_in_bindings)]
 #![feature(unboxed_closures)]
 #![feature(trait_alias)]
+#![feature(label_break_value)]
 
 use tokio::prelude::*;
 use futures::future::{Future, lazy, select};
@@ -16,22 +17,17 @@ mod x11;
 use tokio::prelude::*;
 use std::process::exit;
 use std::{io, mem, slice, thread, time};
-use std::io::{Read, stdout, Write};
+use std::io::{stdout, Write};
 
 use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL, KEY_F13, KEY_A, KEY_F14, KEY_F15, KEY_F16, KEY_F17, KEY_NUMERIC_0, KEY_NUMERIC_1, KEY_NUMERIC_3, KEY_NUMERIC_4, KEY_NUMERIC_5, KEY_NUMERIC_6, KEY_NUMERIC_7, KEY_NUMERIC_8, KEY_KP0, KEY_KP1, KEY_KP2, KEY_KP3, KEY_KP4, KEY_KP5, KEY_KP6, KEY_KP7};
-use std::borrow::{BorrowMut, Borrow};
 use crate::x11::{x11_get_active_window, x11_test, x11_initialize};
 use tokio::task;
-// use std::error::Error;
 use anyhow::Result;
-use tokio::sync::oneshot;
 use tokio::time::Duration;
-use tokio::stream::StreamExt;
 use std::sync::Arc;
 use nom::lib::std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
-use std::path::Path;
-use tokio::fs::File;
+use crate::x11::ActiveWindowResult;
 
 pub type time_t = i64;
 pub type suseconds_t = i64;
@@ -64,8 +60,9 @@ pub struct State {
     disable_alt_mod: bool,
 
     ignore_list: Vec<input_event>,
+    mappings: KeyMappings,
 
-    active_window_class: Option<String>,
+    active_window: Option<ActiveWindowResult>,
 }
 
 unsafe fn any_as_u8_slice_mut<T: Sized>(p: &mut T) -> &mut [u8] {
@@ -86,11 +83,11 @@ static EV_SIZE: usize = mem::size_of::<input_event>();
 
 fn print_event(ev: &input_event) {
     unsafe {
-        stdout().write_all(any_as_u8_slice(ev));
+        stdout().write_all(any_as_u8_slice(ev)).unwrap();
         // if ev.type_ == EV_KEY as u16 {
         //     println!("{:?}", ev);
         // }
-        stdout().flush();
+        stdout().flush().unwrap();
     }
 }
 
@@ -227,15 +224,21 @@ async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
     Ok(seconds)
 }
 
-async fn log_msg(msg: &str) {
-    let mut out_msg = format!("[DEBUG] {}\n", msg);
+async fn log_msg_async(msg: &str) {
+    let out_msg = format!("[DEBUG] {}\n", msg);
 
     tokio::io::stderr().write_all(out_msg.as_bytes()).await.unwrap();
 }
 
+fn log_msg(msg: &str) {
+    let out_msg = format!("[DEBUG] {}\n", msg);
+
+    io::stderr().write_all(out_msg.as_bytes()).unwrap();
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    log_msg("hi").await;
+    log_msg_async("hi").await;
 
     let mut stdin = tokio::io::stdin();
     let mut read_ev: input_event = unsafe { mem::zeroed() };
@@ -254,7 +257,7 @@ async fn main() -> Result<()> {
             }).await.unwrap();
 
             if let Ok(Some(val)) = res {
-                tx1.send(val).await;
+                tx1.send(val).await.unwrap_or_else(|_| panic!());
             }
         }
     });
@@ -263,7 +266,7 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         loop {
             listen_to_key_events(&mut read_ev, &mut stdin).await;
-            tx2.send(read_ev).await;
+            tx2.send(read_ev).await.unwrap();
         }
     });
 
@@ -278,16 +281,48 @@ async fn main() -> Result<()> {
         right_alt_is_down: false,
         disable_alt_mod: false,
         ignore_list: vec!(),
-        active_window_class: None,
+        mappings: KeyMappings::new(),
+        active_window: None,
     };
+
+
+    state.mappings.replace_key_click(KeyClickAction::new(MOUSE5), KeyClickAction::new(KPD0));
+    state.mappings.replace_key_click(KeyClickAction::new(MOUSE6), KeyClickAction::new(KPD1));
+    state.mappings.replace_key_click(KeyClickAction::new(MOUSE7), KeyClickAction::new(KPD2));
+    state.mappings.replace_key_click(KeyClickAction::new(MOUSE8), KeyClickAction::new(KPD3));
+    state.mappings.replace_key_click(KeyClickAction::new(MOUSE9), KeyClickAction::new(KPD4));
+    state.mappings.replace_key_click(KeyClickAction::new(MOUSE10), KeyClickAction::new(KPD5));
+    state.mappings.replace_key_click(KeyClickAction::new(MOUSE11), KeyClickAction::new(KPD6));
+    state.mappings.replace_key_click(KeyClickAction::new(MOUSE12), KeyClickAction::new(KPD7));
+
+
+    // TODO make the API prettier
+    { // firefox
+        let mut to = KeyClickAction::new(TAB);
+        to.modifiers.ctrl = true;
+        state.mappings.replace_key_click_cond(KeyClickAction::new(MOUSE5), to, Some(KeyActionCondition { window_class_name: Some("firefox".to_string()) }));
+    }
+
+    fn handle_active_window_change(state: &mut State) {
+        trait AppHandler<'a> = FnMut<(&'a mut State, ), Output=()> + 'static;
+        type Callback<'a> = Box<AppHandler<'a>>;
+        fn mk_callback<'a, F>(f: F) -> Callback<'a>
+            where F: AppHandler<'a> { Box::new(f) as Callback }
+
+        let mut app_handlers = HashMap::new();
+        app_handlers.insert("firefox", mk_callback(|state: &mut State| {
+            // TODO refactor on_change to handle regex later
+        }));
+    }
 
     loop {
         tokio::select! {
-            Some(v) = rx1.recv() => {
-                state.active_window_class = Some(v.class);
+            Some(window) = rx1.recv() => {
+                state.active_window = Some(window);
+                handle_active_window_change(&mut state);
             }
             Some(ev) = rx2.recv() => {
-                handle_stdin_ev(&mut state, &ev);
+                handle_stdin_ev(&mut state, &ev).unwrap();
             }
             else => { break }
         }
@@ -298,22 +333,6 @@ async fn main() -> Result<()> {
 
 fn make_event(type_: u16, code: u16, value: i32) -> input_event {
     input_event { type_, code, value, time: DUMMY_TIME }
-}
-
-fn replace_key_simple(ev: &input_event, type_: u16, code: u16, replacement_type: u16, replacement_code: u16) -> Option<()> {
-    if ev.type_ == type_ && ev.code == code {
-        if ev.value == 0 {
-            print_event(&make_event(replacement_type, replacement_code, 0));
-            return Some(());
-        } else if ev.value == 1 {
-            print_event(&make_event(replacement_type, replacement_code, 1));
-            return Some(());
-        } else if ev.value == 2 {
-            print_event(&make_event(replacement_type, replacement_code, 2));
-            return Some(());
-        }
-    }
-    None
 }
 
 async fn listen_to_key_events(ev: &mut input_event, input: &mut tokio::io::Stdin) {
@@ -349,6 +368,61 @@ impl KeyModifiers {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct KeyAction { key: Key, value: i32, modifiers: KeyModifiers }
+
+impl KeyAction { pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value, modifiers: KeyModifiers::new() } } }
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+struct KeyClickAction { key: Key, modifiers: KeyModifiers }
+
+impl KeyClickAction { pub fn new(key: Key) -> Self { KeyClickAction { key, modifiers: KeyModifiers::new() } } }
+
+#[derive(Clone, Eq, PartialEq, Hash)]
+struct KeyActionCondition { window_class_name: Option<String> }
+
+#[derive(Clone, Eq, PartialEq, Hash)]
+struct KeyMappingsValue {
+    action: KeyAction,
+    cond: Option<KeyActionCondition>,
+}
+
+impl KeyMappingsValue { pub fn new(action: KeyAction, cond: Option<KeyActionCondition>) -> Self { KeyMappingsValue { action, cond } } }
+
+#[derive(Clone, Eq, PartialEq)]
+struct KeyMappings(HashMap<KeyAction, Vec<KeyMappingsValue>>);
+
+impl KeyMappings {
+    fn new() -> Self {
+        KeyMappings { 0: Default::default() }
+    }
+
+    fn replace_key(&mut self, from: KeyAction, to: KeyAction) { self.replace_key_cond(from, to, None); }
+
+    fn replace_key_cond(&mut self, from: KeyAction, to: KeyAction, cond: Option<KeyActionCondition>) {
+        let value_list = self.0.entry(from).or_insert(vec![]);//.or(vec!());
+        value_list.push(KeyMappingsValue::new(to, cond.or(None)));
+    }
+
+    fn replace_key_click(&mut self, from: KeyClickAction, to: KeyClickAction) { self.replace_key_click_cond(from, to, None); }
+
+    fn replace_key_click_cond(&mut self, from: KeyClickAction, to: KeyClickAction, cond: Option<KeyActionCondition>) {
+        self.replace_key_cond(
+            KeyAction { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers },
+            KeyAction { key: to.key, value: TYPE_DOWN, modifiers: to.modifiers },
+            cond.clone(),
+        );
+        self.replace_key_cond(
+            KeyAction { key: from.key, value: TYPE_UP, modifiers: from.modifiers },
+            KeyAction { key: to.key, value: TYPE_UP, modifiers: to.modifiers },
+            cond.clone(),
+        );
+
+        self.replace_key_cond(
+            KeyAction { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers },
+            KeyAction { key: to.key, value: TYPE_REPEAT, modifiers: to.modifiers },
+            cond,
+        );
+    }
+}
 
 const fn make_key(code: i32) -> Key { Key { key_type: EV_KEY, code } }
 
@@ -419,73 +493,7 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
         }
     }
 
-
-    struct KeyMappings(HashMap<KeyAction, KeyAction>);
-    let mut mappings = KeyMappings(HashMap::new());
-
-    impl KeyMappings {
-        fn replace_key(&mut self, from: Key, from_value: i32, to: Key, to_value: i32) {
-            self.replace_key_mods(from, from_value, KeyModifiers::new(), to, to_value, KeyModifiers::new());
-        }
-
-        fn replace_key_mods(&mut self, from: Key, from_value: i32, from_modifiers: KeyModifiers, to: Key, to_value: i32, to_modifiers: KeyModifiers) {
-            self.replace_key_action(
-                KeyAction { key: from, value: from_value, modifiers: from_modifiers },
-                KeyAction { key: to, value: to_value, modifiers: to_modifiers },
-            );
-        }
-
-        fn replace_key_click(&mut self, from: Key, to: Key) {
-            self.replace_key(from, TYPE_DOWN, to, TYPE_DOWN);
-            self.replace_key(from, TYPE_UP, to, TYPE_UP);
-            self.replace_key(from, TYPE_REPEAT, to, TYPE_REPEAT);
-        }
-
-        fn replace_key_click_mods(&mut self, from: Key, from_modifiers: KeyModifiers, to: Key, to_modifiers: KeyModifiers) {
-            self.replace_key_mods(from, TYPE_DOWN, from_modifiers, to, TYPE_DOWN, to_modifiers);
-            self.replace_key_mods(from, TYPE_UP, from_modifiers, to, TYPE_UP, to_modifiers);
-            self.replace_key_mods(from, TYPE_REPEAT, from_modifiers, to, TYPE_REPEAT, to_modifiers);
-        }
-
-
-        fn replace_key_action(&mut self, from: KeyAction, to: KeyAction) {
-            self.0.insert(from, to);
-        }
-    }
-
-    mappings.replace_key_click(MOUSE5, KPD0);
-    mappings.replace_key_click(MOUSE6, KPD1);
-    mappings.replace_key_click(MOUSE7, KPD2);
-    mappings.replace_key_click(MOUSE8, KPD3);
-    mappings.replace_key_click(MOUSE9, KPD4);
-    mappings.replace_key_click(MOUSE10, KPD5);
-    mappings.replace_key_click(MOUSE11, KPD6);
-    mappings.replace_key_click(MOUSE12, KPD7);
-
-
-
-    trait AppHandler<'a> = FnMut<(&'a mut KeyMappings, &'a mut State, &'a input_event), Output=()> + 'static;
-    type Callback<'a> = Box<(AppHandler<'a>)>;
-    fn mk_callback<'a, F>(f: F) -> Callback<'a>
-        where F: AppHandler<'a> {
-        Box::new(f) as Callback
-    }
-
-    {
-        let mut app_handlers = HashMap::new();
-        app_handlers.insert("firefox", mk_callback(|mappings: &mut KeyMappings, state, ev: &input_event| {
-            let mut to_mods = KeyModifiers::new();
-            to_mods.ctrl = true;
-
-            mappings.replace_key_click_mods(MOUSE5, KeyModifiers::new(), TAB, to_mods);
-        }));
-
-        state.active_window_class.as_ref()
-            .and_then(|v| app_handlers.get_mut(v.as_str()))
-            .and_then(|cb| { cb(&mut mappings, &mut state, &ev); Some(()) });
-    }
-
-
+    let mappings = &mut state.mappings;
     let from_key_action = KeyAction {
         key: Key { key_type: ev.type_ as i32, code: ev.code as i32 },
         value: ev.value,
@@ -496,31 +504,57 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
             meta: state.meta_is_down.clone(),
         },
     };
-    if let Some(to) = mappings.0.get(&from_key_action) {
-        let to_action = to;
-        let mut using_modifiers = false;
 
-        if to_action.key.key_type != EV_KEY || to_action.value != TYPE_REPEAT {
-            if to_action.modifiers.ctrl {
-                print_event(&make_event(
-                    LEFT_CTRL.key_type as u16,
-                    LEFT_CTRL.code as u16,
-                    to_action.value));
-                using_modifiers = true;
+    'b0: {
+        if let Some(to) = mappings.0.get(&from_key_action) {
+            let mut _to_action: Option<&KeyMappingsValue> = None;
+
+            for mapping_list_item in to.iter() {
+                // check conditions and abort if it doesn't match
+                if let Some(cond) = &mapping_list_item.cond {
+                    if let Some(window_class_name) = &cond.window_class_name {
+                        if let Some(active_window) = &state.active_window {
+                            if *window_class_name != active_window.class {
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        }
+                    }
+                }
+
+                _to_action = Some(mapping_list_item);
             }
+
+            if _to_action.is_none() {
+                break 'b0;
+            }
+            let to_action = _to_action.unwrap().action;
+
+            let mut using_modifiers = false;
+
+            if to_action.key.key_type != EV_KEY || to_action.value != TYPE_REPEAT {
+                if to_action.modifiers.ctrl {
+                    print_event(&make_event(
+                        LEFT_CTRL.key_type as u16,
+                        LEFT_CTRL.code as u16,
+                        to_action.value));
+                    using_modifiers = true;
+                }
+            }
+
+            if using_modifiers {
+                print_event(&SYN);
+                thread::sleep(time::Duration::from_micros(20000));
+            }
+
+            print_event(&make_event(
+                to_action.key.key_type as u16,
+                to_action.key.code as u16,
+                to_action.value));
+
+            return Ok(());
         }
-
-        if using_modifiers {
-            print_event(&SYN);
-            thread::sleep(time::Duration::from_micros(20000));
-        }
-
-        print_event(&make_event(
-            to_action.key.key_type as u16,
-            to_action.key.code as u16,
-            to_action.value));
-
-        return Ok(());
     }
 
 

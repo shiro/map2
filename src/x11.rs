@@ -13,6 +13,7 @@ pub struct ActiveWindowResult {
     pub(crate) name: String,
 }
 
+#[allow(non_snake_case)]
 pub struct X11State<S: Connection + Send + Sync> {
     con: S,
     NET_ACTIVE_WINDOW: Atom,
@@ -26,6 +27,7 @@ pub fn x11_initialize() -> Result<X11State<impl Connection + Send + Sync>> {
     con.change_window_attributes(root, &ChangeWindowAttributesAux::new()
         .event_mask(Some(EventMask::SubstructureNotify | EventMask::PropertyChange)))?;
 
+    #[allow(non_snake_case)]
     let NET_ACTIVE_WINDOW: Atom = intern_atom(&con, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
 
     Ok(X11State {

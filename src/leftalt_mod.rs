@@ -59,8 +59,8 @@ pub fn leftalt_mod(ev: &input_event, state: &mut State) -> bool {
         //     return true;
         // }
 
-        if let Some(newEv) = mapped_key {
-            print_event(newEv);
+        if let Some(new_ev) = mapped_key {
+            print_event(new_ev);
             return true;
         }
 
