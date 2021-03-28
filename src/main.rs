@@ -331,24 +331,45 @@ async fn listen_to_key_events(ev: &mut input_event, input: &mut tokio::io::Stdin
 
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct key { key_type: i32, code: i32 }
+struct Key { key_type: i32, code: i32 }
 
-static MOUSE5: key = key { key_type: EV_KEY, code: 277 };
-static MOUSE6: key = key { key_type: EV_KEY, code: 278 };
-static MOUSE7: key = key { key_type: EV_KEY, code: 279 };
-static MOUSE8: key = key { key_type: EV_KEY, code: 280 };
-static MOUSE9: key = key { key_type: EV_KEY, code: 281 };
-static MOUSE10: key = key { key_type: EV_KEY, code: 282 };
-static MOUSE11: key = key { key_type: EV_KEY, code: 283 };
-static MOUSE12: key = key { key_type: EV_KEY, code: 284 };
-static KPD0: key = key { key_type: EV_KEY, code: KEY_KP0 };
-static KPD1: key = key { key_type: EV_KEY, code: KEY_KP1 };
-static KPD2: key = key { key_type: EV_KEY, code: KEY_KP2 };
-static KPD3: key = key { key_type: EV_KEY, code: KEY_KP3 };
-static KPD4: key = key { key_type: EV_KEY, code: KEY_KP4 };
-static KPD5: key = key { key_type: EV_KEY, code: KEY_KP5 };
-static KPD6: key = key { key_type: EV_KEY, code: KEY_KP6 };
-static KPD7: key = key { key_type: EV_KEY, code: KEY_KP7 };
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+struct KeyModifiers {
+    ctrl: bool,
+    shift: bool,
+    alt: bool,
+    meta: bool,
+}
+
+impl KeyModifiers {
+    fn new() -> KeyModifiers {
+        KeyModifiers { ctrl: false, shift: false, alt: false, meta: false }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+struct KeyAction { key: Key, value: i32, modifiers: KeyModifiers }
+
+const fn make_key(code: i32) -> Key { Key { key_type: EV_KEY, code } }
+
+static MOUSE5: Key = make_key(277);
+static MOUSE6: Key = make_key(278);
+static MOUSE7: Key = make_key(279);
+static MOUSE8: Key = make_key(280);
+static MOUSE9: Key = make_key(281);
+static MOUSE10: Key = make_key(282);
+static MOUSE11: Key = make_key(283);
+static MOUSE12: Key = make_key(284);
+static LEFT_CTRL: Key = make_key(KEY_LEFTCTRL);
+static TAB: Key = make_key(KEY_TAB);
+static KPD0: Key = make_key(KEY_KP0);
+static KPD1: Key = make_key(KEY_KP1);
+static KPD2: Key = make_key(KEY_KP2);
+static KPD3: Key = make_key(KEY_KP3);
+static KPD4: Key = make_key(KEY_KP4);
+static KPD5: Key = make_key(KEY_KP5);
+static KPD6: Key = make_key(KEY_KP6);
+static KPD7: Key = make_key(KEY_KP7);
 
 static TYPE_UP: i32 = 0;
 static TYPE_DOWN: i32 = 1;
@@ -399,16 +420,36 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
     }
 
 
+    struct KeyMappings(HashMap<KeyAction, KeyAction>);
+    let mut mappings = KeyMappings(HashMap::new());
 
-    type key_state = i32;
-    struct key_mappings(HashMap<(key, key_state), (key, key_state)>);
-    let mut mappings = key_mappings(HashMap::new());
+    impl KeyMappings {
+        fn replace_key(&mut self, from: Key, from_value: i32, to: Key, to_value: i32) {
+            self.replace_key_mods(from, from_value, KeyModifiers::new(), to, to_value, KeyModifiers::new());
+        }
 
-    impl key_mappings {
-        fn replace_key_click(&mut self, from: key, to: key) {
-            self.0.insert((from, TYPE_DOWN), (to, TYPE_DOWN));
-            self.0.insert((from, TYPE_UP), (to, TYPE_UP));
-            self.0.insert((from, TYPE_REPEAT), (to, TYPE_REPEAT));
+        fn replace_key_mods(&mut self, from: Key, from_value: i32, from_modifiers: KeyModifiers, to: Key, to_value: i32, to_modifiers: KeyModifiers) {
+            self.replace_key_action(
+                KeyAction { key: from, value: from_value, modifiers: from_modifiers },
+                KeyAction { key: to, value: to_value, modifiers: to_modifiers },
+            );
+        }
+
+        fn replace_key_click(&mut self, from: Key, to: Key) {
+            self.replace_key(from, TYPE_DOWN, to, TYPE_DOWN);
+            self.replace_key(from, TYPE_UP, to, TYPE_UP);
+            self.replace_key(from, TYPE_REPEAT, to, TYPE_REPEAT);
+        }
+
+        fn replace_key_click_mods(&mut self, from: Key, from_modifiers: KeyModifiers, to: Key, to_modifiers: KeyModifiers) {
+            self.replace_key_mods(from, TYPE_DOWN, from_modifiers, to, TYPE_DOWN, to_modifiers);
+            self.replace_key_mods(from, TYPE_UP, from_modifiers, to, TYPE_UP, to_modifiers);
+            self.replace_key_mods(from, TYPE_REPEAT, from_modifiers, to, TYPE_REPEAT, to_modifiers);
+        }
+
+
+        fn replace_key_action(&mut self, from: KeyAction, to: KeyAction) {
+            self.0.insert(from, to);
         }
     }
 
@@ -423,58 +464,63 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
 
 
 
-    trait AppHandler<'a> = Fn<(&'a mut State, &'a input_event), Output=Option<()>> + 'static;
+    trait AppHandler<'a> = FnMut<(&'a mut KeyMappings, &'a mut State, &'a input_event), Output=()> + 'static;
     type Callback<'a> = Box<(AppHandler<'a>)>;
     fn mk_callback<'a, F>(f: F) -> Callback<'a>
         where F: AppHandler<'a> {
         Box::new(f) as Callback
     }
 
-    let mut app_handlers = HashMap::new();
-    app_handlers.insert("firefox",
-                        mk_callback(|state, ev: &input_event| -> Option<()> {
-                            if ev.type_ == EV_KEY as u16 && ev.code == MOUSE5_DOWN.code {
-                                if ev.value == MOUSE5_DOWN.value {
-                                    print_event(&LEFTCTRL_DOWN);
-                                    print_event(&SYN);
-                                    thread::sleep(time::Duration::from_micros(20000));
-                                    print_event(&TAB_DOWN);
+    {
+        let mut app_handlers = HashMap::new();
+        app_handlers.insert("firefox", mk_callback(|mappings: &mut KeyMappings, state, ev: &input_event| {
+            let mut to_mods = KeyModifiers::new();
+            to_mods.ctrl = true;
 
-                                    return Some(());
-                                } else if ev.value == MOUSE5_REPEAT.value {
-                                    print_event(&TAB_REPEAT);
-                                    return Some(());
-                                } else if ev.value == MOUSE5_UP.value {
-                                    print_event(&LEFTCTRL_UP);
-                                    print_event(&SYN);
-                                    thread::sleep(time::Duration::from_micros(20000));
-                                    print_event(&TAB_UP);
+            mappings.replace_key_click_mods(MOUSE5, KeyModifiers::new(), TAB, to_mods);
+        }));
 
-                                    return Some(());
-                                }
-                            }
-                            None
-                        }));
-
-    if state.active_window_class.as_ref()
-        .and_then(|v| app_handlers.get(v.as_str()))
-        .and_then(|cb| cb(&mut state, &ev))
-        .is_some() {
-        return Ok(());
+        state.active_window_class.as_ref()
+            .and_then(|v| app_handlers.get_mut(v.as_str()))
+            .and_then(|cb| { cb(&mut mappings, &mut state, &ev); Some(()) });
     }
 
 
+    let from_key_action = KeyAction {
+        key: Key { key_type: ev.type_ as i32, code: ev.code as i32 },
+        value: ev.value,
+        modifiers: KeyModifiers {
+            ctrl: state.leftcontrol_is_down.clone(),
+            shift: state.shift_is_down.clone(),
+            alt: state.leftalt_is_down.clone(),
+            meta: state.meta_is_down.clone(),
+        },
+    };
+    if let Some(to) = mappings.0.get(&from_key_action) {
+        let to_action = to;
+        let mut using_modifiers = false;
 
+        if to_action.key.key_type != EV_KEY || to_action.value != TYPE_REPEAT {
+            if to_action.modifiers.ctrl {
+                print_event(&make_event(
+                    LEFT_CTRL.key_type as u16,
+                    LEFT_CTRL.code as u16,
+                    to_action.value));
+                using_modifiers = true;
+            }
+        }
 
-    let from_key = key { key_type: ev.type_ as i32, code: ev.code as i32 };
-    let from_val = ev.value;
-    if let Some(to) = mappings.0.get(&(from_key, from_val)) {
-        let (to_key, to_val) = to;
+        if using_modifiers {
+            print_event(&SYN);
+            thread::sleep(time::Duration::from_micros(20000));
+        }
 
         print_event(&make_event(
-            to_key.key_type as u16,
-            to_key.code as u16,
-            *to_val));
+            to_action.key.key_type as u16,
+            to_action.key.code as u16,
+            to_action.value));
+
+        return Ok(());
     }
 
 
