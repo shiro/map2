@@ -236,6 +236,18 @@ fn log_msg(msg: &str) {
     io::stderr().write_all(out_msg.as_bytes()).unwrap();
 }
 
+
+enum ScopeInstruction {
+    Scope(Scope),
+    KeyMapping(KeyMappings),
+}
+
+struct Scope {
+    condition: Option<KeyActionCondition>,
+    instructions: Vec<ScopeInstruction>,
+}
+
+
 #[tokio::main]
 async fn main() -> Result<()> {
     log_msg_async("hi").await;
@@ -285,41 +297,76 @@ async fn main() -> Result<()> {
         active_window: None,
     };
 
+    let mut global_scope = Scope {
+        condition: None,
+        instructions: vec![],
+    };
 
-    state.mappings.replace_key_click(KeyClickAction::new(MOUSE5), KeyClickAction::new(KPD0));
-    state.mappings.replace_key_click(KeyClickAction::new(MOUSE6), KeyClickAction::new(KPD1));
-    state.mappings.replace_key_click(KeyClickAction::new(MOUSE7), KeyClickAction::new(KPD2));
-    state.mappings.replace_key_click(KeyClickAction::new(MOUSE8), KeyClickAction::new(KPD3));
-    state.mappings.replace_key_click(KeyClickAction::new(MOUSE9), KeyClickAction::new(KPD4));
-    state.mappings.replace_key_click(KeyClickAction::new(MOUSE10), KeyClickAction::new(KPD5));
-    state.mappings.replace_key_click(KeyClickAction::new(MOUSE11), KeyClickAction::new(KPD6));
-    state.mappings.replace_key_click(KeyClickAction::new(MOUSE12), KeyClickAction::new(KPD7));
+    let mut global_mappings = KeyMappings::new();
+
+    global_mappings.replace_key_click(KeyClickAction::new(MOUSE5), KeyClickAction::new(KPD0));
+    global_mappings.replace_key_click(KeyClickAction::new(MOUSE6), KeyClickAction::new(KPD1));
+    global_mappings.replace_key_click(KeyClickAction::new(MOUSE7), KeyClickAction::new(KPD2));
+    global_mappings.replace_key_click(KeyClickAction::new(MOUSE8), KeyClickAction::new(KPD3));
+    global_mappings.replace_key_click(KeyClickAction::new(MOUSE9), KeyClickAction::new(KPD4));
+    global_mappings.replace_key_click(KeyClickAction::new(MOUSE10), KeyClickAction::new(KPD5));
+    global_mappings.replace_key_click(KeyClickAction::new(MOUSE11), KeyClickAction::new(KPD6));
+    global_mappings.replace_key_click(KeyClickAction::new(MOUSE12), KeyClickAction::new(KPD7));
+
+    global_scope.instructions.push(ScopeInstruction::KeyMapping(global_mappings));
 
 
     // TODO make the API prettier
     { // firefox
+        let mut local_mappings = KeyMappings::new();
+
         let mut to = KeyClickAction::new(TAB);
         to.modifiers.ctrl = true;
-        state.mappings.replace_key_click_cond(KeyClickAction::new(MOUSE5), to, Some(KeyActionCondition { window_class_name: Some("firefox".to_string()) }));
+        local_mappings.replace_key_click(KeyClickAction::new(MOUSE5), to);
+
+        global_scope.instructions.push(ScopeInstruction::Scope(Scope {
+            condition: Some(KeyActionCondition { window_class_name: Some("firefox".to_string()) }),
+            instructions: vec![ScopeInstruction::KeyMapping(local_mappings)],
+        }));
     }
 
-    fn handle_active_window_change(state: &mut State) {
-        trait AppHandler<'a> = FnMut<(&'a mut State, ), Output=()> + 'static;
-        type Callback<'a> = Box<AppHandler<'a>>;
-        fn mk_callback<'a, F>(f: F) -> Callback<'a>
-            where F: AppHandler<'a> { Box::new(f) as Callback }
+    fn eval_scope(scope: &Scope, state: &mut State) {
+        // check condition
+        if let Some(cond) = &scope.condition {
+            if let Some(window_class_name) = &cond.window_class_name {
+                if let Some(active_window) = &state.active_window {
+                    if *window_class_name != active_window.class {
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+        }
 
-        let mut app_handlers = HashMap::new();
-        app_handlers.insert("firefox", mk_callback(|state: &mut State| {
-            // TODO refactor on_change to handle regex later
-        }));
+        for instruction in &scope.instructions {
+            match instruction {
+                ScopeInstruction::Scope(sub_scope) => { eval_scope(sub_scope, state); }
+                ScopeInstruction::KeyMapping(mapping) => {
+                    state.mappings.0.extend(mapping.0.iter());
+                }
+            }
+        }
+    }
+
+    eval_scope(&global_scope, &mut state);
+
+    fn handle_active_window_change(scope: &Scope, state: &mut State) {
+        state.mappings = KeyMappings::new();
+
+        eval_scope(scope, state);
     }
 
     loop {
         tokio::select! {
             Some(window) = rx1.recv() => {
                 state.active_window = Some(window);
-                handle_active_window_change(&mut state);
+                handle_active_window_change(&global_scope,&mut state);
             }
             Some(ev) = rx2.recv() => {
                 handle_stdin_ev(&mut state, &ev).unwrap();
@@ -379,47 +426,31 @@ impl KeyClickAction { pub fn new(key: Key) -> Self { KeyClickAction { key, modif
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct KeyActionCondition { window_class_name: Option<String> }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-struct KeyMappingsValue {
-    action: KeyAction,
-    cond: Option<KeyActionCondition>,
-}
-
-impl KeyMappingsValue { pub fn new(action: KeyAction, cond: Option<KeyActionCondition>) -> Self { KeyMappingsValue { action, cond } } }
-
 #[derive(Clone, Eq, PartialEq)]
-struct KeyMappings(HashMap<KeyAction, Vec<KeyMappingsValue>>);
+struct KeyMappings(HashMap<KeyAction, KeyAction>);
 
 impl KeyMappings {
     fn new() -> Self {
         KeyMappings { 0: Default::default() }
     }
 
-    fn replace_key(&mut self, from: KeyAction, to: KeyAction) { self.replace_key_cond(from, to, None); }
-
-    fn replace_key_cond(&mut self, from: KeyAction, to: KeyAction, cond: Option<KeyActionCondition>) {
-        let value_list = self.0.entry(from).or_insert(vec![]);//.or(vec!());
-        value_list.push(KeyMappingsValue::new(to, cond.or(None)));
+    fn replace_key(&mut self, from: KeyAction, to: KeyAction) {
+        self.0.insert(from, to);
     }
 
-    fn replace_key_click(&mut self, from: KeyClickAction, to: KeyClickAction) { self.replace_key_click_cond(from, to, None); }
-
-    fn replace_key_click_cond(&mut self, from: KeyClickAction, to: KeyClickAction, cond: Option<KeyActionCondition>) {
-        self.replace_key_cond(
+    fn replace_key_click(&mut self, from: KeyClickAction, to: KeyClickAction) {
+        self.replace_key(
             KeyAction { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers },
             KeyAction { key: to.key, value: TYPE_DOWN, modifiers: to.modifiers },
-            cond.clone(),
         );
-        self.replace_key_cond(
+        self.replace_key(
             KeyAction { key: from.key, value: TYPE_UP, modifiers: from.modifiers },
             KeyAction { key: to.key, value: TYPE_UP, modifiers: to.modifiers },
-            cond.clone(),
         );
 
-        self.replace_key_cond(
+        self.replace_key(
             KeyAction { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers },
             KeyAction { key: to.key, value: TYPE_REPEAT, modifiers: to.modifiers },
-            cond,
         );
     }
 }
@@ -505,56 +536,30 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
         },
     };
 
-    'b0: {
-        if let Some(to) = mappings.0.get(&from_key_action) {
-            let mut _to_action: Option<&KeyMappingsValue> = None;
+    if let Some(to_action) = mappings.0.get(&from_key_action) {
+        let mut using_modifiers = false;
 
-            for mapping_list_item in to.iter() {
-                // check conditions and abort if it doesn't match
-                if let Some(cond) = &mapping_list_item.cond {
-                    if let Some(window_class_name) = &cond.window_class_name {
-                        if let Some(active_window) = &state.active_window {
-                            if *window_class_name != active_window.class {
-                                continue;
-                            }
-                        } else {
-                            continue;
-                        }
-                    }
-                }
-
-                _to_action = Some(mapping_list_item);
+        if to_action.key.key_type != EV_KEY || to_action.value != TYPE_REPEAT {
+            if to_action.modifiers.ctrl {
+                print_event(&make_event(
+                    LEFT_CTRL.key_type as u16,
+                    LEFT_CTRL.code as u16,
+                    to_action.value));
+                using_modifiers = true;
             }
-
-            if _to_action.is_none() {
-                break 'b0;
-            }
-            let to_action = _to_action.unwrap().action;
-
-            let mut using_modifiers = false;
-
-            if to_action.key.key_type != EV_KEY || to_action.value != TYPE_REPEAT {
-                if to_action.modifiers.ctrl {
-                    print_event(&make_event(
-                        LEFT_CTRL.key_type as u16,
-                        LEFT_CTRL.code as u16,
-                        to_action.value));
-                    using_modifiers = true;
-                }
-            }
-
-            if using_modifiers {
-                print_event(&SYN);
-                thread::sleep(time::Duration::from_micros(20000));
-            }
-
-            print_event(&make_event(
-                to_action.key.key_type as u16,
-                to_action.key.code as u16,
-                to_action.value));
-
-            return Ok(());
         }
+
+        if using_modifiers {
+            print_event(&SYN);
+            thread::sleep(time::Duration::from_micros(20000));
+        }
+
+        print_event(&make_event(
+            to_action.key.key_type as u16,
+            to_action.key.code as u16,
+            to_action.value));
+
+        return Ok(());
     }
 
 
