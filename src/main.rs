@@ -330,8 +330,20 @@ async fn main() -> Result<()> {
         }));
     }
 
-    fn eval_scope(scope: &Scope, state: &mut State) {
+    type Cache = HashMap<String, KeyMappings>;
+    let mut cache: Cache = HashMap::new();
+
+    fn eval_scope(scope: &Scope, state: &mut State, cache: &mut Cache) {
         log_msg("evaling scope");
+
+        if let Some(active_window) = &state.active_window {
+            if let Some(cached) = cache.get(&active_window.class) {
+                state.mappings.0.extend(&cached.0);
+                log_msg("cached");
+                return;
+            }
+        }
+
         // check condition
         if let Some(cond) = &scope.condition {
             if let Some(window_class_name) = &cond.window_class_name {
@@ -347,27 +359,32 @@ async fn main() -> Result<()> {
 
         for instruction in &scope.instructions {
             match instruction {
-                ScopeInstruction::Scope(sub_scope) => { eval_scope(sub_scope, state); }
+                ScopeInstruction::Scope(sub_scope) => { eval_scope(sub_scope, state, cache); }
                 ScopeInstruction::KeyMapping(mapping) => {
                     state.mappings.0.extend(mapping.0.iter());
                 }
             }
         }
+
+        // cache for later
+        if let Some(active_window) = &state.active_window {
+            cache.insert(active_window.class.to_string(), state.mappings.clone());
+        }
     }
 
-    eval_scope(&global_scope, &mut state);
+    eval_scope(&global_scope, &mut state, &mut cache);
 
-    fn handle_active_window_change(scope: &Scope, state: &mut State) {
+    fn handle_active_window_change(scope: &Scope, state: &mut State, cache: &mut Cache) {
         state.mappings = KeyMappings::new();
 
-        eval_scope(scope, state);
+        eval_scope(scope, state, cache);
     }
 
     loop {
         tokio::select! {
             Some(window) = rx1.recv() => {
                 state.active_window = Some(window);
-                handle_active_window_change(&global_scope,&mut state);
+                handle_active_window_change(&global_scope,&mut state, &mut cache);
             }
             Some(ev) = rx2.recv() => {
                 handle_stdin_ev(&mut state, &ev).unwrap();
