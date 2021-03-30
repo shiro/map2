@@ -1,11 +1,21 @@
-- JOB: "intercept -g $DEVNODE | RUST_BACKTRACE=1 /home/shiro/bin/runinx /home/shiro/project/key-mods-rs/target/debug/key-mods-rs | uinput -d $DEVNODE"
-  DEVICE:
-    NAME: "Asus Keyboard"
-    EVENTS:
-      EV_KEY: [KEY_CAPSLOCK, KEY_ESC, KEY_TAB]
+- CMD: mux -c key-mods -c keyboard -c mouse
+- JOB:
+    - mux -i key-mods | RUST_BACKTRACE=1 /home/shiro/bin/runinx /home/shiro/project/key-mods-rs/target/debug/key-mods-rs | mux -o keyboard -o mouse
+    - mux -i keyboard | uinput -c /home/shiro/project/key-mods-rs/devices/keyboard.yaml
+    - mux -i mouse | uinput -c /home/shiro/project/key-mods-rs/devices/mouse.yaml
 
-- JOB: "intercept -g $DEVNODE | RUST_BACKTRACE=1 /home/shiro/bin/runinx /home/shiro/project/key-mods-rs/target/debug/key-mods-rs | uinput -d $DEVNODE -c /home/shiro/project/key-mods-rs/keyboard.yaml"
+
+- JOB: "intercept -g $DEVNODE | mux -o key-mods"
   DEVICE:
-    NAME: "Logitech G700s.*"
-    EVENTS:
-      EV_REL: [REL_X,REL_Y]
+    LINK: /dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd
+    # NAME: "Asus Keyboard"
+    # EVENTS:
+      # EV_KEY: [KEY_CAPSLOCK, KEY_ESC, KEY_TAB]
+
+- JOB: "intercept -g $DEVNODE | mux -o key-mods"
+  DEVICE:
+    LINK: /dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-mouse
+#     NAME: "Logitech G700s.*"
+#     EVENTS:
+#       EV_REL: [REL_X,REL_Y]
+

@@ -14,7 +14,7 @@ sleep 10
 
 echo stop
 
-sudo killall -9 intercept
+sudo killall -9 intercept key-mods-rs
 
 sleep 1
 

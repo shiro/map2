@@ -331,6 +331,7 @@ async fn main() -> Result<()> {
     }
 
     fn eval_scope(scope: &Scope, state: &mut State) {
+        log_msg("evaling scope");
         // check condition
         if let Some(cond) = &scope.condition {
             if let Some(window_class_name) = &cond.window_class_name {
