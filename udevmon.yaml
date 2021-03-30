@@ -1,7 +1,7 @@
 - CMD: mux -c key-mods -c keyboard -c mouse
 - JOB:
     - mux -i key-mods | RUST_BACKTRACE=1 /home/shiro/bin/runinx /home/shiro/project/key-mods-rs/target/debug/key-mods-rs | mux -o keyboard -o mouse
-    - mux -i keyboard | uinput -c /home/shiro/project/key-mods-rs/devices/keyboard.yaml 
+    - mux -i keyboard | uinput -c /home/shiro/project/key-mods-rs/devices/keyboard.yaml
     - mux -i mouse | uinput -c /home/shiro/project/key-mods-rs/devices/mouse.yaml
 
 

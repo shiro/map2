@@ -368,7 +368,7 @@ async fn main() -> Result<()> {
 
         // cache for later
         if let Some(active_window) = &state.active_window {
-            cache.insert(active_window.class.to_string(), state.mappings.clone());
+            // cache.insert(active_window.class.to_string(), state.mappings.clone());
         }
     }
 
@@ -483,6 +483,9 @@ static MOUSE9: Key = make_key(281);
 static MOUSE10: Key = make_key(282);
 static MOUSE11: Key = make_key(283);
 static MOUSE12: Key = make_key(284);
+static LEFT_META: Key = make_key(KEY_LEFTMETA);
+static LEFT_ALT: Key = make_key(KEY_LEFTALT);
+static LEFT_SHIFT: Key = make_key(KEY_LEFTSHIFT);
 static LEFT_CTRL: Key = make_key(KEY_LEFTCTRL);
 static TAB: Key = make_key(KEY_TAB);
 static KPD0: Key = make_key(KEY_KP0);
@@ -499,7 +502,7 @@ static TYPE_DOWN: i32 = 1;
 static TYPE_REPEAT: i32 = 2;
 
 fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
-    if ev.type_ == EV_SYN as u16 || ev.type_ == EV_MSC as u16 && ev.code == MSC_SCAN as u16 {
+    if ev.type_ != EV_KEY as u16 {
         print_event(&ev);
         return Ok(());
     }
@@ -558,10 +561,34 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
         let mut using_modifiers = false;
 
         if to_action.key.key_type != EV_KEY || to_action.value != TYPE_REPEAT {
+            if to_action.modifiers.meta {
+                print_event(&make_event(
+                    LEFT_META.key_type as u16,
+                    LEFT_META.code as u16,
+                    to_action.value));
+                using_modifiers = true;
+            }
+
             if to_action.modifiers.ctrl {
                 print_event(&make_event(
                     LEFT_CTRL.key_type as u16,
                     LEFT_CTRL.code as u16,
+                    to_action.value));
+                using_modifiers = true;
+            }
+
+            if to_action.modifiers.alt {
+                print_event(&make_event(
+                    LEFT_ALT.key_type as u16,
+                    LEFT_ALT.code as u16,
+                    to_action.value));
+                using_modifiers = true;
+            }
+
+            if to_action.modifiers.shift {
+                print_event(&make_event(
+                    LEFT_SHIFT.key_type as u16,
+                    LEFT_SHIFT.code as u16,
                     to_action.value));
                 using_modifiers = true;
             }
