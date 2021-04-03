@@ -1,6 +1,6 @@
 use std::{thread, time};
 
-use crate::{LEFTALT_DOWN, LEFTALT_REPEAT, LEFTALT_UP, ARROW_DOWN_DOWN, ARROW_DOWN_REPEAT, ARROW_DOWN_UP, ARROW_LEFT_DOWN, ARROW_LEFT_REPEAT, ARROW_LEFT_UP, ARROW_RIGHT_DOWN, ARROW_RIGHT_REPEAT, ARROW_RIGHT_UP, ARROW_UP_DOWN, ARROW_UP_REPEAT, ARROW_UP_UP, CAPSLOCK_DOWN, CAPSLOCK_REPEAT, CAPSLOCK_UP, equal, ESC_DOWN, ESC_UP, ev_ignored, H_DOWN, H_REPEAT, H_UP, ignore_ev, input_event, is_modifier_down, J_DOWN, J_REPEAT, J_UP, K_DOWN, K_REPEAT, K_UP, L_DOWN, L_REPEAT, L_UP, LEFTCTRL_DOWN, LEFTCTRL_UP, META_DOWN, META_UP, print_event, SHIFT_DOWN, SHIFT_UP, State, SYN, TAB_DOWN, TAB_REPEAT, TAB_UP, unignore_ev};
+use crate::{LEFTALT_DOWN, LEFTALT_REPEAT, LEFTALT_UP, ARROW_DOWN_DOWN, ARROW_DOWN_REPEAT, ARROW_DOWN_UP, ARROW_LEFT_DOWN, ARROW_LEFT_REPEAT, ARROW_LEFT_UP, ARROW_RIGHT_DOWN, ARROW_RIGHT_REPEAT, ARROW_RIGHT_UP, ARROW_UP_DOWN, ARROW_UP_REPEAT, ARROW_UP_UP, CAPSLOCK_DOWN, CAPSLOCK_REPEAT, CAPSLOCK_UP, equal, ESC_DOWN, ESC_UP, ev_ignored, H_DOWN, H_REPEAT, H_UP, ignore_ev, input_event, is_modifier_down, J_DOWN, J_REPEAT, J_UP, K_DOWN, K_REPEAT, K_UP, L_DOWN, L_REPEAT, L_UP, LEFTCTRL_DOWN, LEFTCTRL_UP, META_DOWN, META_UP, print_event, SHIFT_DOWN, SHIFT_UP, State, SYN, TAB_DOWN, TAB_REPEAT, TAB_UP, unignore_ev, log_msg, WHEEL};
 
 pub fn leftalt_mod(ev: &input_event, state: &mut State) -> bool {
     if state.leftalt_is_down {
@@ -54,10 +54,6 @@ pub fn leftalt_mod(ev: &input_event, state: &mut State) -> bool {
             mapped_key = Some(&ARROW_RIGHT_UP);
         }
 
-        // if equal(ev, &wheel_up)) {
-        //     print_event(&ALT_UP);
-        //     return true;
-        // }
 
         if let Some(new_ev) = mapped_key {
             print_event(new_ev);

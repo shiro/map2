@@ -4,6 +4,7 @@
 #![feature(unboxed_closures)]
 #![feature(trait_alias)]
 #![feature(label_break_value)]
+#![feature(let_chains)]
 
 use tokio::prelude::*;
 use futures::future::{Future, lazy, select};
@@ -19,7 +20,7 @@ use std::process::exit;
 use std::{io, mem, slice, thread, time};
 use std::io::{stdout, Write};
 
-use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL, KEY_F13, KEY_A, KEY_F14, KEY_F15, KEY_F16, KEY_F17, KEY_NUMERIC_0, KEY_NUMERIC_1, KEY_NUMERIC_3, KEY_NUMERIC_4, KEY_NUMERIC_5, KEY_NUMERIC_6, KEY_NUMERIC_7, KEY_NUMERIC_8, KEY_KP0, KEY_KP1, KEY_KP2, KEY_KP3, KEY_KP4, KEY_KP5, KEY_KP6, KEY_KP7};
+use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL, KEY_F13, KEY_A, KEY_F14, KEY_F15, KEY_F16, KEY_F17, KEY_NUMERIC_0, KEY_NUMERIC_1, KEY_NUMERIC_3, KEY_NUMERIC_4, KEY_NUMERIC_5, KEY_NUMERIC_6, KEY_NUMERIC_7, KEY_NUMERIC_8, KEY_KP0, KEY_KP1, KEY_KP2, KEY_KP3, KEY_KP4, KEY_KP5, KEY_KP6, KEY_KP7, REL_WHEEL};
 use crate::x11::{x11_get_active_window, x11_test, x11_initialize};
 use tokio::task;
 use anyhow::Result;
@@ -28,6 +29,8 @@ use std::sync::Arc;
 use nom::lib::std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 use crate::x11::ActiveWindowResult;
+
+extern crate timer;
 
 pub type time_t = i64;
 pub type suseconds_t = i64;
@@ -188,6 +191,8 @@ static MOUSE12_UP: input_event = input_event { type_: EV_KEY as u16, code: 284 a
 static MOUSE12_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 1, time: DUMMY_TIME };
 static MOUSE12_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 2, time: DUMMY_TIME };
 
+static WHEEL: input_event = input_event { type_: EV_REL as u16, code: REL_WHEEL as u16, value: 0, time: DUMMY_TIME };
+
 static SYN: input_event = input_event { type_: EV_SYN as u16, code: SYN_REPORT as u16, value: 0, time: DUMMY_TIME };
 // endregion
 
@@ -321,7 +326,10 @@ async fn main() -> Result<()> {
         let mut local_mappings = KeyMappings::new();
 
         let mut to = KeyClickAction::new(TAB);
-        to.modifiers.ctrl = true;
+        // to.modifiers.ctrl = true;
+        let mut to_modifiers = KeyModifiers::new();
+        to_modifiers.ctrl = KeyModifierState::DOWN;
+        to.modifiers = Some(to_modifiers);
         local_mappings.replace_key_click(KeyClickAction::new(MOUSE5), to);
 
         global_scope.instructions.push(ScopeInstruction::Scope(Scope {
@@ -417,29 +425,62 @@ async fn listen_to_key_events(ev: &mut input_event, input: &mut tokio::io::Stdin
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct Key { key_type: i32, code: i32 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+enum KeyModifierState {
+    KEEP,
+    UP,
+    DOWN,
+}
+
+impl KeyModifierState {
+    fn to_event_value(&self) -> i32 {
+        match self {
+            KeyModifierState::KEEP => 2,
+            KeyModifierState::UP => 0,
+            KeyModifierState::DOWN => 1
+        }
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 struct KeyModifiers {
-    ctrl: bool,
-    shift: bool,
-    alt: bool,
-    meta: bool,
+    ctrl: KeyModifierState,
+    shift: KeyModifierState,
+    alt: KeyModifierState,
+    meta: KeyModifierState,
 }
 
 impl KeyModifiers {
     fn new() -> KeyModifiers {
-        KeyModifiers { ctrl: false, shift: false, alt: false, meta: false }
+        use KeyModifierState::*;
+        KeyModifiers { ctrl: KEEP, shift: KEEP, alt: KEEP, meta: KEEP }
+    }
+    fn inverse(&self) -> KeyModifiers {
+        use KeyModifierState::*;
+        fn invert_state(state: &KeyModifierState) -> KeyModifierState {
+            if *state == DOWN { return UP; }
+            if *state == UP { return DOWN; }
+            return KEEP;
+        }
+
+        let mut inverted = Self::new();
+        inverted.ctrl = invert_state(&self.ctrl);
+        inverted.alt = invert_state(&self.alt);
+        inverted.meta = invert_state(&self.meta);
+        inverted.shift = invert_state(&self.shift);
+        inverted
     }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct KeyAction { key: Key, value: i32, modifiers: KeyModifiers }
+struct KeyAction { key: Key, value: i32, modifiers: Option<KeyModifiers> }
 
-impl KeyAction { pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value, modifiers: KeyModifiers::new() } } }
+impl KeyAction { pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value, modifiers: None } } }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct KeyClickAction { key: Key, modifiers: KeyModifiers }
+struct KeyClickAction { key: Key, modifiers: Option<KeyModifiers> }
 
-impl KeyClickAction { pub fn new(key: Key) -> Self { KeyClickAction { key, modifiers: KeyModifiers::new() } } }
+impl KeyClickAction { pub fn new(key: Key) -> Self { KeyClickAction { key, modifiers: None } } }
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct KeyActionCondition { window_class_name: Option<String> }
@@ -461,14 +502,20 @@ impl KeyMappings {
             KeyAction { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers },
             KeyAction { key: to.key, value: TYPE_DOWN, modifiers: to.modifiers },
         );
+
+        let mut to_up_key_modifiers = None;
+        if let Some(mut modifiers) = to.modifiers {
+            to_up_key_modifiers = Some(modifiers.inverse());
+        }
+
         self.replace_key(
             KeyAction { key: from.key, value: TYPE_UP, modifiers: from.modifiers },
-            KeyAction { key: to.key, value: TYPE_UP, modifiers: to.modifiers },
+            KeyAction { key: to.key, value: TYPE_UP, modifiers: to_up_key_modifiers },
         );
 
         self.replace_key(
             KeyAction { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers },
-            KeyAction { key: to.key, value: TYPE_REPEAT, modifiers: to.modifiers },
+            KeyAction { key: to.key, value: TYPE_REPEAT, modifiers: None },
         );
     }
 }
@@ -546,51 +593,64 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
     }
 
     let mappings = &mut state.mappings;
+    let mut from_modifiers = None;
+    if state.leftcontrol_is_down || state.leftalt_is_down || state.meta_is_down || state.shift_is_down {
+        use KeyModifierState::*;
+
+        let mut modifiers = KeyModifiers::new();
+        if state.leftcontrol_is_down { modifiers.ctrl = DOWN; }
+        if state.leftalt_is_down { modifiers.alt = DOWN; }
+        if state.meta_is_down { modifiers.meta = DOWN; }
+        if state.shift_is_down { modifiers.shift = DOWN; }
+
+        from_modifiers = Some(modifiers);
+    }
+
     let from_key_action = KeyAction {
         key: Key { key_type: ev.type_ as i32, code: ev.code as i32 },
         value: ev.value,
-        modifiers: KeyModifiers {
-            ctrl: state.leftcontrol_is_down.clone(),
-            shift: state.shift_is_down.clone(),
-            alt: state.leftalt_is_down.clone(),
-            meta: state.meta_is_down.clone(),
-        },
+        modifiers: from_modifiers,
     };
 
     if let Some(to_action) = mappings.0.get(&from_key_action) {
         let mut using_modifiers = false;
 
         if to_action.key.key_type != EV_KEY || to_action.value != TYPE_REPEAT {
-            if to_action.modifiers.meta {
-                print_event(&make_event(
-                    LEFT_META.key_type as u16,
-                    LEFT_META.code as u16,
-                    to_action.value));
-                using_modifiers = true;
-            }
+            if let Some(to_modifiers) = to_action.modifiers {
+                use KeyModifierState::*;
 
-            if to_action.modifiers.ctrl {
-                print_event(&make_event(
-                    LEFT_CTRL.key_type as u16,
-                    LEFT_CTRL.code as u16,
-                    to_action.value));
-                using_modifiers = true;
-            }
+                if to_modifiers.meta != KEEP {
+                    print_event(&make_event(
+                        LEFT_META.key_type as u16,
+                        LEFT_META.code as u16,
+                        to_modifiers.meta.to_event_value()));
+                    using_modifiers = true;
+                }
 
-            if to_action.modifiers.alt {
-                print_event(&make_event(
-                    LEFT_ALT.key_type as u16,
-                    LEFT_ALT.code as u16,
-                    to_action.value));
-                using_modifiers = true;
-            }
+                if to_modifiers.ctrl != KEEP {
+                    log_msg("ctrl");
+                    print_event(&make_event(
+                        LEFT_CTRL.key_type as u16,
+                        LEFT_CTRL.code as u16,
+                        to_modifiers.ctrl.to_event_value()));
+                    using_modifiers = true;
+                }
 
-            if to_action.modifiers.shift {
-                print_event(&make_event(
-                    LEFT_SHIFT.key_type as u16,
-                    LEFT_SHIFT.code as u16,
-                    to_action.value));
-                using_modifiers = true;
+                if to_modifiers.alt != KEEP {
+                    print_event(&make_event(
+                        LEFT_ALT.key_type as u16,
+                        LEFT_ALT.code as u16,
+                        to_modifiers.alt.to_event_value()));
+                    using_modifiers = true;
+                }
+
+                if to_modifiers.shift != KEEP {
+                    print_event(&make_event(
+                        LEFT_SHIFT.key_type as u16,
+                        LEFT_SHIFT.code as u16,
+                        to_modifiers.shift.to_event_value()));
+                    using_modifiers = true;
+                }
             }
         }
 

@@ -14,7 +14,7 @@ sleep 10
 
 echo stop
 
-sudo killall -9 intercept key-mods-rs
+sudo killall -9 intercept key-mods-rs udevmon uinput intercept
 
 sleep 1
 
