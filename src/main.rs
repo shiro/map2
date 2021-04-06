@@ -20,7 +20,7 @@ use std::process::exit;
 use std::{io, mem, slice, thread, time};
 use std::io::{stdout, Write};
 
-use input_linux_sys::{KEY_E, KEY_K, KEY_J, EV_KEY, KEY_TAB, KEY_LEFTMETA, KEY_LEFTSHIFT, KEY_LEFTALT, EV_SYN, SYN_REPORT, EV_MSC, MSC_SCAN, KEY_CAPSLOCK, KEY_LEFTCTRL, KEY_ESC, KEY_H, KEY_L, KEY_LEFT, KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_RIGHTALT, KEY_F8, REL_Y, REL_X, EV_REL, KEY_F13, KEY_A, KEY_F14, KEY_F15, KEY_F16, KEY_F17, KEY_NUMERIC_0, KEY_NUMERIC_1, KEY_NUMERIC_3, KEY_NUMERIC_4, KEY_NUMERIC_5, KEY_NUMERIC_6, KEY_NUMERIC_7, KEY_NUMERIC_8, KEY_KP0, KEY_KP1, KEY_KP2, KEY_KP3, KEY_KP4, KEY_KP5, KEY_KP6, KEY_KP7, REL_WHEEL};
+use input_linux_sys::*;
 use crate::x11::{x11_get_active_window, x11_test, x11_initialize};
 use tokio::task;
 use anyhow::Result;
@@ -325,12 +325,32 @@ async fn main() -> Result<()> {
     { // firefox
         let mut local_mappings = KeyMappings::new();
 
-        let mut to = KeyClickAction::new(TAB);
-        // to.modifiers.ctrl = true;
-        let mut to_modifiers = KeyModifiers::new();
-        to_modifiers.ctrl = KeyModifierState::DOWN;
-        to.modifiers = Some(to_modifiers);
-        local_mappings.replace_key_click(KeyClickAction::new(MOUSE5), to);
+        {
+            let mut to = KeyClickAction::new(TAB);
+            let mut to_modifiers = KeyModifiers::new();
+            to_modifiers.ctrl = KeyModifierState::DOWN;
+            to.modifiers = Some(to_modifiers);
+            local_mappings.replace_key_click(KeyClickAction::new(MOUSE5), to);
+        }
+
+        {
+            let mut to = KeyClickAction::new(T);
+            let mut to_modifiers = KeyModifiers::new();
+            to_modifiers.ctrl = KeyModifierState::DOWN;
+            to.modifiers = Some(to_modifiers);
+            local_mappings.replace_key_click(KeyClickAction::new(MOUSE6), to);
+        }
+
+        local_mappings.replace_key_click(KeyClickAction::new(MOUSE7), KeyClickAction::new(F5));
+
+        {
+            let mut to = KeyClickAction::new(W);
+            let mut to_modifiers = KeyModifiers::new();
+            to_modifiers.ctrl = KeyModifierState::DOWN;
+            to.modifiers = Some(to_modifiers);
+            local_mappings.replace_key_click(KeyClickAction::new(MOUSE12), to);
+        }
+
 
         global_scope.instructions.push(ScopeInstruction::Scope(Scope {
             condition: Some(KeyActionCondition { window_class_name: Some("firefox".to_string()) }),
@@ -342,8 +362,6 @@ async fn main() -> Result<()> {
     let mut cache: Cache = HashMap::new();
 
     fn eval_scope(scope: &Scope, state: &mut State, cache: &mut Cache) {
-        log_msg("evaling scope");
-
         if let Some(active_window) = &state.active_window {
             if let Some(cached) = cache.get(&active_window.class) {
                 state.mappings.0.extend(&cached.0);
@@ -535,6 +553,9 @@ static LEFT_ALT: Key = make_key(KEY_LEFTALT);
 static LEFT_SHIFT: Key = make_key(KEY_LEFTSHIFT);
 static LEFT_CTRL: Key = make_key(KEY_LEFTCTRL);
 static TAB: Key = make_key(KEY_TAB);
+static T: Key = make_key(KEY_T);
+static W: Key = make_key(KEY_W);
+static F5: Key = make_key(KEY_F5);
 static KPD0: Key = make_key(KEY_KP0);
 static KPD1: Key = make_key(KEY_KP1);
 static KPD2: Key = make_key(KEY_KP2);
@@ -628,7 +649,6 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
                 }
 
                 if to_modifiers.ctrl != KEEP {
-                    log_msg("ctrl");
                     print_event(&make_event(
                         LEFT_CTRL.key_type as u16,
                         LEFT_CTRL.code as u16,
