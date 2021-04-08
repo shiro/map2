@@ -1,10 +1,12 @@
-use crate::{input_event, State, TAB_DOWN, TAB_REPEAT, TAB_UP, LEFTALT_UP, SHIFT_UP, META_UP, SYN, LEFTALT_DOWN, SHIFT_DOWN, META_DOWN, print_event};
+use crate::*;
+use crate::{KeyAction};
 use std::{thread, time};
+// use crate::KeySequenceItem::KeyAction;
 
-pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
+pub fn tab_mod(ev: &crate::input_event, state: &mut State) -> bool {
     if state.tab_is_down {
         // tab repeat
-        if crate::equal(&ev, &TAB_DOWN) || crate::equal(&ev, &TAB_REPEAT) {
+        if ev == &TAB_DOWN || ev == &TAB_REPEAT {
             return true;
         }
 
@@ -13,8 +15,8 @@ pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
             state.tab_is_down = false;
 
             // tab up was handled before, just release all mods
-            if crate::ev_ignored(&TAB_DOWN, &mut state.ignore_list) {
-                crate::unignore_ev(&TAB_DOWN, &mut state.ignore_list);
+            if state.ignore_list.is_ignored(&KeyAction::new(TAB, TYPE_DOWN)) {
+                state.ignore_list.unignore(&KeyAction::new(TAB, TYPE_DOWN));
                 return true;
             }
 
@@ -27,7 +29,7 @@ pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
 
         // tab + [key down]
         if ev.value == 1 {
-            crate::ignore_ev(&TAB_DOWN, &mut state.ignore_list);
+            state.ignore_list.ignore(&KeyAction::new(TAB, TYPE_DOWN));
             crate::print_event(&LEFTALT_DOWN);
             crate::print_event(&SHIFT_DOWN);
             crate::print_event(&META_DOWN);
@@ -41,7 +43,7 @@ pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
 
             return true;
         }
-    } else if crate::equal(&ev, &TAB_DOWN) {
+    } else if ev == &TAB_DOWN {
         state.tab_is_down = true;
         return true;
     }

@@ -29,6 +29,7 @@ use std::sync::Arc;
 use nom::lib::std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 use crate::x11::ActiveWindowResult;
+use crate::KeyModifierWithState::META;
 
 extern crate timer;
 
@@ -51,6 +52,41 @@ pub struct input_event {
     pub value: i32,
 }
 
+impl PartialEq for input_event {
+    fn eq(&self, other: &Self) -> bool {
+        self.code == other.code &&
+            self.type_ == other.type_ &&
+            self.value == other.value
+    }
+}
+
+impl Eq for input_event {}
+
+struct IgnoreList(Vec<KeyAction>);
+
+impl IgnoreList {
+    pub fn new() -> Self { IgnoreList(Default::default()) }
+
+    fn is_ignored(&self, key: &KeyAction) -> bool {
+        match self.0.iter().position(|x| x == key) {
+            None => false,
+            Some(_) => true
+        }
+    }
+
+    fn unignore(&mut self, key: &KeyAction) {
+        if let Some(pos) = self.0.iter().position(|x| x == key) {
+            self.0.remove(pos);
+        }
+    }
+
+    fn ignore(&mut self, key: &KeyAction) {
+        if let None = self.0.iter().position(|x| x == key) {
+            self.0.push(*key);
+        }
+    }
+}
+
 pub struct State {
     tab_is_down: bool,
     capslock_is_down: bool,
@@ -62,7 +98,7 @@ pub struct State {
 
     disable_alt_mod: bool,
 
-    ignore_list: Vec<input_event>,
+    ignore_list: IgnoreList,
     mappings: KeyMappings,
 
     active_window: Option<ActiveWindowResult>,
@@ -88,7 +124,7 @@ fn print_event(ev: &input_event) {
     unsafe {
         stdout().write_all(any_as_u8_slice(ev)).unwrap();
         // if ev.type_ == EV_KEY as u16 {
-        //     println!("{:?}", ev);
+        //     log_msg(format!("{:?}", ev).as_str());
         // }
         stdout().flush().unwrap();
     }
@@ -102,98 +138,139 @@ fn equal(ev1: &input_event, ev2: &input_event) -> bool {
 
 
 // region key codes
-static DUMMY_TIME: timeval = timeval { tv_sec: 0, tv_usec: 0 };
+const DUMMY_TIME: timeval = timeval { tv_sec: 0, tv_usec: 0 };
 
-static TAB_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_TAB as u16, value: 0, time: DUMMY_TIME };
-static TAB_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_TAB as u16, value: 1, time: DUMMY_TIME };
-static TAB_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_TAB as u16, value: 2, time: DUMMY_TIME };
+const TAB_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_TAB as u16, value: 0, time: DUMMY_TIME };
+const TAB_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_TAB as u16, value: 1, time: DUMMY_TIME };
+const TAB_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_TAB as u16, value: 2, time: DUMMY_TIME };
 
-static META_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTMETA as u16, value: 0, time: DUMMY_TIME };
-static META_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTMETA as u16, value: 1, time: DUMMY_TIME };
-static META_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTMETA as u16, value: 2, time: DUMMY_TIME };
+const META_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTMETA as u16, value: 0, time: DUMMY_TIME };
+const META_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTMETA as u16, value: 1, time: DUMMY_TIME };
+const META_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTMETA as u16, value: 2, time: DUMMY_TIME };
 
-static SHIFT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTSHIFT as u16, value: 0, time: DUMMY_TIME };
-static SHIFT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTSHIFT as u16, value: 1, time: DUMMY_TIME };
-static SHIFT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTSHIFT as u16, value: 2, time: DUMMY_TIME };
+const SHIFT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTSHIFT as u16, value: 0, time: DUMMY_TIME };
+const SHIFT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTSHIFT as u16, value: 1, time: DUMMY_TIME };
+const SHIFT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTSHIFT as u16, value: 2, time: DUMMY_TIME };
 
-static LEFTALT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTALT as u16, value: 0, time: DUMMY_TIME };
-static LEFTALT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTALT as u16, value: 1, time: DUMMY_TIME };
-static LEFTALT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTALT as u16, value: 2, time: DUMMY_TIME };
+const LEFTALT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTALT as u16, value: 0, time: DUMMY_TIME };
+const LEFTALT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTALT as u16, value: 1, time: DUMMY_TIME };
+const LEFTALT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTALT as u16, value: 2, time: DUMMY_TIME };
 
-static RIGHTALT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHTALT as u16, value: 0, time: DUMMY_TIME };
-static RIGHTALT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHTALT as u16, value: 1, time: DUMMY_TIME };
-static RIGHTALT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHTALT as u16, value: 2, time: DUMMY_TIME };
+const RIGHTALT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHTALT as u16, value: 0, time: DUMMY_TIME };
+const RIGHTALT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHTALT as u16, value: 1, time: DUMMY_TIME };
+const RIGHTALT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHTALT as u16, value: 2, time: DUMMY_TIME };
 
-static CAPSLOCK_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 0, time: DUMMY_TIME };
-static CAPSLOCK_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 1, time: DUMMY_TIME };
-static CAPSLOCK_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 2, time: DUMMY_TIME };
+const CAPSLOCK_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 0, time: DUMMY_TIME };
+const CAPSLOCK_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 1, time: DUMMY_TIME };
+const CAPSLOCK_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_CAPSLOCK as u16, value: 2, time: DUMMY_TIME };
 
-static LEFTCTRL_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 0, time: DUMMY_TIME };
-static LEFTCTRL_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 1, time: DUMMY_TIME };
-static LEFTCTRL_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 2, time: DUMMY_TIME };
+const LEFTCTRL_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 0, time: DUMMY_TIME };
+const LEFTCTRL_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 1, time: DUMMY_TIME };
+const LEFTCTRL_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFTCTRL as u16, value: 2, time: DUMMY_TIME };
 
-static ESC_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 0, time: DUMMY_TIME };
-static ESC_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 1, time: DUMMY_TIME };
-static ESC_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 2, time: DUMMY_TIME };
+const ESC_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 0, time: DUMMY_TIME };
+const ESC_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 1, time: DUMMY_TIME };
+const ESC_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_ESC as u16, value: 2, time: DUMMY_TIME };
 
-static H_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 0, time: DUMMY_TIME };
-static H_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 1, time: DUMMY_TIME };
-static H_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 2, time: DUMMY_TIME };
-static J_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 0, time: DUMMY_TIME };
-static J_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 1, time: DUMMY_TIME };
-static J_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 2, time: DUMMY_TIME };
-static K_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 0, time: DUMMY_TIME };
-static K_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 1, time: DUMMY_TIME };
-static K_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 2, time: DUMMY_TIME };
-static L_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 0, time: DUMMY_TIME };
-static L_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 1, time: DUMMY_TIME };
-static L_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 2, time: DUMMY_TIME };
+const H_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 0, time: DUMMY_TIME };
+const H_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 1, time: DUMMY_TIME };
+const H_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_H as u16, value: 2, time: DUMMY_TIME };
+const J_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 0, time: DUMMY_TIME };
+const J_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 1, time: DUMMY_TIME };
+const J_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_J as u16, value: 2, time: DUMMY_TIME };
+const K_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 0, time: DUMMY_TIME };
+const K_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 1, time: DUMMY_TIME };
+const K_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_K as u16, value: 2, time: DUMMY_TIME };
+const L_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 0, time: DUMMY_TIME };
+const L_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 1, time: DUMMY_TIME };
+const L_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_L as u16, value: 2, time: DUMMY_TIME };
 
-static ARROW_LEFT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFT as u16, value: 0, time: DUMMY_TIME };
-static ARROW_LEFT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFT as u16, value: 1, time: DUMMY_TIME };
-static ARROW_LEFT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFT as u16, value: 2, time: DUMMY_TIME };
-static ARROW_DOWN_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_DOWN as u16, value: 0, time: DUMMY_TIME };
-static ARROW_DOWN_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_DOWN as u16, value: 1, time: DUMMY_TIME };
-static ARROW_DOWN_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_DOWN as u16, value: 2, time: DUMMY_TIME };
-static ARROW_RIGHT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHT as u16, value: 0, time: DUMMY_TIME };
-static ARROW_RIGHT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHT as u16, value: 1, time: DUMMY_TIME };
-static ARROW_RIGHT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHT as u16, value: 2, time: DUMMY_TIME };
-static ARROW_UP_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_UP as u16, value: 0, time: DUMMY_TIME };
-static ARROW_UP_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_UP as u16, value: 1, time: DUMMY_TIME };
-static ARROW_UP_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_UP as u16, value: 2, time: DUMMY_TIME };
+const ARROW_LEFT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFT as u16, value: 0, time: DUMMY_TIME };
+const ARROW_LEFT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFT as u16, value: 1, time: DUMMY_TIME };
+const ARROW_LEFT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_LEFT as u16, value: 2, time: DUMMY_TIME };
+const ARROW_DOWN_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_DOWN as u16, value: 0, time: DUMMY_TIME };
+const ARROW_DOWN_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_DOWN as u16, value: 1, time: DUMMY_TIME };
+const ARROW_DOWN_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_DOWN as u16, value: 2, time: DUMMY_TIME };
+const ARROW_RIGHT_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHT as u16, value: 0, time: DUMMY_TIME };
+const ARROW_RIGHT_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHT as u16, value: 1, time: DUMMY_TIME };
+const ARROW_RIGHT_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_RIGHT as u16, value: 2, time: DUMMY_TIME };
+const ARROW_UP_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_UP as u16, value: 0, time: DUMMY_TIME };
+const ARROW_UP_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_UP as u16, value: 1, time: DUMMY_TIME };
+const ARROW_UP_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_UP as u16, value: 2, time: DUMMY_TIME };
 
-static F8_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as u16, value: 0, time: DUMMY_TIME };
-static F8_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as u16, value: 1, time: DUMMY_TIME };
-static F8_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as u16, value: 2, time: DUMMY_TIME };
+const F8_UP: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as u16, value: 0, time: DUMMY_TIME };
+const F8_DOWN: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as u16, value: 1, time: DUMMY_TIME };
+const F8_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: KEY_F8 as u16, value: 2, time: DUMMY_TIME };
 
-static MOUSE5_UP: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 0, time: DUMMY_TIME };
-static MOUSE5_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 1, time: DUMMY_TIME };
-static MOUSE5_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 2, time: DUMMY_TIME };
-static MOUSE6_UP: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 0, time: DUMMY_TIME };
-static MOUSE6_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 1, time: DUMMY_TIME };
-static MOUSE6_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 2, time: DUMMY_TIME };
-static MOUSE7_UP: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 0, time: DUMMY_TIME };
-static MOUSE7_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 1, time: DUMMY_TIME };
-static MOUSE7_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 2, time: DUMMY_TIME };
-static MOUSE8_UP: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 0, time: DUMMY_TIME };
-static MOUSE8_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 1, time: DUMMY_TIME };
-static MOUSE8_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 2, time: DUMMY_TIME };
-static MOUSE9_UP: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 0, time: DUMMY_TIME };
-static MOUSE9_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 1, time: DUMMY_TIME };
-static MOUSE9_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 2, time: DUMMY_TIME };
-static MOUSE10_UP: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 0, time: DUMMY_TIME };
-static MOUSE10_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 1, time: DUMMY_TIME };
-static MOUSE10_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 2, time: DUMMY_TIME };
-static MOUSE11_UP: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 0, time: DUMMY_TIME };
-static MOUSE11_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 1, time: DUMMY_TIME };
-static MOUSE11_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 2, time: DUMMY_TIME };
-static MOUSE12_UP: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 0, time: DUMMY_TIME };
-static MOUSE12_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 1, time: DUMMY_TIME };
-static MOUSE12_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 2, time: DUMMY_TIME };
+const MOUSE5_UP: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 0, time: DUMMY_TIME };
+const MOUSE5_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 1, time: DUMMY_TIME };
+const MOUSE5_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 277 as u16, value: 2, time: DUMMY_TIME };
+const MOUSE6_UP: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 0, time: DUMMY_TIME };
+const MOUSE6_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 1, time: DUMMY_TIME };
+const MOUSE6_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 278 as u16, value: 2, time: DUMMY_TIME };
+const MOUSE7_UP: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 0, time: DUMMY_TIME };
+const MOUSE7_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 1, time: DUMMY_TIME };
+const MOUSE7_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 279 as u16, value: 2, time: DUMMY_TIME };
+const MOUSE8_UP: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 0, time: DUMMY_TIME };
+const MOUSE8_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 1, time: DUMMY_TIME };
+const MOUSE8_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 280 as u16, value: 2, time: DUMMY_TIME };
+const MOUSE9_UP: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 0, time: DUMMY_TIME };
+const MOUSE9_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 1, time: DUMMY_TIME };
+const MOUSE9_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 281 as u16, value: 2, time: DUMMY_TIME };
+const MOUSE10_UP: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 0, time: DUMMY_TIME };
+const MOUSE10_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 1, time: DUMMY_TIME };
+const MOUSE10_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 282 as u16, value: 2, time: DUMMY_TIME };
+const MOUSE11_UP: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 0, time: DUMMY_TIME };
+const MOUSE11_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 1, time: DUMMY_TIME };
+const MOUSE11_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 283 as u16, value: 2, time: DUMMY_TIME };
+const MOUSE12_UP: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 0, time: DUMMY_TIME };
+const MOUSE12_DOWN: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 1, time: DUMMY_TIME };
+const MOUSE12_REPEAT: input_event = input_event { type_: EV_KEY as u16, code: 284 as u16, value: 2, time: DUMMY_TIME };
 
-static WHEEL: input_event = input_event { type_: EV_REL as u16, code: REL_WHEEL as u16, value: 0, time: DUMMY_TIME };
+const WHEEL: input_event = input_event { type_: EV_REL as u16, code: REL_WHEEL as u16, value: 0, time: DUMMY_TIME };
 
-static SYN: input_event = input_event { type_: EV_SYN as u16, code: SYN_REPORT as u16, value: 0, time: DUMMY_TIME };
+const SYN: input_event = input_event { type_: EV_SYN as u16, code: SYN_REPORT as u16, value: 0, time: DUMMY_TIME };
+// endregion
+
+// region key references
+static MOUSE5: Key = make_key(277);
+static MOUSE6: Key = make_key(278);
+static MOUSE7: Key = make_key(279);
+static MOUSE8: Key = make_key(280);
+static MOUSE9: Key = make_key(281);
+static MOUSE10: Key = make_key(282);
+static MOUSE11: Key = make_key(283);
+static MOUSE12: Key = make_key(284);
+static LEFT_META: Key = make_key(KEY_LEFTMETA);
+static LEFT_ALT: Key = make_key(KEY_LEFTALT);
+static RIGHT_ALT: Key = make_key(KEY_RIGHTALT);
+static LEFT_SHIFT: Key = make_key(KEY_LEFTSHIFT);
+static LEFT_CTRL: Key = make_key(KEY_LEFTCTRL);
+static TAB: Key = make_key(KEY_TAB);
+static CAPSLOCK: Key = make_key(KEY_CAPSLOCK);
+static T: Key = make_key(KEY_T);
+static W: Key = make_key(KEY_W);
+static H: Key = make_key(KEY_H);
+static J: Key = make_key(KEY_J);
+static K: Key = make_key(KEY_K);
+static L: Key = make_key(KEY_L);
+static LEFT: Key = make_key(KEY_LEFT);
+static RIGHT: Key = make_key(KEY_RIGHT);
+static UP: Key = make_key(KEY_UP);
+static DOWN: Key = make_key(KEY_DOWN);
+static F5: Key = make_key(KEY_F5);
+static KPD0: Key = make_key(KEY_KP0);
+static KPD1: Key = make_key(KEY_KP1);
+static KPD2: Key = make_key(KEY_KP2);
+static KPD3: Key = make_key(KEY_KP3);
+static KPD4: Key = make_key(KEY_KP4);
+static KPD5: Key = make_key(KEY_KP5);
+static KPD6: Key = make_key(KEY_KP6);
+static KPD7: Key = make_key(KEY_KP7);
+
+static TYPE_UP: i32 = 0;
+static TYPE_DOWN: i32 = 1;
+static TYPE_REPEAT: i32 = 2;
 // endregion
 
 
@@ -202,14 +279,14 @@ fn is_modifier_down(state: &State) -> bool {
 }
 
 fn ev_ignored(ev: &input_event, ignore_list: &mut Vec<input_event>) -> bool {
-    match ignore_list.iter().position(|x: &input_event| equal(x, ev)) {
+    match ignore_list.iter().position(|x: &input_event| x == ev) {
         None => false,
         Some(_) => true
     }
 }
 
 fn unignore_ev(ev: &input_event, ignore_list: &mut Vec<input_event>) {
-    if let Some(pos) = ignore_list.iter().position(|x: &input_event| equal(x, ev)) {
+    if let Some(pos) = ignore_list.iter().position(|x: &input_event| x == ev) {
         ignore_list.remove(pos);
     }
 }
@@ -218,21 +295,6 @@ fn ignore_ev(ev: &input_event, ignore_list: &mut Vec<input_event>) {
     if let None = ignore_list.iter().position(|x: &input_event| equal(x, ev)) {
         ignore_list.push(*ev);
     }
-}
-
-
-async fn delay_for(seconds: u64) -> Result<u64, task::JoinError> {
-    task::spawn_blocking(move || {
-        thread::sleep(Duration::from_secs(seconds));
-    })
-        .await?;
-    Ok(seconds)
-}
-
-async fn log_msg_async(msg: &str) {
-    let out_msg = format!("[DEBUG] {}\n", msg);
-
-    tokio::io::stderr().write_all(out_msg.as_bytes()).await.unwrap();
 }
 
 fn log_msg(msg: &str) {
@@ -255,8 +317,6 @@ struct Scope {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    log_msg_async("hi").await;
-
     let mut stdin = tokio::io::stdin();
     let mut read_ev: input_event = unsafe { mem::zeroed() };
 
@@ -297,7 +357,7 @@ async fn main() -> Result<()> {
         leftalt_is_down: false,
         right_alt_is_down: false,
         disable_alt_mod: false,
-        ignore_list: vec!(),
+        ignore_list: IgnoreList::new(),
         mappings: KeyMappings::new(),
         active_window: None,
     };
@@ -318,39 +378,35 @@ async fn main() -> Result<()> {
     global_mappings.replace_key_click(KeyClickAction::new(MOUSE11), KeyClickAction::new(KPD6));
     global_mappings.replace_key_click(KeyClickAction::new(MOUSE12), KeyClickAction::new(KPD7));
 
+    { // arrow keys
+        global_mappings.replace_key_click(
+            KeyClickAction::new_mods(H, *KeyModifierFlags::new().alt()),
+            KeyClickAction::new(LEFT),
+        );
+        global_mappings.replace_key_click(
+            KeyClickAction::new_mods(L, *KeyModifierFlags::new().alt()),
+            KeyClickAction::new(RIGHT),
+        );
+        global_mappings.replace_key_click(
+            KeyClickAction::new_mods(K, *KeyModifierFlags::new().alt()),
+            KeyClickAction::new(UP),
+        );
+        global_mappings.replace_key_click(
+            KeyClickAction::new_mods(J, *KeyModifierFlags::new().alt()),
+            KeyClickAction::new(DOWN),
+        );
+    }
+
     global_scope.instructions.push(ScopeInstruction::KeyMapping(global_mappings));
 
 
-    // TODO make the API prettier
     { // firefox
         let mut local_mappings = KeyMappings::new();
 
-        {
-            let mut to = KeyClickAction::new(TAB);
-            let mut to_modifiers = KeyModifiers::new();
-            to_modifiers.ctrl = KeyModifierState::DOWN;
-            to.modifiers = Some(to_modifiers);
-            local_mappings.replace_key_click(KeyClickAction::new(MOUSE5), to);
-        }
-
-        {
-            let mut to = KeyClickAction::new(T);
-            let mut to_modifiers = KeyModifiers::new();
-            to_modifiers.ctrl = KeyModifierState::DOWN;
-            to.modifiers = Some(to_modifiers);
-            local_mappings.replace_key_click(KeyClickAction::new(MOUSE6), to);
-        }
-
+        local_mappings.replace_key_click(KeyClickAction::new(MOUSE5), KeyClickAction::new_mods(TAB, *KeyModifierFlags::new().ctrl()));
+        local_mappings.replace_key_click(KeyClickAction::new(MOUSE6), KeyClickAction::new_mods(T, *KeyModifierFlags::new().ctrl()));
         local_mappings.replace_key_click(KeyClickAction::new(MOUSE7), KeyClickAction::new(F5));
-
-        {
-            let mut to = KeyClickAction::new(W);
-            let mut to_modifiers = KeyModifiers::new();
-            to_modifiers.ctrl = KeyModifierState::DOWN;
-            to.modifiers = Some(to_modifiers);
-            local_mappings.replace_key_click(KeyClickAction::new(MOUSE12), to);
-        }
-
+        local_mappings.replace_key_click(KeyClickAction::new(MOUSE12), KeyClickAction::new_mods(W, *KeyModifierFlags::new().ctrl()));
 
         global_scope.instructions.push(ScopeInstruction::Scope(Scope {
             condition: Some(KeyActionCondition { window_class_name: Some("firefox".to_string()) }),
@@ -364,8 +420,10 @@ async fn main() -> Result<()> {
     fn eval_scope(scope: &Scope, state: &mut State, cache: &mut Cache) {
         if let Some(active_window) = &state.active_window {
             if let Some(cached) = cache.get(&active_window.class) {
-                state.mappings.0.extend(&cached.0);
-                log_msg("cached");
+                state.mappings.0.extend(
+                    cached.0.iter()
+                        .map(|(k, v)| { (k.clone(), v.clone()) })
+                );
                 return;
             }
         }
@@ -387,7 +445,10 @@ async fn main() -> Result<()> {
             match instruction {
                 ScopeInstruction::Scope(sub_scope) => { eval_scope(sub_scope, state, cache); }
                 ScopeInstruction::KeyMapping(mapping) => {
-                    state.mappings.0.extend(mapping.0.iter());
+                    state.mappings.0.extend(
+                        mapping.0.iter()
+                            .map(|(k, v)| { (k.clone(), v.clone()) })
+                    );
                 }
             }
         }
@@ -440,42 +501,106 @@ async fn listen_to_key_events(ev: &mut input_event, input: &mut tokio::io::Stdin
 }
 
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct Key { key_type: i32, code: i32 }
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub struct Key { key_type: i32, code: i32 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-enum KeyModifierState {
+enum KeyModifierStateType {
     KEEP,
     UP,
     DOWN,
 }
 
-impl KeyModifierState {
+impl KeyModifierStateType {
     fn to_event_value(&self) -> i32 {
         match self {
-            KeyModifierState::KEEP => 2,
-            KeyModifierState::UP => 0,
-            KeyModifierState::DOWN => 1
+            KeyModifierStateType::KEEP => 2,
+            KeyModifierStateType::UP => 0,
+            KeyModifierStateType::DOWN => 1
         }
     }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-struct KeyModifiers {
-    ctrl: KeyModifierState,
-    shift: KeyModifierState,
-    alt: KeyModifierState,
-    meta: KeyModifierState,
+struct KeyModifierFlags {
+    ctrl: bool,
+    shift: bool,
+    alt: bool,
+    meta: bool,
 }
 
-impl KeyModifiers {
-    fn new() -> KeyModifiers {
-        use KeyModifierState::*;
-        KeyModifiers { ctrl: KEEP, shift: KEEP, alt: KEEP, meta: KEEP }
+impl KeyModifierFlags {
+    pub fn new() -> Self { KeyModifierFlags { ctrl: false, shift: false, alt: false, meta: false } }
+    pub fn invert(mut self) -> Self {
+        self.ctrl = !self.ctrl;
+        self.alt = !self.alt;
+        self.shift = !self.shift;
+        self.meta = !self.meta;
+        self
     }
-    fn inverse(&self) -> KeyModifiers {
-        use KeyModifierState::*;
-        fn invert_state(state: &KeyModifierState) -> KeyModifierState {
+    pub fn ctrl(&mut self) -> &mut Self {
+        self.ctrl = true;
+        self
+    }
+    pub fn alt(&mut self) -> &mut Self {
+        self.alt = true;
+        self
+    }
+    pub fn shift(&mut self) -> &mut Self {
+        self.shift = true;
+        self
+    }
+    pub fn meta(&mut self) -> &mut Self {
+        self.meta = true;
+        self
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+struct KeyModifierAction {
+    ctrl: KeyModifierStateType,
+    shift: KeyModifierStateType,
+    alt: KeyModifierStateType,
+    meta: KeyModifierStateType,
+}
+
+enum KeyModifierWithState {
+    CTRL(KeyModifierStateType),
+    SHIFT(KeyModifierStateType),
+    ALT(KeyModifierStateType),
+    META(KeyModifierStateType),
+}
+
+#[derive(Clone, Hash)]
+enum KeySequenceItem {
+    KeyAction(KeyAction),
+    EatKeyAction(KeyAction),
+}
+
+#[derive(Clone, Hash)]
+struct KeySequence(Vec<KeySequenceItem>);
+
+impl KeySequence {
+    pub fn new() -> Self { KeySequence(Default::default()) }
+}
+
+impl KeyModifierAction {
+    fn new() -> KeyModifierAction {
+        use KeyModifierStateType::*;
+        KeyModifierAction { ctrl: KEEP, shift: KEEP, alt: KEEP, meta: KEEP }
+    }
+    fn apply(mut self, modifier: KeyModifierWithState) -> Self {
+        match modifier {
+            KeyModifierWithState::CTRL(state) => { self.ctrl = state }
+            KeyModifierWithState::SHIFT(state) => { self.shift = state }
+            KeyModifierWithState::ALT(state) => { self.alt = state }
+            KeyModifierWithState::META(state) => { self.meta = state }
+        };
+        self
+    }
+    fn inverse(&self) -> KeyModifierAction {
+        use KeyModifierStateType::*;
+        fn invert_state(state: &KeyModifierStateType) -> KeyModifierStateType {
             if *state == DOWN { return UP; }
             if *state == UP { return DOWN; }
             return KEEP;
@@ -490,84 +615,98 @@ impl KeyModifiers {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub struct KeyAction { key: Key, value: i32 }
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub struct KeyActionMods { key: Key, value: i32, modifiers: KeyModifierFlags }
+
+impl KeyAction { pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value } } }
+
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct KeyAction { key: Key, value: i32, modifiers: Option<KeyModifiers> }
+struct KeyClickAction { key: Key, modifiers: KeyModifierFlags }
 
-impl KeyAction { pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value, modifiers: None } } }
-
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct KeyClickAction { key: Key, modifiers: Option<KeyModifiers> }
-
-impl KeyClickAction { pub fn new(key: Key) -> Self { KeyClickAction { key, modifiers: None } } }
+impl KeyClickAction {
+    pub fn new(key: Key) -> Self { KeyClickAction { key, modifiers: KeyModifierFlags::new() } }
+    pub fn new_mods(key: Key, modifiers: KeyModifierFlags) -> Self { KeyClickAction { key, modifiers } }
+}
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct KeyActionCondition { window_class_name: Option<String> }
 
-#[derive(Clone, Eq, PartialEq)]
-struct KeyMappings(HashMap<KeyAction, KeyAction>);
+struct KeyMappings(HashMap<KeyActionMods, KeySequence>);
 
 impl KeyMappings {
     fn new() -> Self {
         KeyMappings { 0: Default::default() }
     }
 
-    fn replace_key(&mut self, from: KeyAction, to: KeyAction) {
+    fn replace_key(&mut self, from: KeyActionMods, to: KeySequence) {
         self.0.insert(from, to);
     }
 
     fn replace_key_click(&mut self, from: KeyClickAction, to: KeyClickAction) {
-        self.replace_key(
-            KeyAction { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers },
-            KeyAction { key: to.key, value: TYPE_DOWN, modifiers: to.modifiers },
-        );
+        {
+            let mut to_seq = KeySequence::new();
 
-        let mut to_up_key_modifiers = None;
-        if let Some(mut modifiers) = to.modifiers {
-            to_up_key_modifiers = Some(modifiers.inverse());
+            if from.modifiers.ctrl && !to.modifiers.ctrl {
+                to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_CTRL, value: TYPE_UP }));
+                to_seq.0.push(KeySequenceItem::EatKeyAction(KeyAction::new(LEFT_CTRL, TYPE_UP)));
+            }
+            if from.modifiers.alt && !to.modifiers.alt {
+                to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_ALT, value: TYPE_UP }));
+                to_seq.0.push(KeySequenceItem::EatKeyAction(KeyAction::new(LEFT_ALT, TYPE_UP)));
+            }
+            if from.modifiers.shift && !to.modifiers.shift {
+                to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_SHIFT, value: TYPE_UP }));
+                to_seq.0.push(KeySequenceItem::EatKeyAction(KeyAction::new(LEFT_SHIFT, TYPE_UP)));
+            }
+            if from.modifiers.meta && !to.modifiers.meta {
+                to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_META, value: TYPE_UP }));
+                to_seq.0.push(KeySequenceItem::EatKeyAction(KeyAction::new(LEFT_META, TYPE_UP)));
+            }
+
+            if to.modifiers.ctrl && !from.modifiers.ctrl { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_CTRL, value: TYPE_DOWN })) }
+            if to.modifiers.alt && !from.modifiers.alt { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_ALT, value: TYPE_DOWN })) }
+            if to.modifiers.shift && !from.modifiers.shift { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_SHIFT, value: TYPE_DOWN })) }
+            if to.modifiers.meta && !from.modifiers.meta { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_META, value: TYPE_DOWN })) }
+
+            to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: to.key, value: TYPE_DOWN }));
+
+            self.replace_key(
+                KeyActionMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() },
+                to_seq,
+            );
         }
 
-        self.replace_key(
-            KeyAction { key: from.key, value: TYPE_UP, modifiers: from.modifiers },
-            KeyAction { key: to.key, value: TYPE_UP, modifiers: to_up_key_modifiers },
-        );
+        {
+            let mut to_seq = KeySequence::new();
+            to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: to.key, value: TYPE_UP }));
 
-        self.replace_key(
-            KeyAction { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers },
-            KeyAction { key: to.key, value: TYPE_REPEAT, modifiers: None },
-        );
+            if to.modifiers.ctrl && !from.modifiers.ctrl { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_CTRL, value: TYPE_UP })) }
+            if to.modifiers.alt && !from.modifiers.alt { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_ALT, value: TYPE_UP })) }
+            if to.modifiers.shift && !from.modifiers.shift { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_SHIFT, value: TYPE_UP })) }
+            if to.modifiers.meta && !from.modifiers.meta { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: LEFT_META, value: TYPE_UP })) }
+
+            self.replace_key(
+                KeyActionMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() },
+                to_seq,
+            );
+        }
+
+        {
+            let mut to_seq = KeySequence::new();
+            to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: to.key, value: TYPE_REPEAT }));
+
+            self.replace_key(
+                KeyActionMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers },
+                to_seq,
+            );
+        }
     }
 }
 
 const fn make_key(code: i32) -> Key { Key { key_type: EV_KEY, code } }
-
-static MOUSE5: Key = make_key(277);
-static MOUSE6: Key = make_key(278);
-static MOUSE7: Key = make_key(279);
-static MOUSE8: Key = make_key(280);
-static MOUSE9: Key = make_key(281);
-static MOUSE10: Key = make_key(282);
-static MOUSE11: Key = make_key(283);
-static MOUSE12: Key = make_key(284);
-static LEFT_META: Key = make_key(KEY_LEFTMETA);
-static LEFT_ALT: Key = make_key(KEY_LEFTALT);
-static LEFT_SHIFT: Key = make_key(KEY_LEFTSHIFT);
-static LEFT_CTRL: Key = make_key(KEY_LEFTCTRL);
-static TAB: Key = make_key(KEY_TAB);
-static T: Key = make_key(KEY_T);
-static W: Key = make_key(KEY_W);
-static F5: Key = make_key(KEY_F5);
-static KPD0: Key = make_key(KEY_KP0);
-static KPD1: Key = make_key(KEY_KP1);
-static KPD2: Key = make_key(KEY_KP2);
-static KPD3: Key = make_key(KEY_KP3);
-static KPD4: Key = make_key(KEY_KP4);
-static KPD5: Key = make_key(KEY_KP5);
-static KPD6: Key = make_key(KEY_KP6);
-static KPD7: Key = make_key(KEY_KP7);
-
-static TYPE_UP: i32 = 0;
-static TYPE_DOWN: i32 = 1;
-static TYPE_REPEAT: i32 = 2;
 
 fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
     if ev.type_ != EV_KEY as u16 {
@@ -575,21 +714,50 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
         return Ok(());
     }
 
-    if equal(&ev, &F8_DOWN) {
-        state.disable_alt_mod = !state.disable_alt_mod;
-    }
-
-    if equal(&ev, &LEFTCTRL_DOWN) {
+    if ev == &LEFTCTRL_DOWN {
         state.leftcontrol_is_down = true;
-    } else if equal(&ev, &LEFTCTRL_UP) {
+    } else if ev == &LEFTCTRL_UP {
         state.leftcontrol_is_down = false;
+
+        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_CTRL, TYPE_UP)) {
+            state.ignore_list.unignore(&KeyAction::new(LEFT_CTRL, TYPE_UP));
+            return Ok(());
+        }
     }
 
-    if equal(&ev, &SHIFT_DOWN) {
-        state.shift_is_down = true;
-    } else if equal(&ev, &SHIFT_UP) {
-        state.shift_is_down = false;
+    if ev == &LEFTALT_DOWN {
+        state.leftalt_is_down = true;
+    } else if ev == &LEFTALT_UP {
+        state.leftalt_is_down = false;
+
+        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_ALT, TYPE_UP)) {
+            state.ignore_list.unignore(&KeyAction::new(LEFT_ALT, TYPE_UP));
+            return Ok(());
+        }
     }
+
+    if ev == &SHIFT_DOWN {
+        state.shift_is_down = true;
+    } else if ev == &SHIFT_UP {
+        state.shift_is_down = false;
+
+        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_SHIFT, TYPE_UP)) {
+            state.ignore_list.unignore(&KeyAction::new(LEFT_SHIFT, TYPE_UP));
+            return Ok(());
+        }
+    }
+
+    if ev == &META_DOWN {
+        state.meta_is_down = true;
+    } else if ev == &META_UP {
+        state.meta_is_down = false;
+
+        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_META, TYPE_UP)) {
+            state.ignore_list.unignore(&KeyAction::new(LEFT_META, TYPE_UP));
+            return Ok(());
+        }
+    }
+
 
     if crate::tab_mod::tab_mod(&ev, state) {
         return Ok(());
@@ -602,87 +770,48 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
     }
 
     if !state.disable_alt_mod {
-        if crate::leftalt_mod::leftalt_mod(&ev, state) {
-            return Ok(());
-        }
-    }
-
-    if !state.disable_alt_mod {
         if crate::rightalt_mod::rightalt_mod(&ev, state) {
             return Ok(());
         }
     }
 
     let mappings = &mut state.mappings;
-    let mut from_modifiers = None;
-    if state.leftcontrol_is_down || state.leftalt_is_down || state.meta_is_down || state.shift_is_down {
-        use KeyModifierState::*;
+    let mut from_modifiers = KeyModifierFlags::new();
+    from_modifiers.ctrl = state.leftcontrol_is_down.clone();
+    from_modifiers.alt = state.leftalt_is_down.clone();
+    from_modifiers.shift = state.shift_is_down.clone();
+    from_modifiers.meta = state.meta_is_down.clone();
 
-        let mut modifiers = KeyModifiers::new();
-        if state.leftcontrol_is_down { modifiers.ctrl = DOWN; }
-        if state.leftalt_is_down { modifiers.alt = DOWN; }
-        if state.meta_is_down { modifiers.meta = DOWN; }
-        if state.shift_is_down { modifiers.shift = DOWN; }
-
-        from_modifiers = Some(modifiers);
-    }
-
-    let from_key_action = KeyAction {
+    let from_key_action = KeyActionMods {
         key: Key { key_type: ev.type_ as i32, code: ev.code as i32 },
         value: ev.value,
         modifiers: from_modifiers,
     };
 
-    if let Some(to_action) = mappings.0.get(&from_key_action) {
-        let mut using_modifiers = false;
+    if let Some(to_action_seq) = mappings.0.get(&from_key_action) {
+        let mut prev_was_modifier = false;
 
-        if to_action.key.key_type != EV_KEY || to_action.value != TYPE_REPEAT {
-            if let Some(to_modifiers) = to_action.modifiers {
-                use KeyModifierState::*;
+        for seq_item in to_action_seq.0.iter() {
+            match seq_item {
+                KeySequenceItem::KeyAction(action) => {
+                    if prev_was_modifier && action.key.key_type == EV_KEY {
+                        print_event(&SYN);
+                        thread::sleep(time::Duration::from_micros(20000));
+                    }
 
-                if to_modifiers.meta != KEEP {
+                    prev_was_modifier = action.key == LEFT_CTRL || action.key == LEFT_ALT || action.key == LEFT_SHIFT || action.key == LEFT_META;
+
                     print_event(&make_event(
-                        LEFT_META.key_type as u16,
-                        LEFT_META.code as u16,
-                        to_modifiers.meta.to_event_value()));
-                    using_modifiers = true;
+                        action.key.key_type as u16,
+                        action.key.code as u16,
+                        action.value));
                 }
-
-                if to_modifiers.ctrl != KEEP {
-                    print_event(&make_event(
-                        LEFT_CTRL.key_type as u16,
-                        LEFT_CTRL.code as u16,
-                        to_modifiers.ctrl.to_event_value()));
-                    using_modifiers = true;
-                }
-
-                if to_modifiers.alt != KEEP {
-                    print_event(&make_event(
-                        LEFT_ALT.key_type as u16,
-                        LEFT_ALT.code as u16,
-                        to_modifiers.alt.to_event_value()));
-                    using_modifiers = true;
-                }
-
-                if to_modifiers.shift != KEEP {
-                    print_event(&make_event(
-                        LEFT_SHIFT.key_type as u16,
-                        LEFT_SHIFT.code as u16,
-                        to_modifiers.shift.to_event_value()));
-                    using_modifiers = true;
+                KeySequenceItem::EatKeyAction(keyAction) => {
+                    state.ignore_list.ignore(keyAction);
                 }
             }
         }
 
-        if using_modifiers {
-            print_event(&SYN);
-            thread::sleep(time::Duration::from_micros(20000));
-        }
-
-        print_event(&make_event(
-            to_action.key.key_type as u16,
-            to_action.key.code as u16,
-            to_action.value));
 
         return Ok(());
     }

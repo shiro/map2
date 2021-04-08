@@ -1,7 +1,7 @@
-use crate::{input_event, State, TAB_DOWN, TAB_REPEAT, TAB_UP, LEFTALT_UP, SHIFT_UP, META_UP, SYN, LEFTALT_DOWN, SHIFT_DOWN, META_DOWN, CAPSLOCK_DOWN, CAPSLOCK_REPEAT, CAPSLOCK_UP, equal, is_modifier_down, print_event, LEFTCTRL_DOWN, ESC_DOWN, ESC_UP, H_DOWN, J_DOWN, K_DOWN, L_DOWN, LEFTCTRL_UP};
+use crate::*;
 use std::{thread, time};
 
-pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
+pub fn caps_mod(ev: &crate::input_event, state: &mut State) -> bool {
     if state.capslock_is_down {
         // capslock repeat
         if crate::equal(&ev, &CAPSLOCK_DOWN) || crate::equal(&ev, &CAPSLOCK_REPEAT) {
@@ -14,8 +14,8 @@ pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
             print_event(&LEFTCTRL_UP);
 
             // return if up event is ignored
-            if crate::ev_ignored(&CAPSLOCK_DOWN, &mut state.ignore_list) {
-                crate::unignore_ev(&CAPSLOCK_DOWN, &mut state.ignore_list);
+            if state.ignore_list.is_ignored(&KeyAction::new(CAPSLOCK, TYPE_DOWN)) {
+                state.ignore_list.unignore(&KeyAction::new(CAPSLOCK, TYPE_DOWN));
                 return true;
             }
 
@@ -28,7 +28,7 @@ pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
 
         // capslock + [key down]
         if ev.value == 1 {
-            crate::ignore_ev(&CAPSLOCK_DOWN, &mut state.ignore_list);
+            state.ignore_list.ignore(&KeyAction::new(CAPSLOCK, TYPE_DOWN));
 
             // navigation keys (h, j, k, l)
             // only bind to capslock + directional keys, no modifiers

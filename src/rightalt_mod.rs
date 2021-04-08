@@ -1,23 +1,22 @@
 use std::{thread, time};
+use crate::*;
 
-use crate::{LEFTALT_DOWN, LEFTALT_REPEAT, LEFTALT_UP, ARROW_DOWN_DOWN, ARROW_DOWN_REPEAT, ARROW_DOWN_UP, ARROW_LEFT_DOWN, ARROW_LEFT_REPEAT, ARROW_LEFT_UP, ARROW_RIGHT_DOWN, ARROW_RIGHT_REPEAT, ARROW_RIGHT_UP, ARROW_UP_DOWN, ARROW_UP_REPEAT, ARROW_UP_UP, CAPSLOCK_DOWN, CAPSLOCK_REPEAT, CAPSLOCK_UP, equal, ESC_DOWN, ESC_UP, ev_ignored, H_DOWN, H_REPEAT, H_UP, ignore_ev, input_event, is_modifier_down, J_DOWN, J_REPEAT, J_UP, K_DOWN, K_REPEAT, K_UP, L_DOWN, L_REPEAT, L_UP, LEFTCTRL_DOWN, LEFTCTRL_UP, META_DOWN, META_UP, print_event, SHIFT_DOWN, SHIFT_UP, State, SYN, TAB_DOWN, TAB_REPEAT, TAB_UP, unignore_ev, RIGHTALT_DOWN, RIGHTALT_REPEAT, RIGHTALT_UP};
-use input_linux_sys::{KEY_H, KEY_J, KEY_L, KEY_K};
-
-pub fn rightalt_mod(ev: &input_event, state: &mut State) -> bool {
+pub fn rightalt_mod(ev: &crate::input_event, state: &mut State) -> bool {
     if state.right_alt_is_down {
-        if equal(ev, &RIGHTALT_DOWN) ||
-            equal(ev, &RIGHTALT_REPEAT) {
+        if ev == &RIGHTALT_DOWN ||
+            ev == &RIGHTALT_REPEAT {
             return true;
         }
 
-        if equal(ev, &RIGHTALT_UP) {
+        if ev == &RIGHTALT_UP {
             state.right_alt_is_down = false;
-            if ev_ignored(&RIGHTALT_UP, &mut state.ignore_list) {
-                unignore_ev(&RIGHTALT_UP, &mut state.ignore_list);
+            if state.ignore_list.is_ignored(&KeyAction::new(RIGHT_ALT, TYPE_DOWN)) {
+                state.ignore_list.unignore(&KeyAction::new(RIGHT_ALT, TYPE_DOWN));
                 print_event(&RIGHTALT_UP);
                 print_event(&META_UP);
                 return true;
             }
+
             print_event(&RIGHTALT_DOWN);
             print_event(&SYN);
             thread::sleep(time::Duration::from_micros(20000));
@@ -33,7 +32,7 @@ pub fn rightalt_mod(ev: &input_event, state: &mut State) -> bool {
                 print_event(&META_DOWN);
 
                 // ignore right alt release
-                ignore_ev(&RIGHTALT_UP, &mut state.ignore_list);
+                state.ignore_list.unignore(&KeyAction::new(RIGHT_ALT, TYPE_DOWN));
             } else {
                 print_event(&RIGHTALT_DOWN);
             }
@@ -44,7 +43,7 @@ pub fn rightalt_mod(ev: &input_event, state: &mut State) -> bool {
 
             return true;
         }
-    } else if equal(ev, &RIGHTALT_DOWN) {
+    } else if ev == &RIGHTALT_DOWN {
         state.right_alt_is_down = true;
         return true;
     }
