@@ -11,7 +11,6 @@ use futures::future::{Future, lazy, select};
 
 mod tab_mod;
 mod caps_mod;
-mod leftalt_mod;
 mod rightalt_mod;
 mod x11;
 
