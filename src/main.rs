@@ -1,42 +1,37 @@
 #![feature(type_ascription)]
 #![feature(async_closure)]
-#![feature(impl_trait_in_bindings)]
 #![feature(unboxed_closures)]
 #![feature(trait_alias)]
 #![feature(label_break_value)]
-#![feature(let_chains)]
 
+extern crate timer;
+
+use std::{io, mem, thread, time};
+use std::io::{stdout, Write};
+use std::sync::Arc;
+
+use anyhow::Result;
+use input_linux_sys::*;
+use nom::lib::std::collections::HashMap;
 use tokio::prelude::*;
-use futures::future::{Future, lazy, select};
+use tokio::task;
+
+use crate::x11::{x11_initialize, x11_test};
+use crate::x11::ActiveWindowResult;
 
 mod tab_mod;
 mod caps_mod;
 mod rightalt_mod;
 mod x11;
 
-use tokio::prelude::*;
-use std::process::exit;
-use std::{io, mem, slice, thread, time};
-use std::io::{stdout, Write};
-
-use input_linux_sys::*;
-use crate::x11::{x11_get_active_window, x11_test, x11_initialize};
-use tokio::task;
-use anyhow::Result;
-use tokio::time::Duration;
-use std::sync::Arc;
-use nom::lib::std::collections::HashMap;
-use tokio::sync::mpsc::Sender;
-use crate::x11::ActiveWindowResult;
-use crate::KeyModifierWithState::META;
-
-extern crate timer;
-
+#[allow(non_camel_case_types)]
 pub type time_t = i64;
+#[allow(non_camel_case_types)]
 pub type suseconds_t = i64;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
+#[allow(non_camel_case_types)]
 pub struct timeval {
     pub tv_sec: time_t,
     pub tv_usec: suseconds_t,
@@ -116,8 +111,6 @@ unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
         ::std::mem::size_of::<T>(),
     )
 }
-
-static EV_SIZE: usize = mem::size_of::<input_event>();
 
 fn print_event(ev: &input_event) {
     unsafe {
@@ -319,8 +312,8 @@ async fn main() -> Result<()> {
     let mut stdin = tokio::io::stdin();
     let mut read_ev: input_event = unsafe { mem::zeroed() };
 
-    let (mut tx1, mut rx1) = tokio::sync::mpsc::channel(128);
-    let (mut tx2, mut rx2) = tokio::sync::mpsc::channel(128);
+    let (tx1, mut rx1) = tokio::sync::mpsc::channel(128);
+    let (tx2, mut rx2) = tokio::sync::mpsc::channel(128);
 
     // x11 thread
     tokio::spawn(async move {
@@ -421,8 +414,7 @@ async fn main() -> Result<()> {
         if let Some(active_window) = &state.active_window {
             if let Some(cached) = cache.get(&active_window.class) {
                 state.mappings.0.extend(
-                    cached.0.iter()
-                        .map(|(k, v)| { (k.clone(), v.clone()) })
+                    cached.0.iter().map(|(k, v)| { (k.clone(), v.clone()) })
                 );
                 return;
             }
@@ -446,8 +438,7 @@ async fn main() -> Result<()> {
                 ScopeInstruction::Scope(sub_scope) => { eval_scope(sub_scope, state, cache); }
                 ScopeInstruction::KeyMapping(mapping) => {
                     state.mappings.0.extend(
-                        mapping.0.iter()
-                            .map(|(k, v)| { (k.clone(), v.clone()) })
+                        mapping.0.iter().map(|(k, v)| { (k.clone(), v.clone()) })
                     );
                 }
             }
@@ -455,7 +446,7 @@ async fn main() -> Result<()> {
 
         // cache for later
         if let Some(active_window) = &state.active_window {
-            // cache.insert(active_window.class.to_string(), state.mappings.clone());
+            cache.insert(active_window.class.to_string(), state.mappings.clone());
         }
     }
 
@@ -634,6 +625,7 @@ impl KeyClickAction {
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct KeyActionCondition { window_class_name: Option<String> }
 
+#[derive(Clone)]
 struct KeyMappings(HashMap<KeyActionMods, KeySequence>);
 
 impl KeyMappings {
@@ -806,8 +798,8 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
                         action.key.code as u16,
                         action.value));
                 }
-                KeySequenceItem::EatKeyAction(keyAction) => {
-                    state.ignore_list.ignore(keyAction);
+                KeySequenceItem::EatKeyAction(key_action) => {
+                    state.ignore_list.ignore(key_action);
                 }
             }
         }

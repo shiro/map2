@@ -1,6 +1,4 @@
 use anyhow::Result;
-use tokio::prelude::*;
-use futures::future::{Future, lazy};
 
 use x11rb::protocol::xproto::{GetPropertyReply, ConnectionExt, Atom, Window, intern_atom, AtomEnum, Screen, ChangeWindowAttributesAux, EventMask};
 use x11rb::connection::Connection;
@@ -28,7 +26,7 @@ pub fn x11_initialize() -> Result<X11State<impl Connection + Send + Sync>> {
         .event_mask(Some(EventMask::SubstructureNotify | EventMask::PropertyChange)))?;
 
     #[allow(non_snake_case)]
-    let NET_ACTIVE_WINDOW: Atom = intern_atom(&con, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
+        let NET_ACTIVE_WINDOW: Atom = intern_atom(&con, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
 
     Ok(X11State {
         con,
@@ -54,7 +52,7 @@ pub fn x11_get_active_window() -> Result<ActiveWindowResult> {
     let (conn, screen) = x11rb::connect(None)?;
     let root = conn.setup().roots[screen].root;
 
-    let mut net_active_window: Atom = intern_atom(&conn, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
+    let net_active_window: Atom = intern_atom(&conn, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
     let mut net_wm_name: Atom = intern_atom(&conn, false, b"_NET_WM_NAME").unwrap().reply()?.atom;
     let mut utf8_string: Atom = intern_atom(&conn, false, b"UTF8_STRING").unwrap().reply()?.atom;
 
