@@ -403,7 +403,7 @@ async fn main() -> Result<()> {
         let mut local_mappings = KeyMappings::new();
 
         local_mappings.replace_key_click(KeyClickAction::new(MOUSE5), KeyClickAction::new_mods(TAB, *KeyModifierFlags::new().ctrl()));
-        local_mappings.replace_key_click(KeyClickAction::new_mods(MOUSE5, *KeyModifierFlags::new().shift()), KeyClickAction::new_mods(TAB, *KeyModifierFlags::new().ctrl()));
+        local_mappings.replace_key_click(KeyClickAction::new_mods(MOUSE5, *KeyModifierFlags::new().shift()), KeyClickAction::new_mods(TAB, *KeyModifierFlags::new().ctrl().shift()));
         local_mappings.replace_key_click(KeyClickAction::new(MOUSE6), KeyClickAction::new_mods(T, *KeyModifierFlags::new().ctrl()));
         local_mappings.replace_key_click(KeyClickAction::new(MOUSE7), KeyClickAction::new(F5));
         local_mappings.replace_key_click(KeyClickAction::new(MOUSE12), KeyClickAction::new_mods(W, *KeyModifierFlags::new().ctrl()));
