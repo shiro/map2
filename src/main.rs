@@ -4,11 +4,12 @@
 #![feature(trait_alias)]
 #![feature(label_break_value)]
 
-extern crate timer;
+#[macro_use]
+extern crate lazy_static;
 
 use std::{io, mem, thread, time};
 use std::io::{stdout, Write};
-use std::sync::Arc;
+use std::sync::{Arc};
 
 use anyhow::Result;
 use input_linux_sys::*;
@@ -18,6 +19,7 @@ use tokio::task;
 
 use crate::x11::{x11_initialize, x11_test};
 use crate::x11::ActiveWindowResult;
+use tokio::sync::mpsc::Sender;
 
 mod tab_mod;
 mod caps_mod;
@@ -312,8 +314,9 @@ async fn main() -> Result<()> {
     let mut stdin = tokio::io::stdin();
     let mut read_ev: input_event = unsafe { mem::zeroed() };
 
-    let (tx1, mut rx1) = tokio::sync::mpsc::channel(128);
-    let (tx2, mut rx2) = tokio::sync::mpsc::channel(128);
+    let (window_ev_tx, mut window_ev_rx) = tokio::sync::mpsc::channel(128);
+    let (input_ev_tx, mut input_ev_rx) = tokio::sync::mpsc::channel(128);
+    let (delay_tx, mut delay_rx) = tokio::sync::mpsc::channel(128);
 
     // x11 thread
     tokio::spawn(async move {
@@ -326,7 +329,7 @@ async fn main() -> Result<()> {
             }).await.unwrap();
 
             if let Ok(Some(val)) = res {
-                tx1.send(val).await.unwrap_or_else(|_| panic!());
+                window_ev_tx.send(val).await.unwrap_or_else(|_| panic!());
             }
         }
     });
@@ -335,7 +338,7 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         loop {
             listen_to_key_events(&mut read_ev, &mut stdin).await;
-            tx2.send(read_ev).await.unwrap();
+            input_ev_tx.send(read_ev).await.unwrap();
         }
     });
 
@@ -369,6 +372,58 @@ async fn main() -> Result<()> {
     global_mappings.replace_key_click(KeyClickAction::new(MOUSE10), KeyClickAction::new(KPD5));
     global_mappings.replace_key_click(KeyClickAction::new(MOUSE11), KeyClickAction::new(KPD6));
     global_mappings.replace_key_click(KeyClickAction::new(MOUSE12), KeyClickAction::new(KPD7));
+
+
+    { // figma-linux
+        let mut local_mappings = KeyMappings::new();
+
+        local_mappings.replace_key(KeyActionMods { key: MOUSE5, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionMods { key: MOUSE5, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(
+            KeyActionMods { key: MOUSE5, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}palette-pick{enter}".to_string()),
+        );
+
+        local_mappings.replace_key(KeyActionMods { key: MOUSE6, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionMods { key: MOUSE6, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(
+            KeyActionMods { key: MOUSE6, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}atom-sync{enter}".to_string()),
+        );
+
+        local_mappings.replace_key(KeyActionMods { key: MOUSE7, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionMods { key: MOUSE7, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(
+            KeyActionMods { key: MOUSE7, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}batch styler{enter}".to_string()),
+        );
+
+        local_mappings.replace_key(KeyActionMods { key: MOUSE8, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionMods { key: MOUSE8, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(
+            KeyActionMods { key: MOUSE8, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}chroma colors{enter}".to_string()),
+        );
+
+        local_mappings.replace_key(KeyActionMods { key: MOUSE9, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionMods { key: MOUSE9, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(
+            KeyActionMods { key: MOUSE9, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}scripter{enter}".to_string()),
+        );
+
+        local_mappings.replace_key(KeyActionMods { key: MOUSE11, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionMods { key: MOUSE11, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(
+            KeyActionMods { key: MOUSE11, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}theme-flip{enter}".to_string()),
+        );
+
+        global_scope.instructions.push(ScopeInstruction::Scope(Scope {
+            condition: Some(KeyActionCondition { window_class_name: Some("figma-linux".to_string()) }),
+            instructions: vec![ScopeInstruction::KeyMapping(local_mappings)],
+        }));
+    }
 
     { // arrow keys
         global_mappings.replace_key_click(
@@ -460,12 +515,15 @@ async fn main() -> Result<()> {
 
     loop {
         tokio::select! {
-            Some(window) = rx1.recv() => {
+            Some(window) = window_ev_rx.recv() => {
                 state.active_window = Some(window);
-                handle_active_window_change(&global_scope,&mut state, &mut cache);
+                handle_active_window_change(&global_scope, &mut state, &mut cache);
             }
-            Some(ev) = rx2.recv() => {
-                handle_stdin_ev(&mut state, &ev).unwrap();
+            Some(ev) = input_ev_rx.recv() => {
+                handle_stdin_ev(&mut state, &ev, delay_tx.clone()).unwrap();
+            }
+            Some(seq) = delay_rx.recv() => {
+                process_key_sequence(&mut state.ignore_list, &seq, delay_tx.clone()).unwrap();
             }
             else => { break }
         }
@@ -522,13 +580,6 @@ struct KeyModifierFlags {
 
 impl KeyModifierFlags {
     pub fn new() -> Self { KeyModifierFlags { ctrl: false, shift: false, alt: false, meta: false } }
-    pub fn invert(mut self) -> Self {
-        self.ctrl = !self.ctrl;
-        self.alt = !self.alt;
-        self.shift = !self.shift;
-        self.meta = !self.meta;
-        self
-    }
     pub fn ctrl(&mut self) -> &mut Self {
         self.ctrl = true;
         self
@@ -566,13 +617,109 @@ enum KeyModifierWithState {
 enum KeySequenceItem {
     KeyAction(KeyAction),
     EatKeyAction(KeyAction),
+    SleepAction(time::Duration),
 }
 
 #[derive(Clone, Hash)]
 struct KeySequence(Vec<KeySequenceItem>);
 
+type KEYCODE = i32;
+
+trait KeycodeExt {
+    fn to_key(&self) -> Key;
+}
+
+impl KeycodeExt for KEYCODE {
+    fn to_key(&self) -> Key { Key { key_type: EV_KEY, code: *self } }
+}
+
+lazy_static! {
+    static ref KEY_LOOKUP: HashMap<&'static str, KeySequence> = {
+        let mut m = HashMap::new();
+        m.insert("enter", KeySequence::new().append_click(KEY_ENTER.to_key()));
+        m.insert("esc", KeySequence::new().append_click(KEY_ESC.to_key()));
+        m.insert("ctrl", KeySequence::new().append_click(KEY_LEFTCTRL.to_key()));
+        m.insert("ctrl down", KeySequence::new() .append_action(KeyAction::new(KEY_LEFTCTRL.to_key(), TYPE_DOWN)));
+        m.insert("ctrl up", KeySequence::new() .append_action(KeyAction::new(KEY_LEFTCTRL.to_key(), TYPE_UP)));
+        m.insert("shift", KeySequence::new().append_click(KEY_LEFTSHIFT.to_key()));
+        m.insert(" ", KeySequence::new().append_click(KEY_SPACE.to_key()));
+        m.insert("-", KeySequence::new().append_click(KEY_MINUS.to_key()));
+        m.insert("/", KeySequence::new().append_click(KEY_SLASH.to_key()));
+        m.insert("a", KeySequence::new().append_click(KEY_A.to_key()));
+        m.insert("b", KeySequence::new().append_click(KEY_B.to_key()));
+        m.insert("c", KeySequence::new().append_click(KEY_C.to_key()));
+        m.insert("d", KeySequence::new().append_click(KEY_D.to_key()));
+        m.insert("e", KeySequence::new().append_click(KEY_E.to_key()));
+        m.insert("f", KeySequence::new().append_click(KEY_F.to_key()));
+        m.insert("g", KeySequence::new().append_click(KEY_G.to_key()));
+        m.insert("h", KeySequence::new().append_click(KEY_H.to_key()));
+        m.insert("i", KeySequence::new().append_click(KEY_I.to_key()));
+        m.insert("j", KeySequence::new().append_click(KEY_J.to_key()));
+        m.insert("k", KeySequence::new().append_click(KEY_K.to_key()));
+        m.insert("l", KeySequence::new().append_click(KEY_L.to_key()));
+        m.insert("m", KeySequence::new().append_click(KEY_M.to_key()));
+        m.insert("n", KeySequence::new().append_click(KEY_N.to_key()));
+        m.insert("o", KeySequence::new().append_click(KEY_O.to_key()));
+        m.insert("p", KeySequence::new().append_click(KEY_P.to_key()));
+        m.insert("q", KeySequence::new().append_click(KEY_Q.to_key()));
+        m.insert("r", KeySequence::new().append_click(KEY_R.to_key()));
+        m.insert("s", KeySequence::new().append_click(KEY_S.to_key()));
+        m.insert("t", KeySequence::new().append_click(KEY_T.to_key()));
+        m.insert("u", KeySequence::new().append_click(KEY_U.to_key()));
+        m.insert("v", KeySequence::new().append_click(KEY_V.to_key()));
+        m.insert("w", KeySequence::new().append_click(KEY_W.to_key()));
+        m.insert("x", KeySequence::new().append_click(KEY_X.to_key()));
+        m.insert("y", KeySequence::new().append_click(KEY_Y.to_key()));
+        m.insert("z", KeySequence::new().append_click(KEY_Z.to_key()));
+        m.insert("V", KeySequence::new()
+            .append_action(KeyAction::new(KEY_LEFTSHIFT.to_key(), TYPE_DOWN))
+            .append_click(KEY_V.to_key())
+            .append_action(KeyAction::new(KEY_LEFTSHIFT.to_key(), TYPE_UP))
+        );
+        m
+    };
+}
+
 impl KeySequence {
     pub fn new() -> Self { KeySequence(Default::default()) }
+    pub fn append(mut self, item: KeySequenceItem) -> Self {
+        self.0.push(item);
+        self
+    }
+    pub fn append_action(mut self, action: KeyAction) -> Self {
+        self = self.append(KeySequenceItem::KeyAction(action));
+        self
+    }
+    pub fn append_click(mut self, key: Key) -> Self {
+        self = self.append_action(KeyAction::new(key, TYPE_DOWN));
+        // self = self.sleep_for_millis(10);
+        self = self.append_action(KeyAction::new(key, TYPE_UP));
+        // self = self.sleep_for_millis(100);
+        self
+    }
+    pub fn sleep_for_millis(mut self, duration: u64) -> Self {
+        self.append(KeySequenceItem::SleepAction(time::Duration::from_millis(duration)))
+    }
+
+    pub fn append_string_sequence(mut self, sequence: String) -> Self {
+        let mut it = sequence.chars();
+        while let Some(ch) = it.next() {
+            // special
+            if ch == '{' {
+                let special_char = it.by_ref().take_while(|&ch| ch != '}').collect::<String>();
+                let seq = KEY_LOOKUP.get(special_char.as_str())
+                    .expect(format!("failed to lookup key '{}'", special_char).as_str());
+                self.0.extend(seq.0.iter().cloned());
+                continue;
+            }
+
+            let seq = KEY_LOOKUP.get(ch.to_string().as_str())
+                .expect(format!("failed to lookup key '{}'", ch).as_str());
+            self.0.extend(seq.0.iter().cloned());
+        }
+
+        self
+    }
 }
 
 impl KeyModifierAction {
@@ -700,74 +847,77 @@ impl KeyMappings {
 
 const fn make_key(code: i32) -> Key { Key { key_type: EV_KEY, code } }
 
-fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
+
+fn update_modifiers(state: &mut State, ev: &input_event) {
+    if *ev == LEFTCTRL_DOWN {
+        state.leftcontrol_is_down = true;
+    } else if *ev == LEFTCTRL_UP {
+        state.leftcontrol_is_down = false;
+
+        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_CTRL, TYPE_UP)) {
+            state.ignore_list.unignore(&KeyAction::new(LEFT_CTRL, TYPE_UP));
+            return;
+        }
+    }
+
+    if *ev == LEFTALT_DOWN {
+        state.leftalt_is_down = true;
+    } else if *ev == LEFTALT_UP {
+        state.leftalt_is_down = false;
+
+        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_ALT, TYPE_UP)) {
+            state.ignore_list.unignore(&KeyAction::new(LEFT_ALT, TYPE_UP));
+            return;
+        }
+    }
+
+    if *ev == SHIFT_DOWN {
+        state.shift_is_down = true;
+    } else if *ev == SHIFT_UP {
+        state.shift_is_down = false;
+
+        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_SHIFT, TYPE_UP)) {
+            state.ignore_list.unignore(&KeyAction::new(LEFT_SHIFT, TYPE_UP));
+            return;
+        }
+    }
+
+    if *ev == META_DOWN {
+        state.meta_is_down = true;
+    } else if *ev == META_UP {
+        state.meta_is_down = false;
+
+        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_META, TYPE_UP)) {
+            state.ignore_list.unignore(&KeyAction::new(LEFT_META, TYPE_UP));
+            return;
+        }
+    }
+}
+
+fn handle_stdin_ev(mut state: &mut State, ev: &input_event, delay_tx: tokio::sync::mpsc::Sender<KeySequence>) -> Result<()> {
     if ev.type_ != EV_KEY as u16 {
         print_event(&ev);
         return Ok(());
     }
 
-    if ev == &LEFTCTRL_DOWN {
-        state.leftcontrol_is_down = true;
-    } else if ev == &LEFTCTRL_UP {
-        state.leftcontrol_is_down = false;
+    update_modifiers(&mut state, &ev);
 
-        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_CTRL, TYPE_UP)) {
-            state.ignore_list.unignore(&KeyAction::new(LEFT_CTRL, TYPE_UP));
-            return Ok(());
-        }
-    }
-
-    if ev == &LEFTALT_DOWN {
-        state.leftalt_is_down = true;
-    } else if ev == &LEFTALT_UP {
-        state.leftalt_is_down = false;
-
-        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_ALT, TYPE_UP)) {
-            state.ignore_list.unignore(&KeyAction::new(LEFT_ALT, TYPE_UP));
-            return Ok(());
-        }
-    }
-
-    if ev == &SHIFT_DOWN {
-        state.shift_is_down = true;
-    } else if ev == &SHIFT_UP {
-        state.shift_is_down = false;
-
-        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_SHIFT, TYPE_UP)) {
-            state.ignore_list.unignore(&KeyAction::new(LEFT_SHIFT, TYPE_UP));
-            return Ok(());
-        }
-    }
-
-    if ev == &META_DOWN {
-        state.meta_is_down = true;
-    } else if ev == &META_UP {
-        state.meta_is_down = false;
-
-        if state.ignore_list.is_ignored(&KeyAction::new(LEFT_META, TYPE_UP)) {
-            state.ignore_list.unignore(&KeyAction::new(LEFT_META, TYPE_UP));
-            return Ok(());
-        }
-    }
-
-
-    if crate::tab_mod::tab_mod(&ev, state) {
+    if crate::tab_mod::tab_mod(&ev, &mut *state) {
         return Ok(());
     }
 
     if !state.leftcontrol_is_down {
-        if crate::caps_mod::caps_mod(&ev, state) {
+        if crate::caps_mod::caps_mod(&ev, &mut *state) {
             return Ok(());
         }
     }
 
     if !state.disable_alt_mod {
-        if crate::rightalt_mod::rightalt_mod(&ev, state) {
+        if crate::rightalt_mod::rightalt_mod(&ev, &mut *state) {
             return Ok(());
         }
     }
 
-    let mappings = &mut state.mappings;
     let mut from_modifiers = KeyModifierFlags::new();
     from_modifiers.ctrl = state.leftcontrol_is_down.clone();
     from_modifiers.alt = state.leftalt_is_down.clone();
@@ -780,36 +930,41 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event) -> Result<()> {
         modifiers: from_modifiers,
     };
 
-    if let Some(to_action_seq) = mappings.0.get(&from_key_action) {
-        let mut prev_was_modifier = false;
-
-        for seq_item in to_action_seq.0.iter() {
-            match seq_item {
-                KeySequenceItem::KeyAction(action) => {
-                    if prev_was_modifier && action.key.key_type == EV_KEY {
-                        print_event(&SYN);
-                        thread::sleep(time::Duration::from_micros(20000));
-                    }
-
-                    prev_was_modifier = action.key == LEFT_CTRL || action.key == LEFT_ALT || action.key == LEFT_SHIFT || action.key == LEFT_META;
-
-                    print_event(&make_event(
-                        action.key.key_type as u16,
-                        action.key.code as u16,
-                        action.value));
-                }
-                KeySequenceItem::EatKeyAction(key_action) => {
-                    state.ignore_list.ignore(key_action);
-                }
-            }
-        }
-
-
+    if let Some(to_action_seq) = state.mappings.0.get(&from_key_action) {
+        process_key_sequence(&mut state.ignore_list, to_action_seq, delay_tx);
         return Ok(());
     }
-
 
     print_event(&ev);
 
     Ok(())
+}
+
+fn process_key_sequence(ignore_list: &mut IgnoreList, to_action_seq: &KeySequence, delay_tx: Sender<KeySequence>) -> Result<()> {
+    for (idx, seq_item) in to_action_seq.0.iter().enumerate() {
+        match seq_item {
+            KeySequenceItem::KeyAction(action) => {
+                print_event(&make_event(
+                    action.key.key_type as u16,
+                    action.key.code as u16,
+                    action.value));
+
+                print_event(&SYN);
+                thread::sleep(time::Duration::from_micros(20000));
+            }
+            KeySequenceItem::EatKeyAction(key_action) => {
+                ignore_list.ignore(&key_action);
+            }
+            KeySequenceItem::SleepAction(duration) => {
+                let duration = duration.clone();
+                let seq = KeySequence(to_action_seq.0.iter().skip(idx + 1).map(|v| v.clone()).collect());
+                tokio::spawn(async move {
+                    tokio::time::sleep(duration).await;
+                    delay_tx.send(seq).await;
+                });
+                return Ok(());
+            }
+        }
+    }
+    return Ok(());
 }
