@@ -125,12 +125,6 @@ async fn main() -> Result<()> {
     tokio::spawn(async move {
         loop {
             listen_to_key_events(&mut read_ev, &mut stdin).await;
-
-            if read_ev.type_ != input_linux_sys::EV_KEY as u16 {
-                print_event(&read_ev);
-                continue;
-            }
-
             input_ev_tx.send(read_ev).await.unwrap();
         }
     });
@@ -470,6 +464,11 @@ fn update_modifiers(state: &mut State, ev: &input_event) {
 }
 
 fn handle_stdin_ev(mut state: &mut State, ev: &input_event, delay_tx: tokio::sync::mpsc::Sender<KeySequence>) -> Result<()> {
+    if ev.type_ != input_linux_sys::EV_KEY as u16 {
+        print_event(&ev);
+        return Ok(());
+    }
+
     update_modifiers(&mut state, &ev);
 
     if crate::tab_mod::tab_mod(&ev, &mut *state) {
