@@ -1,73 +1,70 @@
 use crate::*;
 use std::{thread, time};
 
-pub fn caps_mod(ev: &crate::input_event, state: &mut State) -> bool {
+pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
     if state.capslock_is_down {
-        // capslock repeat
-        if crate::equal(&ev, &CAPSLOCK_DOWN) || crate::equal(&ev, &CAPSLOCK_REPEAT) {
+        if *ev == INPUT_EV_CAPSLOCK.down || *ev == INPUT_EV_CAPSLOCK.repeat {
             return true;
         }
 
-        // capslock up
-        if crate::equal(&ev, &CAPSLOCK_UP) {
+        if *ev == INPUT_EV_CAPSLOCK.up {
             state.capslock_is_down = false;
-            print_event(&LEFTCTRL_UP);
+            print_event(&INPUT_EV_LEFTCTRL.up);
 
-            // return if up event is ignored
-            if state.ignore_list.is_ignored(&KeyAction::new(CAPSLOCK, TYPE_DOWN)) {
-                state.ignore_list.unignore(&KeyAction::new(CAPSLOCK, TYPE_DOWN));
+            if state.ignore_list.is_ignored(&KeyAction::new(KEY_CAPSLOCK, TYPE_DOWN)) {
+                state.ignore_list.unignore(&KeyAction::new(KEY_CAPSLOCK, TYPE_DOWN));
                 return true;
             }
 
-            crate::print_event(&ESC_DOWN);
-            crate::print_event(&SYN);
+            crate::print_event(&INPUT_EV_ESC.down);
+            crate::print_event(&INPUT_EV_SYN);
             thread::sleep(time::Duration::from_micros(20000));
-            crate::print_event(&ESC_UP);
+            crate::print_event(&INPUT_EV_ESC.up);
             return true;
         }
 
         // capslock + [key down]
         if ev.value == 1 {
-            state.ignore_list.ignore(&KeyAction::new(CAPSLOCK, TYPE_DOWN));
+            state.ignore_list.ignore(&KeyAction::new(KEY_CAPSLOCK, TYPE_DOWN));
 
             // navigation keys (h, j, k, l)
             // only bind to capslock + directional keys, no modifiers
             if !state.tab_is_down &&
-                !is_modifier_down(state) && (
-                equal(ev, &H_DOWN) ||
-                    equal(ev, &J_DOWN) ||
-                    equal(ev, &K_DOWN) ||
-                    equal(ev, &L_DOWN)) {
-                print_event(&META_DOWN);
-                print_event(&LEFTALT_DOWN);
-                print_event(&LEFTCTRL_DOWN);
-                print_event(&SHIFT_DOWN);
+                !state.is_modifier_down() && (
+                *ev == INPUT_EV_H.down ||
+                    *ev == INPUT_EV_J.down ||
+                    *ev == INPUT_EV_K.down ||
+                    *ev == INPUT_EV_L.down) {
+                print_event(&INPUT_EV_META.down);
+                print_event(&INPUT_EV_LEFTALT.down);
+                print_event(&INPUT_EV_LEFTCTRL.down);
+                print_event(&INPUT_EV_SHIFT.down);
                 print_event(ev);
 
-                print_event(&SYN);
+                print_event(&INPUT_EV_SYN);
                 thread::sleep(time::Duration::from_micros(20000));
 
-                print_event(&META_UP);
-                print_event(&LEFTALT_UP);
-                print_event(&LEFTCTRL_UP);
-                print_event(&SHIFT_UP);
+                print_event(&INPUT_EV_META.up);
+                print_event(&INPUT_EV_LEFTALT.up);
+                print_event(&INPUT_EV_LEFTCTRL.up);
+                print_event(&INPUT_EV_SHIFT.up);
 
                 return true;
             }
 
             return false;
         }
-    } else if equal(ev, &CAPSLOCK_DOWN) && !is_modifier_down(state) {
+    } else if *ev == INPUT_EV_CAPSLOCK.down && !state.is_modifier_down() {
         state.capslock_is_down = true;
-        print_event(&LEFTCTRL_DOWN);
+        print_event(&INPUT_EV_LEFTCTRL.down);
         return true;
-    } else if equal(ev, &CAPSLOCK_DOWN) { // handle modifier + caps_lock down
+    } else if *ev == INPUT_EV_CAPSLOCK.down { // handle modifier + caps_lock down
         return true;
-    } else if equal(ev, &CAPSLOCK_UP) { // handle modifier + caps_lock up
-        print_event(&ESC_DOWN);
-        print_event(&SYN);
+    } else if *ev == INPUT_EV_CAPSLOCK.up { // handle modifier + caps_lock up
+        print_event(&INPUT_EV_ESC.down);
+        print_event(&INPUT_EV_SYN);
         thread::sleep(time::Duration::from_micros(20000));
-        print_event(&ESC_UP);
+        print_event(&INPUT_EV_ESC.up);
         return true;
     }
     false

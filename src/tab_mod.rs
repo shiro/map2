@@ -1,49 +1,44 @@
 use crate::*;
-use crate::{KeyAction};
 use std::{thread, time};
-// use crate::KeySequenceItem::KeyAction;
 
-pub fn tab_mod(ev: &crate::input_event, state: &mut State) -> bool {
+pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
     if state.tab_is_down {
-        // tab repeat
-        if ev == &TAB_DOWN || ev == &TAB_REPEAT {
+        if *ev == INPUT_EV_TAB.down || *ev == INPUT_EV_TAB.repeat {
             return true;
         }
 
-        // tab up
-        if crate::equal(&ev, &TAB_UP) {
+        if *ev == INPUT_EV_TAB.up {
             state.tab_is_down = false;
 
-            // tab up was handled before, just release all mods
-            if state.ignore_list.is_ignored(&KeyAction::new(TAB, TYPE_DOWN)) {
-                state.ignore_list.unignore(&KeyAction::new(TAB, TYPE_DOWN));
+            if state.ignore_list.is_ignored(&KeyAction::new(KEY_TAB, TYPE_DOWN)) {
+                state.ignore_list.unignore(&KeyAction::new(KEY_TAB, TYPE_DOWN));
                 return true;
             }
 
-            crate::print_event(&TAB_DOWN);
-            crate::print_event(&SYN);
+            print_event(&INPUT_EV_TAB.down);
+            print_event(&INPUT_EV_SYN);
             thread::sleep(time::Duration::from_micros(20000));
-            crate::print_event(&TAB_UP);
+            print_event(&INPUT_EV_TAB.up);
             return true;
         }
 
         // tab + [key down]
         if ev.value == 1 {
-            state.ignore_list.ignore(&KeyAction::new(TAB, TYPE_DOWN));
-            crate::print_event(&LEFTALT_DOWN);
-            crate::print_event(&SHIFT_DOWN);
-            crate::print_event(&META_DOWN);
-            crate::print_event(&SYN);
+            state.ignore_list.ignore(&KeyAction::new(KEY_TAB, TYPE_DOWN));
+            print_event(&INPUT_EV_LEFTALT.down);
+            print_event(&INPUT_EV_SHIFT.down);
+            print_event(&INPUT_EV_META.down);
+            print_event(&INPUT_EV_SYN);
             thread::sleep(time::Duration::from_micros(20000));
             print_event(&ev);
 
-            print_event(&LEFTALT_UP);
-            print_event(&SHIFT_UP);
-            print_event(&META_UP);
+            print_event(&INPUT_EV_LEFTALT.up);
+            print_event(&INPUT_EV_SHIFT.up);
+            print_event(&INPUT_EV_META.up);
 
             return true;
         }
-    } else if ev == &TAB_DOWN {
+    } else if ev == &INPUT_EV_TAB.down {
         state.tab_is_down = true;
         return true;
     }

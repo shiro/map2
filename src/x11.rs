@@ -53,8 +53,8 @@ pub fn x11_get_active_window() -> Result<ActiveWindowResult> {
     let root = conn.setup().roots[screen].root;
 
     let net_active_window: Atom = intern_atom(&conn, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
-    let mut net_wm_name: Atom = intern_atom(&conn, false, b"_NET_WM_NAME").unwrap().reply()?.atom;
-    let mut utf8_string: Atom = intern_atom(&conn, false, b"UTF8_STRING").unwrap().reply()?.atom;
+    let net_wm_name: Atom = intern_atom(&conn, false, b"_NET_WM_NAME").unwrap().reply()?.atom;
+    let utf8_string: Atom = intern_atom(&conn, false, b"UTF8_STRING").unwrap().reply()?.atom;
 
     let focus = find_active_window(&conn, root, net_active_window)?;
 
