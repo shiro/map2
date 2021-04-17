@@ -26,7 +26,7 @@ pub(crate) enum SimpleModifierName {
 
 
 #[derive(Clone)]
-pub struct CompiledKeyMappings(pub(crate) HashMap<KeyActionWithMods, (KeySequence, GuardedVarMap)>);
+pub struct CompiledKeyMappings(pub(crate) HashMap<KeyActionWithMods, Block>);
 
 impl CompiledKeyMappings { pub fn new() -> Self { CompiledKeyMappings(Default::default()) } }
 
@@ -44,7 +44,7 @@ pub struct State {
     pub(crate) disable_alt_mod: bool,
 
     pub(crate) ignore_list: IgnoreList,
-    pub(crate) mappings: CompiledKeyMappings,
+    // pub(crate) mappings: CompiledKeyMappings,
 
     pub(crate) active_window: Option<ActiveWindowResult>,
 }
@@ -75,7 +75,7 @@ impl State {
             right_alt_is_down: false,
             disable_alt_mod: false,
             ignore_list: IgnoreList::new(),
-            mappings: CompiledKeyMappings::new(),
+            // mappings: CompiledKeyMappings::new(),
             active_window: None,
         }
     }

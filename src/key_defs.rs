@@ -1,6 +1,7 @@
 use crate::*;
 // use input_linux_sys;
 use input_linux_sys::*;
+use crate::block_ext::ExprExt;
 
 #[allow(non_camel_case_types)]
 pub type time_t = i64;
@@ -170,44 +171,44 @@ impl KeycodeExt for KEYCODE {
 }
 
 lazy_static! {
-    pub static ref KEY_LOOKUP: HashMap<&'static str, KeySequence> = {
+    pub(crate) static ref KEY_LOOKUP: HashMap<&'static str, Vec<Expr>> = {
         let mut m = HashMap::new();
-        m.insert("enter", KeySequence::new().append_click(KEY_ENTER));
-        m.insert("esc", KeySequence::new().append_click(KEY_ESC));
-        m.insert("ctrl", KeySequence::new().append_click(KEY_LEFT_CTRL));
-        m.insert("ctrl down", KeySequence::new() .append_action(KeyAction::new(KEY_LEFT_CTRL, TYPE_DOWN)));
-        m.insert("ctrl up", KeySequence::new() .append_action(KeyAction::new(KEY_LEFT_CTRL, TYPE_UP)));
-        m.insert("shift", KeySequence::new().append_click(KEY_LEFT_SHIFT));
-        m.insert(" ", KeySequence::new().append_click(KEY_SPACE));
-        m.insert("-", KeySequence::new().append_click(KEY_MINUS));
-        m.insert("/", KeySequence::new().append_click(KEY_SLASH));
-        m.insert("a", KeySequence::new().append_click(KEY_A));
-        m.insert("b", KeySequence::new().append_click(KEY_B));
-        m.insert("c", KeySequence::new().append_click(KEY_C));
-        m.insert("d", KeySequence::new().append_click(KEY_D));
-        m.insert("e", KeySequence::new().append_click(KEY_E));
-        m.insert("f", KeySequence::new().append_click(KEY_F));
-        m.insert("g", KeySequence::new().append_click(KEY_G));
-        m.insert("h", KeySequence::new().append_click(KEY_H));
-        m.insert("i", KeySequence::new().append_click(KEY_I));
-        m.insert("j", KeySequence::new().append_click(KEY_J));
-        m.insert("k", KeySequence::new().append_click(KEY_K));
-        m.insert("l", KeySequence::new().append_click(KEY_L));
-        m.insert("m", KeySequence::new().append_click(KEY_M));
-        m.insert("n", KeySequence::new().append_click(KEY_N));
-        m.insert("o", KeySequence::new().append_click(KEY_O));
-        m.insert("p", KeySequence::new().append_click(KEY_P));
-        m.insert("q", KeySequence::new().append_click(KEY_Q));
-        m.insert("r", KeySequence::new().append_click(KEY_R));
-        m.insert("s", KeySequence::new().append_click(KEY_S));
-        m.insert("t", KeySequence::new().append_click(KEY_T));
-        m.insert("u", KeySequence::new().append_click(KEY_U));
-        m.insert("v", KeySequence::new().append_click(KEY_V));
-        m.insert("w", KeySequence::new().append_click(KEY_W));
-        m.insert("x", KeySequence::new().append_click(KEY_X));
-        m.insert("y", KeySequence::new().append_click(KEY_Y));
-        m.insert("z", KeySequence::new().append_click(KEY_Z));
-        m.insert("V", KeySequence::new()
+        m.insert("enter", vec![].append_click(KEY_ENTER));
+        m.insert("esc", vec![].append_click(KEY_ESC));
+        m.insert("ctrl", vec![].append_click(KEY_LEFT_CTRL));
+        m.insert("ctrl down", vec![] .append_action(KeyAction::new(KEY_LEFT_CTRL, TYPE_DOWN)));
+        m.insert("ctrl up", vec![] .append_action(KeyAction::new(KEY_LEFT_CTRL, TYPE_UP)));
+        m.insert("shift", vec![].append_click(KEY_LEFT_SHIFT));
+        m.insert(" ", vec![].append_click(KEY_SPACE));
+        m.insert("-", vec![].append_click(KEY_MINUS));
+        m.insert("/", vec![].append_click(KEY_SLASH));
+        m.insert("a", vec![].append_click(KEY_A));
+        m.insert("b", vec![].append_click(KEY_B));
+        m.insert("c", vec![].append_click(KEY_C));
+        m.insert("d", vec![].append_click(KEY_D));
+        m.insert("e", vec![].append_click(KEY_E));
+        m.insert("f", vec![].append_click(KEY_F));
+        m.insert("g", vec![].append_click(KEY_G));
+        m.insert("h", vec![].append_click(KEY_H));
+        m.insert("i", vec![].append_click(KEY_I));
+        m.insert("j", vec![].append_click(KEY_J));
+        m.insert("k", vec![].append_click(KEY_K));
+        m.insert("l", vec![].append_click(KEY_L));
+        m.insert("m", vec![].append_click(KEY_M));
+        m.insert("n", vec![].append_click(KEY_N));
+        m.insert("o", vec![].append_click(KEY_O));
+        m.insert("p", vec![].append_click(KEY_P));
+        m.insert("q", vec![].append_click(KEY_Q));
+        m.insert("r", vec![].append_click(KEY_R));
+        m.insert("s", vec![].append_click(KEY_S));
+        m.insert("t", vec![].append_click(KEY_T));
+        m.insert("u", vec![].append_click(KEY_U));
+        m.insert("v", vec![].append_click(KEY_V));
+        m.insert("w", vec![].append_click(KEY_W));
+        m.insert("x", vec![].append_click(KEY_X));
+        m.insert("y", vec![].append_click(KEY_Y));
+        m.insert("z", vec![].append_click(KEY_Z));
+        m.insert("V", vec![]
             .append_action(KeyAction::new(KEY_LEFT_SHIFT, TYPE_DOWN))
             .append_click(KEY_V)
             .append_action(KeyAction::new(KEY_LEFT_SHIFT, TYPE_UP))
