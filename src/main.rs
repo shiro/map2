@@ -10,6 +10,9 @@ extern crate lazy_static;
 use std::{io, mem, thread, time};
 use std::io::{stdout, Write};
 use std::sync::{Arc};
+use std::rc::Rc;
+use std::sync::Mutex;
+
 
 use anyhow::{Result, Error};
 use nom::lib::std::collections::HashMap;
@@ -24,6 +27,7 @@ use crate::key_defs::input_event;
 
 use crate::state::*;
 use crate::scope::*;
+use std::cell::RefCell;
 
 mod tab_mod;
 mod caps_mod;
@@ -130,27 +134,14 @@ async fn main() -> Result<()> {
     });
 
 
-    let mut state = State {
-        tab_is_down: false,
-        capslock_is_down: false,
-        leftcontrol_is_down: false,
-        shift_is_down: false,
-        meta_is_down: false,
-        leftalt_is_down: false,
-        right_alt_is_down: false,
-        disable_alt_mod: false,
-        ignore_list: IgnoreList::new(),
-        mappings: KeyMappings::new(),
-        active_window: None,
-    };
-
+    let mut state = State::new();
     let mut cache: ScopeCache = HashMap::new();
-    let global_scope = mappings::bind_mappings(&mut state);
+    let mut global_scope = mappings::bind_mappings(&mut state);
 
-    eval_scope(&global_scope, &mut state, &mut cache);
+    eval_scope(&mut global_scope, &mut state, &mut cache);
 
-    fn handle_active_window_change(scope: &Scope, state: &mut State, cache: &mut ScopeCache) {
-        state.mappings = KeyMappings::new();
+    fn handle_active_window_change(scope: &mut Scope, state: &mut State, cache: &mut ScopeCache) {
+        state.mappings = CompiledKeyMappings::new();
 
         eval_scope(scope, state, cache);
     }
@@ -159,13 +150,13 @@ async fn main() -> Result<()> {
         tokio::select! {
             Some(window) = window_ev_rx.recv() => {
                 state.active_window = Some(window);
-                handle_active_window_change(&global_scope, &mut state, &mut cache);
+                handle_active_window_change(&mut global_scope, &mut state, &mut cache);
             }
             Some(ev) = input_ev_rx.recv() => {
                 handle_stdin_ev(&mut state, &ev, delay_tx.clone()).unwrap();
             }
-            Some(seq) = delay_rx.recv() => {
-                process_key_sequence(&mut state.ignore_list, &seq, delay_tx.clone()).unwrap();
+            Some((seq, var_map)) = delay_rx.recv() => {
+                process_key_sequence(&mut state.ignore_list, &seq, &var_map, delay_tx.clone()).unwrap();
             }
             else => { break }
         }
@@ -248,10 +239,12 @@ enum KeyModifierWithState {
 }
 
 #[derive(Clone, Hash, Debug)]
-pub enum KeySequenceItem {
+pub(crate) enum KeySequenceItem {
     KeyAction(KeyAction),
     EatKeyAction(KeyAction),
     SleepAction(time::Duration),
+    Assignment(String, ValueType),
+    Condition(Condition),
 }
 
 #[derive(Clone, Hash, Debug)]
@@ -260,7 +253,7 @@ pub struct KeySequence(Vec<KeySequenceItem>);
 
 impl KeySequence {
     pub fn new() -> Self { KeySequence(Default::default()) }
-    pub fn append(mut self, item: KeySequenceItem) -> Self {
+    pub(crate) fn append(mut self, item: KeySequenceItem) -> Self {
         self.0.push(item);
         self
     }
@@ -326,7 +319,7 @@ impl KeyModifierAction {
 pub struct KeyAction { key: Key, value: i32 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub struct KeyActionMods { key: Key, value: i32, modifiers: KeyModifierFlags }
+pub struct KeyActionWithMods { key: Key, value: i32, modifiers: KeyModifierFlags }
 
 impl KeyAction {
     pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value } }
@@ -344,14 +337,23 @@ impl KeyClickAction {
 }
 
 #[derive(Clone)]
-pub struct KeyMappings(HashMap<KeyActionMods, KeySequence>);
+pub(crate) struct KeyMapping {
+    from: KeyActionWithMods,
+    to: KeySequence,
+}
+
+#[derive(Clone)]
+pub(crate) struct KeyMappings(HashMap<KeyActionWithMods, KeySequence>);
+
+// #[derive(Clone)]
+// pub struct KeyMapping { sequence: KeySequence, var_map: Rc<RefCell<VarMap>> }
 
 impl KeyMappings {
     fn new() -> Self {
         KeyMappings { 0: Default::default() }
     }
 
-    fn replace_key(&mut self, from: KeyActionMods, to: KeySequence) {
+    fn replace_key(&mut self, from: KeyActionWithMods, to: KeySequence) {
         self.0.insert(from, to);
     }
 
@@ -384,7 +386,7 @@ impl KeyMappings {
             to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: to.key, value: TYPE_DOWN }));
 
             self.replace_key(
-                KeyActionMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() },
+                KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() },
                 to_seq,
             );
         }
@@ -399,7 +401,7 @@ impl KeyMappings {
             if to.modifiers.meta && !from.modifiers.meta { to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: KEY_LEFT_META, value: TYPE_UP })) }
 
             self.replace_key(
-                KeyActionMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() },
+                KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() },
                 to_seq,
             );
         }
@@ -409,7 +411,7 @@ impl KeyMappings {
             to_seq.0.push(KeySequenceItem::KeyAction(KeyAction { key: to.key, value: TYPE_REPEAT }));
 
             self.replace_key(
-                KeyActionMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers },
+                KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers },
                 to_seq,
             );
         }
@@ -418,52 +420,25 @@ impl KeyMappings {
 
 
 fn update_modifiers(state: &mut State, ev: &input_event) {
-    if *ev == INPUT_EV_LEFTCTRL.down {
-        state.leftcontrol_is_down = true;
-    } else if *ev == INPUT_EV_LEFTCTRL.up {
-        state.leftcontrol_is_down = false;
-
-        if state.ignore_list.is_ignored(&KeyAction::new(KEY_LEFT_CTRL, TYPE_UP)) {
-            state.ignore_list.unignore(&KeyAction::new(KEY_LEFT_CTRL, TYPE_UP));
-            return;
-        }
-    }
-
-    if *ev == INPUT_EV_LEFTALT.down {
-        state.leftalt_is_down = true;
-    } else if *ev == INPUT_EV_LEFTALT.up {
-        state.leftalt_is_down = false;
-
-        if state.ignore_list.is_ignored(&KeyAction::new(KEY_LEFT_ALT, TYPE_UP)) {
-            state.ignore_list.unignore(&KeyAction::new(KEY_LEFT_ALT, TYPE_UP));
-            return;
-        }
-    }
-
-    if *ev == INPUT_EV_SHIFT.down {
-        state.shift_is_down = true;
-    } else if *ev == INPUT_EV_SHIFT.up {
-        state.shift_is_down = false;
-
-        if state.ignore_list.is_ignored(&KeyAction::new(KEY_LEFT_SHIFT, TYPE_UP)) {
-            state.ignore_list.unignore(&KeyAction::new(KEY_LEFT_SHIFT, TYPE_UP));
-            return;
-        }
-    }
-
-    if *ev == INPUT_EV_META.down {
-        state.meta_is_down = true;
-    } else if *ev == INPUT_EV_META.up {
-        state.meta_is_down = false;
-
-        if state.ignore_list.is_ignored(&KeyAction::new(KEY_LEFT_META, TYPE_UP)) {
-            state.ignore_list.unignore(&KeyAction::new(KEY_LEFT_META, TYPE_UP));
-            return;
-        }
-    }
+    vec![
+        (INPUT_EV_LEFTMETA, ModifierName::LeftMeta),
+        (INPUT_EV_RIGHTMETA, ModifierName::RightMeta),
+    ]
+        .iter()
+        .for_each(|(a, b)| {
+            if *ev == a.down {
+                *state.get_modifier_state(b) = true;
+            } else if *ev == a.up {
+                *state.get_modifier_state(b) = false;
+                if state.ignore_list.is_ignored(&KeyAction::new(a.to_key(), TYPE_UP)) {
+                    state.ignore_list.unignore(&KeyAction::new(a.to_key(), TYPE_UP));
+                    return;
+                }
+            }
+        });
 }
 
-fn handle_stdin_ev(mut state: &mut State, ev: &input_event, delay_tx: tokio::sync::mpsc::Sender<KeySequence>) -> Result<()> {
+fn handle_stdin_ev(mut state: &mut State, ev: &input_event, delay_tx: tokio::sync::mpsc::Sender<(KeySequence, GuardedVarMap)>) -> Result<()> {
     if ev.type_ != input_linux_sys::EV_KEY as u16 {
         print_event(&ev);
         return Ok(());
@@ -493,14 +468,14 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event, delay_tx: tokio::syn
     from_modifiers.shift = state.shift_is_down.clone();
     from_modifiers.meta = state.meta_is_down.clone();
 
-    let from_key_action = KeyActionMods {
+    let from_key_action = KeyActionWithMods {
         key: Key { key_type: ev.type_ as i32, code: ev.code as i32 },
         value: ev.value,
         modifiers: from_modifiers,
     };
 
-    if let Some(to_action_seq) = state.mappings.0.get(&from_key_action) {
-        process_key_sequence(&mut state.ignore_list, to_action_seq, delay_tx)?;
+    if let Some((to_action_seq, var_map)) = state.mappings.0.get(&from_key_action) {
+        process_key_sequence(&mut state.ignore_list, to_action_seq, var_map, delay_tx)?;
         return Ok(());
     }
 
@@ -509,7 +484,11 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event, delay_tx: tokio::syn
     Ok(())
 }
 
-fn process_key_sequence(ignore_list: &mut IgnoreList, to_action_seq: &KeySequence, delay_tx: tokio::sync::mpsc::Sender<KeySequence>) -> Result<()> {
+fn process_key_sequence(ignore_list: &mut IgnoreList, to_action_seq: &KeySequence, var_map: &GuardedVarMap, delay_tx: tokio::sync::mpsc::Sender<(KeySequence, GuardedVarMap)>) -> Result<()> {
+    {
+        log_msg(format!("foo is {:?}", var_map.lock().unwrap()).as_str());
+    }
+
     for (idx, seq_item) in to_action_seq.0.iter().enumerate() {
         match seq_item {
             KeySequenceItem::KeyAction(action) => {
@@ -524,12 +503,17 @@ fn process_key_sequence(ignore_list: &mut IgnoreList, to_action_seq: &KeySequenc
             KeySequenceItem::SleepAction(duration) => {
                 let duration = duration.clone();
                 let seq = KeySequence(to_action_seq.0.iter().skip(idx + 1).map(|v| v.clone()).collect());
+                let _var_map = var_map.clone();
                 tokio::spawn(async move {
                     tokio::time::sleep(duration).await;
-                    delay_tx.send(seq).await?;
+                    delay_tx.send((seq, _var_map)).await;
                     Ok::<(), Error>(())
                 });
                 return Ok(());
+            }
+            KeySequenceItem::Assignment(key, value) => {
+                let mut m = var_map.lock().unwrap();
+                m.scope_values.insert(key.to_string(), value.clone());
             }
         }
     }

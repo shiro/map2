@@ -41,7 +41,7 @@ impl PartialEq<Key> for input_event {
 
 impl Eq for input_event {}
 
-const fn make_key(code: i32) -> Key { Key { key_type: input_linux_sys::EV_KEY, code } }
+pub(crate) const fn make_key(code: i32) -> Key { Key { key_type: input_linux_sys::EV_KEY, code } }
 
 pub const INPUT_EV_DUMMY_TIME: timeval = timeval { tv_sec: 0, tv_usec: 0 };
 pub const INPUT_EV_SYN: input_event = input_event { type_: EV_SYN as u16, code: SYN_REPORT as u16, value: 0, time: INPUT_EV_DUMMY_TIME };
@@ -109,9 +109,6 @@ pub static KEY_KPD6: Key = make_key(input_linux_sys::KEY_KP6);
 pub static KEY_KPD7: Key = make_key(input_linux_sys::KEY_KP7);
 
 
-
-
-
 pub struct InputEvGroup {
     pub up: input_event,
     pub down: input_event,
@@ -126,11 +123,15 @@ impl InputEvGroup {
             repeat: input_event { type_: EV_KEY as u16, code: code as u16, value: 2, time: INPUT_EV_DUMMY_TIME },
         }
     }
+    pub fn to_key(&self) -> Key {
+        make_key(self.up.code as i32)
+    }
 }
 
 // region key codes
 pub const INPUT_EV_TAB: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_TAB);
-pub const INPUT_EV_META: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTMETA);
+pub const INPUT_EV_LEFTMETA: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTMETA);
+pub const INPUT_EV_RIGHTMETA: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_RIGHTMETA);
 pub const INPUT_EV_SHIFT: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTSHIFT);
 pub const INPUT_EV_LEFTALT: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTALT);
 pub const INPUT_EV_RIGHTALT: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_RIGHTALT);

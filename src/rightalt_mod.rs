@@ -13,7 +13,7 @@ pub fn rightalt_mod(ev: &crate::input_event, state: &mut State) -> bool {
             if state.ignore_list.is_ignored(&KeyAction::new(KEY_RIGHT_ALT, TYPE_DOWN)) {
                 state.ignore_list.unignore(&KeyAction::new(KEY_RIGHT_ALT, TYPE_DOWN));
                 print_event(&INPUT_EV_RIGHTALT.up);
-                print_event(&INPUT_EV_META.up);
+                print_event(&INPUT_EV_LEFTMETA.up);
                 return true;
             }
 
@@ -30,7 +30,7 @@ pub fn rightalt_mod(ev: &crate::input_event, state: &mut State) -> bool {
             if vec![input_linux_sys::KEY_H as u16, input_linux_sys::KEY_J as u16, input_linux_sys::KEY_K as u16, input_linux_sys::KEY_L as u16]
                 .iter().any(|&code| code == ev.code) {
                 print_event(&INPUT_EV_LEFTALT.down);
-                print_event(&INPUT_EV_META.down);
+                print_event(&INPUT_EV_LEFTMETA.down);
 
                 // ignore right alt release
                 state.ignore_list.unignore(&KeyAction::new(KEY_RIGHT_ALT, TYPE_DOWN));

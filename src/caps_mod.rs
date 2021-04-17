@@ -30,12 +30,12 @@ pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
             // navigation keys (h, j, k, l)
             // only bind to capslock + directional keys, no modifiers
             if !state.tab_is_down &&
-                !state.is_modifier_down() && (
+                !state.is_any_modifier_down() && (
                 *ev == INPUT_EV_H.down ||
                     *ev == INPUT_EV_J.down ||
                     *ev == INPUT_EV_K.down ||
                     *ev == INPUT_EV_L.down) {
-                print_event(&INPUT_EV_META.down);
+                print_event(&INPUT_EV_LEFTMETA.down);
                 print_event(&INPUT_EV_LEFTALT.down);
                 print_event(&INPUT_EV_LEFTCTRL.down);
                 print_event(&INPUT_EV_SHIFT.down);
@@ -44,7 +44,7 @@ pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
                 print_event(&INPUT_EV_SYN);
                 thread::sleep(time::Duration::from_micros(20000));
 
-                print_event(&INPUT_EV_META.up);
+                print_event(&INPUT_EV_LEFTMETA.up);
                 print_event(&INPUT_EV_LEFTALT.up);
                 print_event(&INPUT_EV_LEFTCTRL.up);
                 print_event(&INPUT_EV_SHIFT.up);
@@ -54,7 +54,7 @@ pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
 
             return false;
         }
-    } else if *ev == INPUT_EV_CAPSLOCK.down && !state.is_modifier_down() {
+    } else if *ev == INPUT_EV_CAPSLOCK.down && !state.is_any_modifier_down() {
         state.capslock_is_down = true;
         print_event(&INPUT_EV_LEFTCTRL.down);
         return true;

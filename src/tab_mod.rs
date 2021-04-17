@@ -27,14 +27,14 @@ pub fn tab_mod(ev: &input_event, state: &mut State) -> bool {
             state.ignore_list.ignore(&KeyAction::new(KEY_TAB, TYPE_DOWN));
             print_event(&INPUT_EV_LEFTALT.down);
             print_event(&INPUT_EV_SHIFT.down);
-            print_event(&INPUT_EV_META.down);
+            print_event(&INPUT_EV_LEFTMETA.down);
             print_event(&INPUT_EV_SYN);
             thread::sleep(time::Duration::from_micros(20000));
             print_event(&ev);
 
             print_event(&INPUT_EV_LEFTALT.up);
             print_event(&INPUT_EV_SHIFT.up);
-            print_event(&INPUT_EV_META.up);
+            print_event(&INPUT_EV_LEFTMETA.up);
 
             return true;
         }

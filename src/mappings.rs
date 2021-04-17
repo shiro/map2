@@ -2,14 +2,25 @@ use crate::*;
 
 
 pub fn bind_mappings(state: &mut State) -> Scope {
-    let mut global_scope = Scope {
-        condition: None,
-        instructions: vec![],
-    };
+    let mut global_scope = Scope::new();
 
     let mut global_mappings = KeyMappings::new();
 
-    global_mappings.replace_key_click(KeyClickAction::new(KEY_MOUSE5), KeyClickAction::new(KEY_KPD0));
+
+    // global_mappings.replace_key_click(KeyClickAction::new(KEY_MOUSE5), KeyClickAction::new(KEY_KPD0));
+
+    let mut seq = KeySequence::new();
+    seq.0.push(KeySequenceItem::Assignment("foo".to_string(), ValueType::Bool(true)));
+    seq = seq.append_string_sequence("hello".to_string());
+
+    global_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+    global_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+    global_mappings.replace_key(
+        KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+        seq
+        ,
+    );
+
     global_mappings.replace_key_click(KeyClickAction::new(KEY_MOUSE6), KeyClickAction::new(KEY_KPD1));
     global_mappings.replace_key_click(KeyClickAction::new(KEY_MOUSE7), KeyClickAction::new(KEY_KPD2));
     global_mappings.replace_key_click(KeyClickAction::new(KEY_MOUSE8), KeyClickAction::new(KEY_KPD3));
@@ -22,52 +33,53 @@ pub fn bind_mappings(state: &mut State) -> Scope {
     { // figma-linux
         let mut local_mappings = KeyMappings::new();
 
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE5, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE5, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
         local_mappings.replace_key(
-            KeyActionMods { key: KEY_MOUSE5, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
             KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}palette-pick{enter}".to_string()),
         );
 
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE6, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE6, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE6, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE6, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
         local_mappings.replace_key(
-            KeyActionMods { key: KEY_MOUSE6, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeyActionWithMods { key: KEY_MOUSE6, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
             KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}atom-sync{enter}".to_string()),
         );
 
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE7, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE7, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE7, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE7, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
         local_mappings.replace_key(
-            KeyActionMods { key: KEY_MOUSE7, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeyActionWithMods { key: KEY_MOUSE7, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
             KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}batch styler{enter}".to_string()),
         );
 
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE8, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE8, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE8, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE8, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
         local_mappings.replace_key(
-            KeyActionMods { key: KEY_MOUSE8, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeyActionWithMods { key: KEY_MOUSE8, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
             KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}chroma colors{enter}".to_string()),
         );
 
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE9, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE9, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE9, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE9, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
         local_mappings.replace_key(
-            KeyActionMods { key: KEY_MOUSE9, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeyActionWithMods { key: KEY_MOUSE9, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
             KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}scripter{enter}".to_string()),
         );
 
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE11, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
-        local_mappings.replace_key(KeyActionMods { key: KEY_MOUSE11, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE11, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }, KeySequence::new());
+        local_mappings.replace_key(KeyActionWithMods { key: KEY_MOUSE11, value: TYPE_REPEAT, modifiers: KeyModifierFlags::new() }, KeySequence::new());
         local_mappings.replace_key(
-            KeyActionMods { key: KEY_MOUSE11, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+            KeyActionWithMods { key: KEY_MOUSE11, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
             KeySequence::new().append_string_sequence("{ctrl down}/{ctrl up}theme-flip{enter}".to_string()),
         );
 
-        global_scope.instructions.push(ScopeInstruction::Scope(Scope {
-            condition: Some(KeyActionCondition { window_class_name: Some("figma-linux".to_string()) }),
-            instructions: vec![ScopeInstruction::KeyMapping(local_mappings)],
-        }));
+        let mut scope = Scope::new();
+        scope.instructions = vec![ScopeInstruction::KeyMapping(local_mappings)];
+        scope.condition = Some(KeyActionCondition { window_class_name: Some("figma-linux".to_string()) });
+
+        global_scope.push_scope(scope);
     }
 
     { // arrow keys
@@ -101,10 +113,16 @@ pub fn bind_mappings(state: &mut State) -> Scope {
         local_mappings.replace_key_click(KeyClickAction::new(KEY_MOUSE7), KeyClickAction::new(KEY_F5));
         local_mappings.replace_key_click(KeyClickAction::new(KEY_MOUSE12), KeyClickAction::new_mods(KEY_W, *KeyModifierFlags::new().ctrl()));
 
-        global_scope.instructions.push(ScopeInstruction::Scope(Scope {
-            condition: Some(KeyActionCondition { window_class_name: Some("firefox".to_string()) }),
-            instructions: vec![ScopeInstruction::KeyMapping(local_mappings)],
-        }));
+        let mut scope = Scope::new();
+        scope.instructions = vec![ScopeInstruction::KeyMapping(local_mappings)];
+        scope.condition = Some(KeyActionCondition { window_class_name: Some("firefox".to_string()) });
+
+        global_scope.push_scope(scope);
+
+        // global_scope.instructions.push(ScopeInstruction::Scope(Scope {
+        //     condition: Some(KeyActionCondition { window_class_name: Some("firefox".to_string()) }),
+        //     instructions: vec![ScopeInstruction::KeyMapping(local_mappings)],
+        // }));
     }
 
     global_scope
