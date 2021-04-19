@@ -1,6 +1,11 @@
 use crate::*;
 
 impl Block {
+    pub(crate) fn append_stmt(mut self, stmt: Stmt) -> Self {
+        self.statements.push(stmt);
+        self
+    }
+
     pub(crate) fn replace_key_block(&mut self, from: KeyActionWithMods, mut to: Block) {
         self.attach_underlying_scope(&mut to);
         self.statements.push(Stmt::Expr(Expr::KeyMapping { 0: KeyMapping { from, to } }));
