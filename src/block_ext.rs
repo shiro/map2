@@ -23,6 +23,11 @@ impl Block {
         self.statements.extend(expr_vec.into_iter().map(|expr| Stmt::Expr(expr)));
         self
     }
+
+    pub(crate) fn sleep_for(mut self, duration: time::Duration) -> Self {
+        self.statements.push(Stmt::Expr(Expr::SleepAction(duration)));
+        self
+    }
 }
 
 pub(crate) trait ExprExt {

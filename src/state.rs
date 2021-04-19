@@ -26,7 +26,7 @@ pub(crate) enum SimpleModifierName {
 
 
 #[derive(Clone)]
-pub struct CompiledKeyMappings(pub(crate) HashMap<KeyActionWithMods, Block>);
+pub struct CompiledKeyMappings(pub(crate) HashMap<KeyActionWithMods, Arc<tokio::sync::Mutex<Block>>>);
 
 impl CompiledKeyMappings { pub fn new() -> Self { CompiledKeyMappings(Default::default()) } }
 

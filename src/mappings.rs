@@ -17,6 +17,7 @@ pub(crate) fn bind_mappings(state: &mut State) -> Block {
     global.replace_key_block(
         KeyActionWithMods { key: KEY_MOUSE6, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() },
         Block::new()
+            .sleep_for(time::Duration::from_millis(1000))
             .append_string_sequence("hello{enter}world".to_string()),
     );
 

@@ -1,5 +1,6 @@
 use crate::*;
 use std::borrow::Borrow;
+use tokio::sync::mpsc::Sender;
 
 
 #[derive(Clone, Eq, PartialEq, Hash)]
@@ -16,37 +17,11 @@ pub(crate) struct VarMap {
     pub(crate) parent: Option<GuardedVarMap>,
 }
 
-// pub(crate) enum ScopeInstruction {
-//     Scope(Scope),
-//     KeyMapping(KeyMappings),
-//     Assignment(String, ValueType),
-// }
-
 pub(crate) type GuardedVarMap = Arc<Mutex<VarMap>>;
 
-// pub struct Scope {
-//     pub(crate) var_map: GuardedVarMap,
-//     pub(crate) condition: Option<KeyActionCondition>,
-//     pub(crate) instructions: Block,
-// }
 
-// impl Scope {
-//     pub(crate) fn new() -> Self {
-//         Scope {
-//             var_map: Arc::new(Mutex::new(VarMap { scope_values: Default::default(), parent: None })),
-//             condition: None,
-//             instructions: vec![],
-//         }
-//     }
-//     pub(crate) fn push_scope(&mut self, mut scope: Scope) {
-//         scope.var_map.lock().unwrap().parent = Some(self.var_map.clone());
-//         self.instructions.push(ScopeInstruction::Scope(scope));
-//     }
-// }
-// pub(crate) type ScopeCache = HashMap<String, KeyMappings>;
-
-
-pub(crate) fn eval_conditional_block(condition: &KeyActionCondition, block: &Block, state: &mut State, amb: &mut Ambient) {
+#[async_recursion]
+pub(crate) async fn eval_conditional_block(condition: &KeyActionCondition, block: &Block, amb: &mut Ambient) {
     // check condition
     if let Some(window_class_name) = &condition.window_class_name {
         if let Some(active_window) = &state.active_window {
@@ -58,14 +33,15 @@ pub(crate) fn eval_conditional_block(condition: &KeyActionCondition, block: &Blo
         }
     }
 
-    eval_block(block, state, amb);
+    eval_block(block, amb).await;
 }
 
-pub(crate) fn eval_expr(expr: &Expr, var_map: &GuardedVarMap, state: &mut State, amb: &mut Ambient) -> ExprRet {
+#[async_recursion]
+pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mut Ambient<'_>) -> ExprRet {
     match expr {
         Expr::Eq(left, right) => {
             use ValueType::*;
-            match (eval_expr(left, var_map, state, amb), eval_expr(right, var_map, state, amb)) {
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
                 (ExprRet::Value(left), ExprRet::Value(right)) => {
                     match (left.borrow(), right.borrow()) {
                         (Bool(left), Bool(right)) => ExprRet::Value(Bool(left == right)),
@@ -76,7 +52,7 @@ pub(crate) fn eval_expr(expr: &Expr, var_map: &GuardedVarMap, state: &mut State,
             }
         }
         Expr::Assign(var_name, value) => {
-            let value = match eval_expr(value, var_map, state, amb) {
+            let value = match eval_expr(value, var_map, amb).await {
                 ExprRet::Value(v) => v,
                 ExprRet::Void => panic!("unexpected value")
             };
@@ -88,13 +64,32 @@ pub(crate) fn eval_expr(expr: &Expr, var_map: &GuardedVarMap, state: &mut State,
             if let Some(mappings) = amb.mappings {
                 let mut block = mapping.to.clone();
                 block.var_map = var_map.clone();
-                mappings.0.insert(mapping.from, block);
+                mappings.0.insert(mapping.from, Arc::new(tokio::sync::Mutex::new(block)));
             }
             return ExprRet::Void;
         }
         Expr::Name(var_name) => {
-            let value = var_map.lock().unwrap().scope_values.get(var_name).unwrap().clone();
-            return ExprRet::Value(value);
+            let mut value = None;
+            let mut map = var_map.clone();
+
+            while true {
+                let mut tmp;
+                let mut map_guard = map.lock().unwrap();
+                match map_guard.scope_values.get(var_name) {
+                    Some(v) => {
+                        value = Some(v.clone());
+                        break;
+                    }
+                    None => match &map_guard.parent {
+                        Some(parent) => tmp = parent.clone(),
+                        None => { panic!(format!("variable '{}' not found", var_name)); }
+                    }
+                }
+                drop(map_guard);
+                map = tmp;
+            }
+
+            return ExprRet::Value(value.unwrap());
         }
         Expr::Boolean(value) => {
             return ExprRet::Value(ValueType::Bool(*value));
@@ -107,24 +102,14 @@ pub(crate) fn eval_expr(expr: &Expr, var_map: &GuardedVarMap, state: &mut State,
             return ExprRet::Void;
         }
         Expr::EatKeyAction(action) => {
-            state.ignore_list.ignore(&action);
+            match &amb.message_tx {
+                Some(tx) => { tx.send(ExecutionMessage::EatEv(action.clone())).await; }
+                None => panic!("need message tx"),
+            }
             return ExprRet::Void;
         }
         Expr::SleepAction(duration) => {
-            let duration = duration.clone();
-            // let seq = KeySequence(to_action_seq.0.iter().skip(idx + 1).map(|v| v.clone()).collect());
-            // let _var_map = var_map.clone();
-
-            // let mut new_block = Block::new();
-            // new_block.var_map = var_map.clone();
-            // new_block.statements = block.statements
-
-            // let delay_tx = amb.sleep_tx.unwrap().clone();
-            tokio::spawn(async move {
-                tokio::time::sleep(duration).await;
-                // delay_tx.send((seq, _var_map)).await;
-                Ok::<(), Error>(())
-            });
+            tokio::time::sleep(*duration).await;
             return ExprRet::Void;
         }
     }
@@ -134,32 +119,25 @@ pub(crate) type SleepSender = tokio::sync::mpsc::Sender<Block>;
 
 pub(crate) struct Ambient<'a> {
     pub(crate) mappings: &'a mut Option<&'a mut CompiledKeyMappings>,
-    pub(crate) sleep_tx: Option<&'a mut SleepSender>,
+    pub(crate) message_tx: Option<&'a mut ExecutionMessageSender>,
 }
 
-pub(crate) fn eval_block(block: &Block, state: &mut State, amb: &mut Ambient) {
+#[async_recursion]
+pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
     // let var_map = block.var_map.clone();
     for stmt in &block.statements {
         match stmt {
-            Stmt::Expr(expr) => { eval_expr(expr, &block.var_map, state, amb); }
+            Stmt::Expr(expr) => { eval_expr(expr, &block.var_map, amb).await; }
             Stmt::Block(nested_block) => {
-                // TODO do this on AST creation
-                // nested_block.var_map = Arc::new(Mutex::new(VarMap { scope_values: Default::default(), parent: Some(block.var_map.clone()) }));
-                eval_block(nested_block, state, amb);
+                eval_block(nested_block, amb).await;
             }
             Stmt::ConditionalBlock(condition, nested_block) => {
                 // nested_block.var_map = Arc::new(Mutex::new(VarMap { scope_values: Default::default(), parent: Some(block.var_map.clone()) }));
-                eval_conditional_block(condition, nested_block, state, amb);
+                eval_conditional_block(condition, nested_block, amb).await;
             }
         }
     }
 }
-
-// pub(crate) struct ConditionEq<T: Eq> {
-//     left: T,
-//     right: T,
-// }
-
 
 #[derive(Clone)]
 pub(crate) struct Block {

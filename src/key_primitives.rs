@@ -70,3 +70,7 @@ pub(crate) struct KeyMapping {
     pub(crate) from: KeyActionWithMods,
     pub(crate) to: Block,
 }
+
+pub(crate) static TYPE_UP: i32 = 0;
+pub(crate) static TYPE_DOWN: i32 = 1;
+pub(crate) static TYPE_REPEAT: i32 = 2;

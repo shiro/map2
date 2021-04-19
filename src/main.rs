@@ -12,7 +12,8 @@ use std::io::{stdout, Write};
 use std::sync::{Arc};
 use std::rc::Rc;
 use std::sync::Mutex;
-
+use futures::future::{BoxFuture, FutureExt};
+use async_recursion::async_recursion;
 
 use anyhow::{Result, Error};
 use nom::lib::std::collections::HashMap;
@@ -29,6 +30,8 @@ use crate::key_defs::input_event;
 use crate::state::*;
 use crate::scope::*;
 use std::cell::RefCell;
+
+use futures::executor;
 
 mod tab_mod;
 mod caps_mod;
@@ -90,18 +93,18 @@ fn print_event(ev: &input_event) {
     }
 }
 
-
-static TYPE_UP: i32 = 0;
-static TYPE_DOWN: i32 = 1;
-static TYPE_REPEAT: i32 = 2;
-
-
 fn log_msg(msg: &str) {
     let out_msg = format!("[DEBUG] {}\n", msg);
 
     io::stderr().write_all(out_msg.as_bytes()).unwrap();
 }
 
+
+pub(crate) enum ExecutionMessage {
+    EatEv(KeyAction),
+}
+
+pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMessage>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -110,7 +113,7 @@ async fn main() -> Result<()> {
 
     let (window_ev_tx, mut window_ev_rx) = tokio::sync::mpsc::channel(128);
     let (input_ev_tx, mut input_ev_rx) = tokio::sync::mpsc::channel(128);
-    let (mut delay_tx, mut delay_rx) = tokio::sync::mpsc::channel(128);
+    let (mut message_tx, mut message_rx) = tokio::sync::mpsc::channel(128);
 
     // x11 thread
     tokio::spawn(async move {
@@ -141,19 +144,28 @@ async fn main() -> Result<()> {
     let mut global_scope = mappings::bind_mappings(&mut state);
 
     let mut mappings = CompiledKeyMappings::new();
-    eval_block(&mut global_scope, &mut state, &mut Ambient {
+    executor::block_on(eval_block(&mut global_scope, &mut Ambient {
         mappings: &mut Some(&mut mappings),
-        sleep_tx: None,
-    });
+        message_tx: None,
+    }));
 
     fn handle_active_window_change(scope: &mut Block, state: &mut State, mappings: &mut CompiledKeyMappings) {
         *mappings = CompiledKeyMappings::new();
-        eval_block(scope, state,
-                   &mut Ambient {
-                       mappings: &mut Some(mappings),
-                       sleep_tx: None,
-                   },
-        );
+        executor::block_on(eval_block(scope,
+                                      &mut Ambient {
+                                          mappings: &mut Some(mappings),
+                                          message_tx: None,
+                                      },
+        ));
+    }
+
+    fn handle_execution_message(msg: ExecutionMessage, state: &mut State) {
+        match msg {
+            ExecutionMessage::EatEv(action) => {
+                log_msg("got it");
+                state.ignore_list.ignore(&action);
+            }
+        }
     }
 
     loop {
@@ -163,7 +175,10 @@ async fn main() -> Result<()> {
                 handle_active_window_change(&mut global_scope, &mut state, &mut mappings);
             }
             Some(ev) = input_ev_rx.recv() => {
-                handle_stdin_ev(&mut state, &ev, &mut mappings, &mut delay_tx).unwrap();
+                handle_stdin_ev(&mut state, &ev, &mut mappings, &mut message_tx).unwrap();
+            }
+            Some(msg) = message_rx.recv() => {
+                handle_execution_message(msg, &mut state);
             }
             // Some((seq, var_map)) = delay_rx.recv() => {
             //     process_key_sequence(&mut state.ignore_list, &seq, &var_map, delay_tx.clone()).unwrap();
@@ -189,7 +204,6 @@ async fn listen_to_key_events(ev: &mut input_event, input: &mut tokio::io::Stdin
 }
 
 
-
 fn update_modifiers(state: &mut State, ev: &input_event) {
     vec![
         (INPUT_EV_LEFTMETA, state.meta_is_down),
@@ -211,7 +225,7 @@ fn update_modifiers(state: &mut State, ev: &input_event) {
         });
 }
 
-fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut CompiledKeyMappings, delay_tx: &mut SleepSender) -> Result<()> {
+fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut CompiledKeyMappings, message_tx: &mut ExecutionMessageSender) -> Result<()> {
     if ev.type_ != input_linux_sys::EV_KEY as u16 {
         print_event(&ev);
         return Ok(());
@@ -248,8 +262,12 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut Compi
     };
 
     if let Some(block) = mappings.0.get(&from_key_action) {
-        // process_key_sequence(&mut state.ignore_list, to_action_seq, var_map, delay_tx)?;
-        eval_block(block, state, &mut Ambient { mappings: &mut None, sleep_tx: Some(delay_tx) });
+        let block = block.clone();
+        let mut message_tx = message_tx.clone();
+        task::spawn(async move {
+            let block_guard = block.lock().await;
+            eval_block(&*block_guard, &mut Ambient { mappings: &mut None, message_tx: Some(&mut message_tx) }).await;
+        });
         return Ok(());
     }
 
