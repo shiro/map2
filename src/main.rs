@@ -103,6 +103,7 @@ fn log_msg(msg: &str) {
 pub(crate) enum ExecutionMessage {
     EatEv(KeyAction),
     AddMapping(usize, KeyActionWithMods, Block),
+    GetFocusedWindowInfo(tokio::sync::mpsc::Sender<Option<ActiveWindowInfo>>),
 }
 
 pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMessage>;
@@ -182,6 +183,9 @@ async fn main() -> Result<()> {
                 if token == current_token {
                     mappings.0.insert(from, Arc::new(tokio::sync::Mutex::new(block)));
                 }
+            }
+            ExecutionMessage::GetFocusedWindowInfo(mut tx) => {
+                tx.send(state.active_window.clone());
             }
         }
     }

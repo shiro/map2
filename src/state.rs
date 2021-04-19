@@ -44,8 +44,6 @@ pub struct State {
     pub(crate) disable_alt_mod: bool,
 
     pub(crate) ignore_list: IgnoreList,
-    // pub(crate) mappings: CompiledKeyMappings,
-
     pub(crate) active_window: Option<ActiveWindowInfo>,
 }
 

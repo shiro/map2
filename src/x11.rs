@@ -5,6 +5,7 @@ use x11rb::connection::Connection;
 use x11rb::x11_utils::TryParse;
 use x11rb::protocol::Event::PropertyNotify;
 
+#[derive(Clone)]
 pub(crate)  struct ActiveWindowInfo {
     pub(crate) class: String,
     pub(crate) instance: String,

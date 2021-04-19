@@ -23,15 +23,18 @@ pub(crate) type GuardedVarMap = Arc<Mutex<VarMap>>;
 #[async_recursion]
 pub(crate) async fn eval_conditional_block(condition: &KeyActionCondition, block: &Block, amb: &mut Ambient) {
     // check condition
-    // if let Some(window_class_name) = &condition.window_class_name {
-    //     if let Some(active_window) = &state.active_window {
-    //         if *window_class_name != active_window.class {
-    //             return;
-    //         }
-    //     } else {
-    //         return;
-    //     }
-    // }
+    if let Some(window_class_name) = &condition.window_class_name {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(0);
+        amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await;
+
+        if let Some(active_window) = rx.recv().await.unwrap() {
+            if *window_class_name != active_window.class {
+                return;
+            }
+        } else {
+            return;
+        }
+    }
 
     eval_block(block, amb).await;
 }
@@ -119,7 +122,6 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
 pub(crate) type SleepSender = tokio::sync::mpsc::Sender<Block>;
 
 pub(crate) struct Ambient<'a> {
-    // pub(crate) mappings: &'a mut Option<&'a mut CompiledKeyMappings>,
     pub(crate) message_tx: Option<&'a mut ExecutionMessageSender>,
     pub(crate) window_cycle_token: usize,
 }
