@@ -21,7 +21,7 @@ use tokio::prelude::*;
 use tokio::task;
 
 use crate::x11::{x11_initialize, x11_test};
-use crate::x11::ActiveWindowResult;
+use crate::x11::ActiveWindowInfo;
 
 use crate::key_primitives::*;
 use crate::key_defs::*;
@@ -102,6 +102,7 @@ fn log_msg(msg: &str) {
 
 pub(crate) enum ExecutionMessage {
     EatEv(KeyAction),
+    AddMapping(usize, KeyActionWithMods, Block),
 }
 
 pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMessage>;
@@ -141,29 +142,46 @@ async fn main() -> Result<()> {
 
 
     let mut state = State::new();
-    let mut global_scope = mappings::bind_mappings(&mut state);
+    let mut global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings(&mut state)));
+    let mut window_cycle_token: usize = 0;
 
     let mut mappings = CompiledKeyMappings::new();
-    executor::block_on(eval_block(&mut global_scope, &mut Ambient {
-        mappings: &mut Some(&mut mappings),
-        message_tx: None,
-    }));
 
-    fn handle_active_window_change(scope: &mut Block, state: &mut State, mappings: &mut CompiledKeyMappings) {
-        *mappings = CompiledKeyMappings::new();
-        executor::block_on(eval_block(scope,
-                                      &mut Ambient {
-                                          mappings: &mut Some(mappings),
-                                          message_tx: None,
-                                      },
-        ));
+    {
+        let mut message_tx = message_tx.clone();
+        let mut global_scope = global_scope.clone();
+        task::spawn(async move {
+            eval_block(&mut *global_scope.lock().await, &mut Ambient {
+                window_cycle_token,
+                message_tx: Some(&mut message_tx),
+            }).await;
+        });
     }
 
-    fn handle_execution_message(msg: ExecutionMessage, state: &mut State) {
+    fn handle_active_window_change(block: &mut Arc<tokio::sync::Mutex<Block>>, message_tx: &mut ExecutionMessageSender, mappings: &mut CompiledKeyMappings, window_cycle_token: usize) {
+        *mappings = CompiledKeyMappings::new();
+
+        let mut message_tx = message_tx.clone();
+        let mut block = block.clone();
+        task::spawn(async move {
+            eval_block(&mut *block.lock().await,
+                       &mut Ambient {
+                           message_tx: Some(&mut message_tx),
+                           window_cycle_token,
+                       },
+            ).await;
+        });
+    }
+
+    fn handle_execution_message(current_token: usize, msg: ExecutionMessage, state: &mut State, mappings: &mut CompiledKeyMappings) {
         match msg {
             ExecutionMessage::EatEv(action) => {
-                log_msg("got it");
                 state.ignore_list.ignore(&action);
+            }
+            ExecutionMessage::AddMapping(token, from, mut block) => {
+                if token == current_token {
+                    mappings.0.insert(from, Arc::new(tokio::sync::Mutex::new(block)));
+                }
             }
         }
     }
@@ -172,17 +190,14 @@ async fn main() -> Result<()> {
         tokio::select! {
             Some(window) = window_ev_rx.recv() => {
                 state.active_window = Some(window);
-                handle_active_window_change(&mut global_scope, &mut state, &mut mappings);
+                handle_active_window_change(&mut global_scope, &mut message_tx, &mut mappings, window_cycle_token + 1);
             }
             Some(ev) = input_ev_rx.recv() => {
-                handle_stdin_ev(&mut state, &ev, &mut mappings, &mut message_tx).unwrap();
+                handle_stdin_ev(&mut state, &ev, &mut mappings, &mut message_tx, window_cycle_token).unwrap();
             }
             Some(msg) = message_rx.recv() => {
-                handle_execution_message(msg, &mut state);
+                handle_execution_message(window_cycle_token, msg, &mut state, &mut mappings);
             }
-            // Some((seq, var_map)) = delay_rx.recv() => {
-            //     process_key_sequence(&mut state.ignore_list, &seq, &var_map, delay_tx.clone()).unwrap();
-            // }
             else => { break }
         }
     }
@@ -225,7 +240,7 @@ fn update_modifiers(state: &mut State, ev: &input_event) {
         });
 }
 
-fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut CompiledKeyMappings, message_tx: &mut ExecutionMessageSender) -> Result<()> {
+fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut CompiledKeyMappings, message_tx: &mut ExecutionMessageSender, window_cycle_token: usize) -> Result<()> {
     if ev.type_ != input_linux_sys::EV_KEY as u16 {
         print_event(&ev);
         return Ok(());
@@ -266,7 +281,7 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut Compi
         let mut message_tx = message_tx.clone();
         task::spawn(async move {
             let block_guard = block.lock().await;
-            eval_block(&*block_guard, &mut Ambient { mappings: &mut None, message_tx: Some(&mut message_tx) }).await;
+            eval_block(&*block_guard, &mut Ambient { message_tx: Some(&mut message_tx), window_cycle_token }).await;
         });
         return Ok(());
     }

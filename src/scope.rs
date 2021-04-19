@@ -1,5 +1,5 @@
 use crate::*;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, BorrowMut};
 use tokio::sync::mpsc::Sender;
 
 
@@ -23,15 +23,15 @@ pub(crate) type GuardedVarMap = Arc<Mutex<VarMap>>;
 #[async_recursion]
 pub(crate) async fn eval_conditional_block(condition: &KeyActionCondition, block: &Block, amb: &mut Ambient) {
     // check condition
-    if let Some(window_class_name) = &condition.window_class_name {
-        if let Some(active_window) = &state.active_window {
-            if *window_class_name != active_window.class {
-                return;
-            }
-        } else {
-            return;
-        }
-    }
+    // if let Some(window_class_name) = &condition.window_class_name {
+    //     if let Some(active_window) = &state.active_window {
+    //         if *window_class_name != active_window.class {
+    //             return;
+    //         }
+    //     } else {
+    //         return;
+    //     }
+    // }
 
     eval_block(block, amb).await;
 }
@@ -61,18 +61,19 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             return ExprRet::Void;
         }
         Expr::KeyMapping(mapping) => {
-            if let Some(mappings) = amb.mappings {
-                let mut block = mapping.to.clone();
-                block.var_map = var_map.clone();
-                mappings.0.insert(mapping.from, Arc::new(tokio::sync::Mutex::new(block)));
-            }
+            let mut mapping = mapping.clone();
+            mapping.to.var_map = var_map.clone();
+
+            amb.message_tx.borrow_mut().as_ref().unwrap()
+                .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to)).await;
+
             return ExprRet::Void;
         }
         Expr::Name(var_name) => {
             let mut value = None;
             let mut map = var_map.clone();
 
-            while true {
+            loop {
                 let mut tmp;
                 let mut map_guard = map.lock().unwrap();
                 match map_guard.scope_values.get(var_name) {
@@ -118,8 +119,9 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
 pub(crate) type SleepSender = tokio::sync::mpsc::Sender<Block>;
 
 pub(crate) struct Ambient<'a> {
-    pub(crate) mappings: &'a mut Option<&'a mut CompiledKeyMappings>,
+    // pub(crate) mappings: &'a mut Option<&'a mut CompiledKeyMappings>,
     pub(crate) message_tx: Option<&'a mut ExecutionMessageSender>,
+    pub(crate) window_cycle_token: usize,
 }
 
 #[async_recursion]

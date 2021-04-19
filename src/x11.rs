@@ -5,7 +5,7 @@ use x11rb::connection::Connection;
 use x11rb::x11_utils::TryParse;
 use x11rb::protocol::Event::PropertyNotify;
 
-pub struct ActiveWindowResult {
+pub(crate)  struct ActiveWindowInfo {
     pub(crate) class: String,
     pub(crate) instance: String,
     pub(crate) name: String,
@@ -34,7 +34,7 @@ pub fn x11_initialize() -> Result<X11State<impl Connection + Send + Sync>> {
     })
 }
 
-pub fn x11_test<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Option<ActiveWindowResult>> {
+pub(crate)  fn x11_test<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Option<ActiveWindowInfo>> {
     loop {
         let event = state.con.wait_for_event()?;
 
@@ -48,7 +48,7 @@ pub fn x11_test<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Opti
     }
 }
 
-pub fn x11_get_active_window() -> Result<ActiveWindowResult> {
+pub(crate)  fn x11_get_active_window() -> Result<ActiveWindowInfo> {
     let (conn, screen) = x11rb::connect(None)?;
     let root = conn.setup().roots[screen].root;
 
@@ -73,7 +73,7 @@ pub fn x11_get_active_window() -> Result<ActiveWindowResult> {
 
     let name = parse_string_property(&_name);
 
-    Ok(ActiveWindowResult {
+    Ok(ActiveWindowInfo {
         class: class.to_string(),
         instance: instance.to_string(),
         name: name.to_string(),

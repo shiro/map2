@@ -46,7 +46,7 @@ pub struct State {
     pub(crate) ignore_list: IgnoreList,
     // pub(crate) mappings: CompiledKeyMappings,
 
-    pub(crate) active_window: Option<ActiveWindowResult>,
+    pub(crate) active_window: Option<ActiveWindowInfo>,
 }
 
 
