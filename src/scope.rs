@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Sender;
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub(crate) enum ValueType {
     Bool(bool),
 }
@@ -139,6 +139,11 @@ pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
                 // nested_block.var_map = Arc::new(Mutex::new(VarMap { scope_values: Default::default(), parent: Some(block.var_map.clone()) }));
                 eval_conditional_block(condition, nested_block, amb).await;
             }
+            Stmt::If(expr, block) => {
+                if eval_expr(expr, &block.var_map, amb).await == ExprRet::Value(ValueType::Bool(true)) {
+                    eval_block(block, amb).await;
+                }
+            }
         }
     }
 }
@@ -168,6 +173,7 @@ impl Block {
 }
 
 
+#[derive(Eq, PartialEq)]
 pub(crate) enum ExprRet {
     Void,
     Value(ValueType),
@@ -196,6 +202,7 @@ pub(crate) enum Stmt {
     Expr(Expr),
     Block(Block),
     ConditionalBlock(KeyActionCondition, Block),
+    If(Expr, Block),
     // While
     // For(Expr::Assign, Expr, Expr, Stmt::Block)
     // Return(Expr),
