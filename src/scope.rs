@@ -1,9 +1,8 @@
 use crate::*;
 use std::borrow::{Borrow, BorrowMut};
-use tokio::sync::mpsc::Sender;
 
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -25,7 +24,7 @@ pub(crate) async fn eval_conditional_block(condition: &KeyActionCondition, block
     // check condition
     if let Some(window_class_name) = &condition.window_class_name {
         let (tx, mut rx) = tokio::sync::mpsc::channel(0);
-        amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await;
+        amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await.unwrap();
 
         if let Some(active_window) = rx.recv().await.unwrap() {
             if *window_class_name != active_window.class {
@@ -68,7 +67,8 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             mapping.to.var_map = var_map.clone();
 
             amb.message_tx.borrow_mut().as_ref().unwrap()
-                .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to)).await;
+                .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to)).await
+                .unwrap();
 
             return ExprRet::Void;
         }
@@ -77,8 +77,8 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             let mut map = var_map.clone();
 
             loop {
-                let mut tmp;
-                let mut map_guard = map.lock().unwrap();
+                let tmp;
+                let map_guard = map.lock().unwrap();
                 match map_guard.scope_values.get(var_name) {
                     Some(v) => {
                         value = Some(v.clone());
@@ -107,7 +107,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         }
         Expr::EatKeyAction(action) => {
             match &amb.message_tx {
-                Some(tx) => { tx.send(ExecutionMessage::EatEv(action.clone())).await; }
+                Some(tx) => { tx.send(ExecutionMessage::EatEv(action.clone())).await.unwrap(); }
                 None => panic!("need message tx"),
             }
             return ExprRet::Void;
@@ -148,7 +148,7 @@ pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Block {
     pub(crate) var_map: GuardedVarMap,
     pub(crate) statements: Vec<Stmt>,
@@ -179,7 +179,7 @@ pub(crate) enum ExprRet {
     Value(ValueType),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum Expr {
     Eq(Box<Expr>, Box<Expr>),
     // LT(Expr, Expr),
@@ -197,7 +197,7 @@ pub(crate) enum Expr {
     SleepAction(time::Duration),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) enum Stmt {
     Expr(Expr),
     Block(Block),

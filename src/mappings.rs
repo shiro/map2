@@ -1,7 +1,7 @@
 use crate::*;
 
 
-pub(crate) fn bind_mappings(state: &mut State) -> Block {
+pub(crate) fn bind_mappings() -> Block {
     let mut global = Block::new();
 
     global.replace_key(

@@ -1,5 +1,4 @@
 use crate::*;
-use core::fmt::Alignment::Left;
 
 #[derive(Eq, PartialEq, Hash)]
 pub(crate) enum ModifierName {

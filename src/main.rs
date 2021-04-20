@@ -9,29 +9,22 @@ extern crate lazy_static;
 
 use std::{io, mem, thread, time};
 use std::io::{stdout, Write};
-use std::sync::{Arc};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::Mutex;
-use futures::future::{BoxFuture, FutureExt};
-use async_recursion::async_recursion;
 
-use anyhow::{Result, Error};
+use anyhow::Result;
+use async_recursion::async_recursion;
 use nom::lib::std::collections::HashMap;
 use tokio::prelude::*;
 use tokio::task;
 
-use crate::x11::{x11_initialize, x11_test};
-use crate::x11::ActiveWindowInfo;
-
-use crate::key_primitives::*;
 use crate::key_defs::*;
 use crate::key_defs::input_event;
-
-use crate::state::*;
+use crate::key_primitives::*;
 use crate::scope::*;
-use std::cell::RefCell;
-
-use futures::executor;
+use crate::state::*;
+use crate::x11::{x11_initialize, x11_test};
+use crate::x11::ActiveWindowInfo;
 
 mod tab_mod;
 mod caps_mod;
@@ -43,6 +36,7 @@ mod scope;
 mod mappings;
 mod block_ext;
 mod key_primitives;
+mod parsing;
 
 struct IgnoreList(Vec<KeyAction>);
 
@@ -100,6 +94,7 @@ fn log_msg(msg: &str) {
 }
 
 
+#[derive(Debug)]
 pub(crate) enum ExecutionMessage {
     EatEv(KeyAction),
     AddMapping(usize, KeyActionWithMods, Block),
@@ -143,14 +138,14 @@ async fn main() -> Result<()> {
 
 
     let mut state = State::new();
-    let mut global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings(&mut state)));
-    let mut window_cycle_token: usize = 0;
+    let mut global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings()));
+    let window_cycle_token: usize = 0;
 
     let mut mappings = CompiledKeyMappings::new();
 
     {
         let mut message_tx = message_tx.clone();
-        let mut global_scope = global_scope.clone();
+        let global_scope = global_scope.clone();
         task::spawn(async move {
             eval_block(&mut *global_scope.lock().await, &mut Ambient {
                 window_cycle_token,
@@ -174,7 +169,7 @@ async fn main() -> Result<()> {
         });
     }
 
-    fn handle_execution_message(current_token: usize, msg: ExecutionMessage, state: &mut State, mappings: &mut CompiledKeyMappings) {
+    async fn handle_execution_message(current_token: usize, msg: ExecutionMessage, state: &mut State, mappings: &mut CompiledKeyMappings) {
         match msg {
             ExecutionMessage::EatEv(action) => {
                 state.ignore_list.ignore(&action);
@@ -184,8 +179,8 @@ async fn main() -> Result<()> {
                     mappings.0.insert(from, Arc::new(tokio::sync::Mutex::new(block)));
                 }
             }
-            ExecutionMessage::GetFocusedWindowInfo(mut tx) => {
-                tx.send(state.active_window.clone());
+            ExecutionMessage::GetFocusedWindowInfo(tx) => {
+                tx.send(state.active_window.clone()).await.unwrap();
             }
         }
     }
@@ -200,7 +195,7 @@ async fn main() -> Result<()> {
                 handle_stdin_ev(&mut state, &ev, &mut mappings, &mut message_tx, window_cycle_token).unwrap();
             }
             Some(msg) = message_rx.recv() => {
-                handle_execution_message(window_cycle_token, msg, &mut state, &mut mappings);
+                handle_execution_message(window_cycle_token, msg, &mut state, &mut mappings).await;
             }
             else => { break }
         }

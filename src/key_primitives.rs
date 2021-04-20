@@ -4,14 +4,14 @@ use crate::*;
 pub struct Key { pub(crate) key_type: i32, pub(crate) code: i32 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) enum KeyModifierStateType { KEEP, UP, DOWN }
+pub(crate) enum KeyValue { KEEP, UP, DOWN }
 
-impl KeyModifierStateType {
+impl KeyValue {
     fn to_event_value(&self) -> i32 {
         match self {
-            KeyModifierStateType::KEEP => 2,
-            KeyModifierStateType::UP => 0,
-            KeyModifierStateType::DOWN => 1
+            KeyValue::KEEP => 2,
+            KeyValue::UP => 0,
+            KeyValue::DOWN => 1
         }
     }
 }
@@ -58,14 +58,14 @@ impl KeyAction {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct KeyClickAction { key: Key, modifiers: KeyModifierFlags }
+pub(crate) struct KeyClickActionWithMods { pub(crate) key: Key, pub(crate) modifiers: KeyModifierFlags }
 
-impl KeyClickAction {
-    pub fn new(key: Key) -> Self { KeyClickAction { key, modifiers: KeyModifierFlags::new() } }
-    pub fn new_mods(key: Key, modifiers: KeyModifierFlags) -> Self { KeyClickAction { key, modifiers } }
+impl KeyClickActionWithMods {
+    pub fn new(key: Key) -> Self { KeyClickActionWithMods { key, modifiers: KeyModifierFlags::new() } }
+    pub fn new_with_mods(key: Key, modifiers: KeyModifierFlags) -> Self { KeyClickActionWithMods { key, modifiers } }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct KeyMapping {
     pub(crate) from: KeyActionWithMods,
     pub(crate) to: Block,

@@ -1,7 +1,7 @@
 use crate::*;
 // use input_linux_sys;
 use input_linux_sys::*;
-use crate::block_ext::ExprExt;
+use crate::block_ext::ExprVecExt;
 
 #[allow(non_camel_case_types)]
 pub type time_t = i64;
@@ -171,7 +171,48 @@ impl KeycodeExt for KEYCODE {
 }
 
 lazy_static! {
-    pub(crate) static ref KEY_LOOKUP: HashMap<&'static str, Vec<Expr>> = {
+    pub(crate) static ref KEY_LOOKUP: HashMap<&'static str, Key> = {
+        let mut m = HashMap::new();
+        m.insert("enter", KEY_ENTER);
+        m.insert("esc", KEY_ESC);
+        m.insert("ctrl", KEY_LEFT_CTRL);
+        m.insert("shift", KEY_LEFT_SHIFT);
+        m.insert(" ", KEY_SPACE);
+        m.insert("-", KEY_MINUS);
+        m.insert("/", KEY_SLASH);
+        m.insert("a", KEY_A);
+        m.insert("b", KEY_B);
+        m.insert("c", KEY_C);
+        m.insert("d", KEY_D);
+        m.insert("e", KEY_E);
+        m.insert("f", KEY_F);
+        m.insert("g", KEY_G);
+        m.insert("h", KEY_H);
+        m.insert("i", KEY_I);
+        m.insert("j", KEY_J);
+        m.insert("k", KEY_K);
+        m.insert("l", KEY_L);
+        m.insert("m", KEY_M);
+        m.insert("n", KEY_N);
+        m.insert("o", KEY_O);
+        m.insert("p", KEY_P);
+        m.insert("q", KEY_Q);
+        m.insert("r", KEY_R);
+        m.insert("s", KEY_S);
+        m.insert("t", KEY_T);
+        m.insert("u", KEY_U);
+        m.insert("v", KEY_V);
+        m.insert("w", KEY_W);
+        m.insert("x", KEY_X);
+        m.insert("y", KEY_Y);
+        m.insert("z", KEY_Z);
+        m
+    };
+}
+
+
+lazy_static! {
+    pub(crate) static ref KEY_SEQ_LOOKUP: HashMap<&'static str, Vec<Expr>> = {
         let mut m = HashMap::new();
         m.insert("enter", vec![].append_click(KEY_ENTER));
         m.insert("esc", vec![].append_click(KEY_ESC));
