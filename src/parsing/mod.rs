@@ -2,7 +2,7 @@ use futures::StreamExt;
 use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
-use nom::combinator::opt;
+use nom::combinator::{opt, map};
 use nom::Err as NomErr;
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::IResult;
@@ -57,10 +57,6 @@ fn variable_declaration(input: &str) -> Res<&str, Expr> {
     )
 }
 
-fn expr(input: &str) -> Res<&str, Expr> {
-    context("expr", variable_declaration)(input)
-}
-
 fn key_flags(input: &str) -> Res<&str, KeyModifierFlags> {
     context("key_flags", many0(one_of("^!+#")))(input).and_then(|(next, val)| {
         let mut flags = KeyModifierFlags::new();
@@ -99,7 +95,7 @@ fn key(input: &str) -> Res<&str, ParsedSingleKey> {
         })
 }
 
-// #[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 enum ParsedKeyAction {
     KeyAction(KeyAction),
     KeyClickAction(KeyClickActionWithMods),
@@ -136,6 +132,7 @@ fn key_mapping_inline(input: &str) -> Res<&str, Vec<Expr>> {
             key_action,
             tag("::"),
             key_action,
+            multispace0,
             tag(";"),
         )),
     )(input).and_then(|(next, v)| {
@@ -157,13 +154,20 @@ fn key_mapping_inline(input: &str) -> Res<&str, Vec<Expr>> {
     })
 }
 
+fn expr(input: &str) -> Res<&str, Vec<Expr>> {
+    context(
+        "expr",
+        alt((map(variable_declaration, |v| vec![v]), key_mapping_inline)),
+    )(input)
+}
+
 fn block(input: &str) -> Res<&str, Block> {
     context(
         "block",
         tuple((
             tag("{"),
             multispace0,
-            many0(expr),
+            map(many0(expr), |mut v| v.into_iter().flatten().collect()),
             multispace0,
             tag("}")
         )),
@@ -171,26 +175,20 @@ fn block(input: &str) -> Res<&str, Block> {
         .map(|(next, v)| (next, Block::new().extend_with(v.2)))
 }
 
-// struct Foo {
-//     a: Mutex<usize>,
-// }
-//
-// impl<T: PartialEq> PartialEq for Foo {
-//     fn eq(&self, other: &Self) -> bool {
-//         if ::core::ptr::eq(&self, &other) {
-//             true
-//         } else {
-//             other.lock().unwrap().deref() == self.lock().unwrap().deref()
-//         }
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use input_linux_sys::EV_KEY;
     use nom::error::{ErrorKind, VerboseErrorKind};
 
     use super::*;
+    use tap::Tap;
+
+    #[test]
+    fn test_value() {
+        assert!(matches!(boolean("true"), Ok(("", Expr::Boolean(true)))));
+        assert!(matches!(boolean("false"), Ok(("", Expr::Boolean(false)))));
+        assert!(matches!(boolean("foo"), Err(..)));
+    }
 
     #[test]
     fn test_key_flags() {
@@ -213,10 +211,48 @@ mod tests {
     }
 
     #[test]
-    fn test_value() {
-        assert!(matches!(boolean("true"), Ok(("", Expr::Boolean(true)))));
-        assert!(matches!(boolean("false"), Ok(("", Expr::Boolean(false)))));
-        assert!(matches!(boolean("foo"), Err(..)));
+    fn test_key_action() {
+        assert_eq!(key_action("!a"), Ok(("", ParsedKeyAction::KeyClickAction(
+            KeyClickActionWithMods::new_with_mods(
+                KEY_A,
+                *KeyModifierFlags::new().alt(),
+            )))));
+
+        assert_eq!(key_action("!#^a"), Ok(("", ParsedKeyAction::KeyClickAction(
+            KeyClickActionWithMods::new_with_mods(
+                KEY_A,
+                *KeyModifierFlags::new().ctrl().alt().meta(),
+            )))));
+
+        assert_eq!(key_action("A"), Ok(("", ParsedKeyAction::KeyClickAction(
+            KeyClickActionWithMods::new_with_mods(
+                KEY_A,
+                *KeyModifierFlags::new().shift(),
+            )))));
+
+        assert_eq!(key_action("+A"), Ok(("", ParsedKeyAction::KeyClickAction(
+            KeyClickActionWithMods::new_with_mods(
+                KEY_A,
+                *KeyModifierFlags::new().shift(),
+            )))));
+
+        assert!(matches!(key_action("+ab"), Err(..)));
+        assert!(matches!(key_action("++a"), Err(..)));
+    }
+
+    #[test]
+    fn test_key_mapping_inline() {
+        assert_eq!(key_mapping_inline("a::b;"), Ok(("", vec![]
+            .tap_mut(|v| v.map_key_click(
+                KeyClickActionWithMods::new(KEY_A),
+                KeyClickActionWithMods::new(KEY_B),
+            )))));
+
+        assert_eq!(key_mapping_inline("A::b;"), Ok(("", vec![]
+            .tap_mut(|v| v.map_key_click(
+                KeyClickActionWithMods::new(KEY_A).tap_mut(|v| { v.modifiers.shift(); }),
+                KeyClickActionWithMods::new(KEY_B),
+            )))));
     }
 
     #[test]
@@ -231,11 +267,4 @@ mod tests {
 
         // assert!(matches!(variable_declaration("let hello2 = true;"), Ok(("", Expr::Assign("hello2".to_string(), Box::new(Expr::Boolean(true)))))));
     }
-
-    // #[test]
-    // fn test_scheme() {
-    //     assert_eq!(scheme("https://yay"), Ok(("yay", "https://")));
-    //     assert_eq!(scheme("http://yay"), Ok(("yay", "http://")));
-    //     assert!(matches!( scheme("bla://yay"), Err(NomErr::Error( .. ))));
-    // }
 }

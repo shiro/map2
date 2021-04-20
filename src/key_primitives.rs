@@ -57,7 +57,7 @@ impl KeyAction {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyClickActionWithMods { pub(crate) key: Key, pub(crate) modifiers: KeyModifierFlags }
 
 impl KeyClickActionWithMods {
@@ -65,7 +65,7 @@ impl KeyClickActionWithMods {
     pub fn new_with_mods(key: Key, modifiers: KeyModifierFlags) -> Self { KeyClickActionWithMods { key, modifiers } }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct KeyMapping {
     pub(crate) from: KeyActionWithMods,
     pub(crate) to: Block,

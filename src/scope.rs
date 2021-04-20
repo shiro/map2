@@ -16,6 +16,17 @@ pub(crate) struct VarMap {
     pub(crate) parent: Option<GuardedVarMap>,
 }
 
+impl PartialEq for VarMap {
+    fn eq(&self, other: &Self) -> bool {
+        self.scope_values == other.scope_values &&
+            match (&self.parent, &other.parent) {
+                (None, None) => true,
+                (Some(l), Some(r)) => arc_mutexes_are_equal(&*l, &*r),
+                (_, _) => false,
+            }
+    }
+}
+
 pub(crate) type GuardedVarMap = Arc<Mutex<VarMap>>;
 
 
@@ -148,10 +159,23 @@ pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
     }
 }
 
+fn mutexes_are_equal<T>(first: &Mutex<T>, second: &Mutex<T>) -> bool
+    where T: PartialEq { std::ptr::eq(first, second) || *first.lock().unwrap() == *second.lock().unwrap() }
+
+fn arc_mutexes_are_equal<T>(first: &Arc<Mutex<T>>, second: &Arc<Mutex<T>>) -> bool
+    where T: PartialEq { Arc::ptr_eq(first, second) || *first.lock().unwrap() == *second.lock().unwrap() }
+
 #[derive(Clone, Debug)]
 pub(crate) struct Block {
     pub(crate) var_map: GuardedVarMap,
     pub(crate) statements: Vec<Stmt>,
+}
+
+impl PartialEq for Block {
+    fn eq(&self, other: &Self) -> bool {
+        self.statements == other.statements &&
+            arc_mutexes_are_equal(&self.var_map, &other.var_map)
+    }
 }
 
 impl Block {
@@ -179,7 +203,7 @@ pub(crate) enum ExprRet {
     Value(ValueType),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Expr {
     Eq(Box<Expr>, Box<Expr>),
     // LT(Expr, Expr),
@@ -197,7 +221,7 @@ pub(crate) enum Expr {
     SleepAction(time::Duration),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Stmt {
     Expr(Expr),
     Block(Block),

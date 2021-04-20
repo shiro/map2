@@ -9,6 +9,8 @@ edition = "2018"
 [dependencies]
 input-linux-sys = "0.3.1"
 libc = "0.2.71"
+tap = "1.0.1"
+itertools = "0.10.0"
 anyhow = "1.0"
 x11rb = "0.7.0"
 tokio = { version = "0.3.4", features = ["full"] }
