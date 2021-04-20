@@ -6,7 +6,7 @@ use nom::combinator::{opt, map};
 use nom::Err as NomErr;
 use nom::error::{context, ErrorKind, VerboseError};
 use nom::IResult;
-use nom::multi::many0;
+use nom::multi::{many0, many1};
 use nom::sequence::*;
 
 use crate::*;
@@ -157,8 +157,12 @@ fn key_mapping_inline(input: &str) -> Res<&str, Vec<Expr>> {
 fn expr(input: &str) -> Res<&str, Vec<Expr>> {
     context(
         "expr",
-        alt((map(variable_declaration, |v| vec![v]), key_mapping_inline)),
-    )(input)
+        tuple((
+            multispace0,
+            alt((map(variable_declaration, |v| vec![v]), key_mapping_inline)),
+            multispace0,
+        )),
+    )(input).map(|(next, v)| (next, v.1))
 }
 
 fn block(input: &str) -> Res<&str, Block> {
@@ -166,13 +170,19 @@ fn block(input: &str) -> Res<&str, Block> {
         "block",
         tuple((
             tag("{"),
-            multispace0,
             map(many0(expr), |mut v| v.into_iter().flatten().collect()),
-            multispace0,
             tag("}")
         )),
     )(input)
-        .map(|(next, v)| (next, Block::new().extend_with(v.2)))
+        .map(|(next, v)| (next, Block::new().extend_with(v.1)))
+}
+
+fn global_block(input: &str) -> Res<&str, Block> {
+    context(
+        "global_block",
+        map(many1(expr), |mut v| v.into_iter().flatten().collect()),
+    )(input)
+        .map(|(next, v)| (next, Block::new().extend_with(v)))
 }
 
 #[cfg(test)]
@@ -258,6 +268,17 @@ mod tests {
     #[test]
     fn test_block() {
         assert!(matches!(block("{ let foo = true; }"), Ok(("", ..))));
+    }
+
+    #[test]
+    fn test_global_block() {
+        assert_eq!(global_block("a::b;"), Ok(("", Block::new()
+            .tap_mut(|b| {
+                b.statements.extend(
+                    key_mapping_inline("a::b;").unwrap().1.into_iter().map(|e| Stmt::Expr(e))
+                );
+            })
+        )))
     }
 
     #[test]
