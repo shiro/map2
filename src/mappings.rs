@@ -2,28 +2,40 @@ use crate::*;
 
 
 pub(crate) fn bind_mappings() -> Block {
-    let mut global = Block::new();
 
-    global.replace_key(
-        KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() },
-        KeyAction::new(KEY_A, TYPE_DOWN),
-    );
+    // global.replace_key(
+    //     KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() },
+    //     KeyAction::new(KEY_A, TYPE_DOWN),
+    // );
+    //
+    // global.replace_key(
+    //     KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
+    //     KeyAction::new(KEY_A, TYPE_UP),
+    // );
 
-    global.replace_key(
-        KeyActionWithMods { key: KEY_MOUSE5, value: TYPE_UP, modifiers: KeyModifierFlags::new() },
-        KeyAction::new(KEY_A, TYPE_UP),
-    );
+    // let mut global = Block::new();
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 { panic!("no script file arg given"); }
 
-    global.replace_key_block(
-        KeyActionWithMods { key: KEY_MOUSE6, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() },
-        Block::new()
-            .append_stmt(Stmt::If(Expr::Boolean(false),
-                                  Block::new()
-                                      .append_string_sequence("a".to_string()),
-            ))
-            // .sleep_for(time::Duration::from_millis(1000))
-            .append_string_sequence("b".to_string()),
-    );
+    let script_filename = &args[1];
+    log_msg(script_filename);
+
+    let script = std::fs::read_to_string(script_filename).expect("failed to read file");
+
+    // let script = "a::b;  b::c;".to_string();
+    let mut global = parsing::parse_script(script.as_str()).unwrap();
+
+
+    // global.replace_key_block(
+    //     KeyActionWithMods { key: KEY_MOUSE6, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() },
+    //     Block::new()
+    //         .append_stmt(Stmt::If(Expr::Boolean(false),
+    //                               Block::new()
+    //                                   .append_string_sequence("a".to_string()),
+    //         ))
+    //         // .sleep_for(time::Duration::from_millis(1000))
+    //         .append_string_sequence("b".to_string()),
+    // );
 
     global
 

@@ -173,6 +173,14 @@ impl KeycodeExt for KEYCODE {
 lazy_static! {
     pub(crate) static ref KEY_LOOKUP: HashMap<&'static str, Key> = {
         let mut m = HashMap::new();
+        m.insert("mouse5", KEY_MOUSE5);
+        m.insert("mouse6", KEY_MOUSE6);
+        m.insert("mouse7", KEY_MOUSE7);
+        m.insert("mouse8", KEY_MOUSE8);
+        m.insert("mouse9", KEY_MOUSE9);
+        m.insert("mouse10", KEY_MOUSE10);
+        m.insert("mouse11", KEY_MOUSE11);
+        m.insert("mouse12", KEY_MOUSE12);
         m.insert("enter", KEY_ENTER);
         m.insert("esc", KEY_ESC);
         m.insert("ctrl", KEY_LEFT_CTRL);

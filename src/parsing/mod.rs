@@ -10,7 +10,7 @@ use nom::multi::{many0, many1};
 use nom::sequence::*;
 
 use crate::*;
-use anyhow::Error;
+use anyhow::*;
 use crate::block_ext::ExprVecExt;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
@@ -185,6 +185,13 @@ fn global_block(input: &str) -> Res<&str, Block> {
         .map(|(next, v)| (next, Block::new().extend_with(v)))
 }
 
+pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
+    match global_block(raw_script) {
+        Ok(v) => Ok(v.1),
+        Err(_) => Err(anyhow!("parsing failed"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use input_linux_sys::EV_KEY;
@@ -215,6 +222,7 @@ mod tests {
     #[test]
     fn test_key() {
         assert_eq!(key("a"), Ok(("", ParsedSingleKey::Key(KEY_A))));
+        assert_eq!(key("mouse5"), Ok(("", ParsedSingleKey::Key(KEY_MOUSE5))));
         assert_eq!(key("A"), Ok(("", ParsedSingleKey::CapitalKey(KEY_A))));
         assert_eq!(key("enter"), Ok(("", ParsedSingleKey::Key(KEY_ENTER))));
         assert!(matches!(key("entert"), Err(..)));
