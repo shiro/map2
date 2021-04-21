@@ -174,7 +174,7 @@ async fn main() -> Result<()> {
             ExecutionMessage::EatEv(action) => {
                 state.ignore_list.ignore(&action);
             }
-            ExecutionMessage::AddMapping(token, from, mut block) => {
+            ExecutionMessage::AddMapping(token, from, block) => {
                 if token == current_token {
                     mappings.0.insert(from, Arc::new(tokio::sync::Mutex::new(block)));
                 }

@@ -1,6 +1,6 @@
-use crate::*;
 use std::borrow::{Borrow, BorrowMut};
 
+use crate::*;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
@@ -73,13 +73,15 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             var_map.lock().unwrap().scope_values.insert(var_name.clone(), value);
             return ExprRet::Void;
         }
-        Expr::KeyMapping(mapping) => {
-            let mut mapping = mapping.clone();
-            mapping.to.var_map = var_map.clone();
+        Expr::KeyMapping(mappings) => {
+            for mapping in mappings {
+                let mut mapping = mapping.clone();
+                mapping.to.var_map = var_map.clone();
 
-            amb.message_tx.borrow_mut().as_ref().unwrap()
-                .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to)).await
-                .unwrap();
+                amb.message_tx.borrow_mut().as_ref().unwrap()
+                    .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to)).await
+                    .unwrap();
+            }
 
             return ExprRet::Void;
         }
@@ -211,7 +213,7 @@ pub(crate) enum Expr {
     // INC(Expr),
     // Add(Expr, Expr),
     Assign(String, Box<Expr>),
-    KeyMapping(KeyMapping),
+    KeyMapping(Vec<KeyMapping>),
 
     Name(String),
     Boolean(bool),

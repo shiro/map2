@@ -62,11 +62,11 @@ fn key_flags(input: &str) -> Res<&str, KeyModifierFlags> {
         let mut flags = KeyModifierFlags::new();
         for v in val {
             match v {
-                ('!') => { if !flags.alt { flags.alt(); } else { return Err(make_generic_nom_err()); } }
-                ('^') => { if !flags.ctrl { flags.ctrl(); } else { return Err(make_generic_nom_err()); } }
-                ('+') => { if !flags.shift { flags.shift(); } else { return Err(make_generic_nom_err()); } }
-                ('#') => { if !flags.meta { flags.meta(); } else { return Err(make_generic_nom_err()); } }
-                (_) => unreachable!()
+                '!' => { if !flags.alt { flags.alt(); } else { return Err(make_generic_nom_err()); } }
+                '^' => { if !flags.ctrl { flags.ctrl(); } else { return Err(make_generic_nom_err()); } }
+                '+' => { if !flags.shift { flags.shift(); } else { return Err(make_generic_nom_err()); } }
+                '#' => { if !flags.meta { flags.meta(); } else { return Err(make_generic_nom_err()); } }
+                _ => unreachable!()
             }
         };
         Ok((next, flags))
@@ -139,7 +139,7 @@ fn key_sequence(input: &str) -> Res<&str, Vec<Expr>> {
     })
 }
 
-fn key_mapping_inline(input: &str) -> Res<&str, Vec<Expr>> {
+fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
     context(
         "key_mapping_inline",
         tuple((
@@ -151,38 +151,34 @@ fn key_mapping_inline(input: &str) -> Res<&str, Vec<Expr>> {
             ))
         )),
     )(input).and_then(|(next, v)| {
-        let mut vec = vec![];
-
         let (from, to) = (v.0, v.2);
 
-        match from {
+        Ok((next, match from {
             ParsedKeyAction::KeyAction(_) => { unimplemented!() }
             ParsedKeyAction::KeyClickAction(from) => {
                 match to {
                     ParsedKeyAction::KeyAction(_) => { unimplemented!() }
                     ParsedKeyAction::KeyClickAction(to) => {
-                        vec.map_key_click(from, to);
+                        Expr::map_key_click(from, to)
                     }
                     ParsedKeyAction::KeySequence(expr) => {
-                        vec.map_key_block(from, Block::new()
-                            .tap_mut(|b| b.statements = expr.into_iter().map(|e| Stmt::Expr(e)).collect()),
-                        );
+                        Expr::map_key_block(from, Block::new()
+                            .tap_mut(|b| b.statements = expr.into_iter().map(Stmt::Expr).collect()),
+                        )
                     }
                 }
             }
             ParsedKeyAction::KeySequence(_) => return Err(make_generic_nom_err())
-        }
-
-        Ok((next, vec))
+        }))
     })
 }
 
-fn expr(input: &str) -> Res<&str, Vec<Expr>> {
+fn expr(input: &str) -> Res<&str, Expr> {
     context(
         "expr",
         tuple((
             alt((
-                map(variable_assignment, |v| vec![v]),
+                variable_assignment,
                 key_mapping_inline,
             )),
             multispace0,
@@ -190,13 +186,13 @@ fn expr(input: &str) -> Res<&str, Vec<Expr>> {
     )(input).map(|(next, v)| (next, v.0))
 }
 
-fn stmt(input: &str) -> Res<&str, Vec<Stmt>> {
+fn stmt(input: &str) -> Res<&str, Stmt> {
     context(
         "stmt",
         tuple((
             alt((
-                map(expr, |e| e.into_iter().map(|e| Stmt::Expr(e)).collect()),
-                map(block, |b| vec![Stmt::Block(b)]),
+                map(expr, Stmt::Expr),
+                map(block, Stmt::Block),
             )),
             tag(";"),
         )),
@@ -217,9 +213,9 @@ fn block_body(input: &str) -> Res<&str, Block> {
         match v {
             Some((s1, s2)) => {
                 (next, Block::new().tap_mut(|b| {
-                    b.statements = s1.tap_mut(|v| {
-                        v.extend(s2.into_iter().map(|x| x.1).flatten());
-                    });
+                    let mut statements: Vec<Stmt> = s2.into_iter().map(|x| x.1).collect();
+                    statements.insert(0, s1);
+                    b.statements = statements;
                 }))
             }
             _ => (next, Block::new())
@@ -322,36 +318,32 @@ mod tests {
 
     #[test]
     fn test_key_mapping_inline() {
-        assert_eq!(key_mapping_inline("a::b"), Ok(("", vec![]
-            .tap_mut(|v| v.map_key_click(
-                KeyClickActionWithMods::new(KEY_A),
-                KeyClickActionWithMods::new(KEY_B),
-            )))));
+        assert_eq!(key_mapping_inline("a::b"), Ok(("", Expr::map_key_click(
+            KeyClickActionWithMods::new(KEY_A),
+            KeyClickActionWithMods::new(KEY_B),
+        ))));
 
-        assert_eq!(key_mapping_inline("A::b"), Ok(("", vec![]
-            .tap_mut(|v| v.map_key_click(
-                KeyClickActionWithMods::new(KEY_A).tap_mut(|v| { v.modifiers.shift(); }),
-                KeyClickActionWithMods::new(KEY_B),
-            )))));
+        assert_eq!(key_mapping_inline("A::b"), Ok(("", Expr::map_key_click(
+            KeyClickActionWithMods::new(KEY_A).tap_mut(|v| { v.modifiers.shift(); }),
+            KeyClickActionWithMods::new(KEY_B),
+        ))));
     }
 
     #[test]
     fn test_block() {
         assert_eq!(block_body("a::b;"), Ok(("", Block::new()
-            .tap_mut(|b| { b.statements = stmt("a::b;").unwrap().1; })
+            .tap_mut(|b| { b.statements.push(stmt("a::b;").unwrap().1); })
         )));
 
         assert_eq!(block("{ let foo = true; }"), Ok(("", Block::new()
-            .tap_mut(|b| { b.statements = stmt("let foo = true;").unwrap().1; })
+            .tap_mut(|b| { b.statements.push(stmt("let foo = true;").unwrap().1); })
         )));
 
         assert_eq!(block("{ let foo = true; a::b; b::c; }"), Ok(("", Block::new()
             .tap_mut(|b| {
-                b.statements = stmt("let foo = true;").unwrap().1
-                    .into_iter()
-                    .chain(stmt("a::b;").unwrap().1)
-                    .chain(stmt("b::c;").unwrap().1)
-                    .collect();
+                b.statements.push(stmt("let foo = true;").unwrap().1);
+                b.statements.push(stmt("a::b;").unwrap().1);
+                b.statements.push(stmt("b::c;").unwrap().1);
             })
         )));
     }
