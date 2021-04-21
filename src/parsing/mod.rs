@@ -1,18 +1,18 @@
+use anyhow::*;
 use futures::StreamExt;
 use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
-use nom::combinator::{opt, map};
+use nom::combinator::{map, opt};
 use nom::Err as NomErr;
-use nom::error::{context, ErrorKind, VerboseError};
+use nom::error::{context, VerboseError};
 use nom::IResult;
 use nom::multi::{many0, many1};
 use nom::sequence::*;
+use tap::Tap;
 
 use crate::*;
-use anyhow::*;
 use crate::block_ext::ExprVecExt;
-use tap::Tap;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -95,10 +95,11 @@ fn key(input: &str) -> Res<&str, ParsedSingleKey> {
         })
 }
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 enum ParsedKeyAction {
     KeyAction(KeyAction),
     KeyClickAction(KeyClickActionWithMods),
+    KeySequence(Vec<Expr>),
 }
 
 fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
@@ -125,27 +126,51 @@ fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
 }
 
 
+fn key_sequence(input: &str) -> Res<&str, Vec<Expr>> {
+    context(
+        "key_sequence",
+        tuple((
+            tag("\""),
+            take_until("\""),
+            tag("\""),
+        )),
+    )(input).and_then(|(next, v)| {
+        Ok((next, vec![].append_string_sequence(v.1)))
+    })
+}
+
 fn key_mapping_inline(input: &str) -> Res<&str, Vec<Expr>> {
     context(
         "key_mapping_inline",
         tuple((
             key_action,
             tag("::"),
-            key_action,
+            alt((
+                map(key_sequence, |seq| ParsedKeyAction::KeySequence(seq)),
+                key_action,
+            ))
         )),
     )(input).and_then(|(next, v)| {
         let mut vec = vec![];
 
-        match v.0 {
+        let (from, to) = (v.0, v.2);
+
+        match from {
             ParsedKeyAction::KeyAction(_) => { unimplemented!() }
             ParsedKeyAction::KeyClickAction(from) => {
-                match v.2 {
+                match to {
                     ParsedKeyAction::KeyAction(_) => { unimplemented!() }
                     ParsedKeyAction::KeyClickAction(to) => {
                         vec.map_key_click(from, to);
                     }
+                    ParsedKeyAction::KeySequence(expr) => {
+                        vec.map_key_block(from, Block::new()
+                            .tap_mut(|b| b.statements = expr.into_iter().map(|e| Stmt::Expr(e)).collect()),
+                        );
+                    }
                 }
             }
+            ParsedKeyAction::KeySequence(_) => return Err(make_generic_nom_err())
         }
 
         Ok((next, vec))
@@ -226,9 +251,9 @@ pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
 mod tests {
     use input_linux_sys::EV_KEY;
     use nom::error::{ErrorKind, VerboseErrorKind};
+    use tap::Tap;
 
     use super::*;
-    use tap::Tap;
 
     #[test]
     fn test_value() {
@@ -256,6 +281,13 @@ mod tests {
         assert_eq!(key("A"), Ok(("", ParsedSingleKey::CapitalKey(KEY_A))));
         assert_eq!(key("enter"), Ok(("", ParsedSingleKey::Key(KEY_ENTER))));
         assert!(matches!(key("entert"), Err(..)));
+    }
+
+    #[test]
+    fn test_key_sequence() {
+        assert_eq!(key_sequence("\"hello world\""), Ok(("", vec![]
+            .append_string_sequence("hello world")
+        )));
     }
 
     #[test]

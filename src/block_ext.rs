@@ -29,7 +29,7 @@ impl Block {
         self
     }
 
-    pub(crate) fn append_string_sequence(mut self, sequence: String) -> Self {
+    pub(crate) fn append_string_sequence(mut self, sequence: &str) -> Self {
         let expr_vec = vec![].append_string_sequence(sequence);
         self.statements.extend(expr_vec.into_iter().map(|expr| Stmt::Expr(expr)));
         self
@@ -45,8 +45,9 @@ pub(crate) trait ExprVecExt {
     fn append_click(self, key: Key) -> Self;
     fn append_action(self, action: KeyAction) -> Self;
     fn sleep_for_millis(self, duration: u64) -> Self;
-    fn append_string_sequence(self, sequence: String) -> Self;
+    fn append_string_sequence(self, sequence: &str) -> Self;
     fn map_key_click(&mut self, from: KeyClickActionWithMods, to: KeyClickActionWithMods);
+    fn map_key_block(&mut self, from: KeyClickActionWithMods, to: Block);
 }
 
 impl ExprVecExt for Vec<Expr> {
@@ -65,7 +66,7 @@ impl ExprVecExt for Vec<Expr> {
         unimplemented!();
     }
 
-    fn append_string_sequence(mut self, sequence: String) -> Self {
+    fn append_string_sequence(mut self, sequence: &str) -> Self {
         let mut it = sequence.chars();
 
         while let Some(ch) = it.next() {
@@ -134,6 +135,33 @@ impl ExprVecExt for Vec<Expr> {
 
             self.push(Expr::KeyMapping(KeyMapping { from: KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers }, to: block }))
         }
+    }
+
+    fn map_key_block(&mut self, from: KeyClickActionWithMods, to: Block) {
+        self.push(Expr::KeyMapping(KeyMapping {
+            from: KeyActionWithMods {
+                key: from.key,
+                value: TYPE_DOWN,
+                modifiers: from.modifiers,
+            },
+            to,
+        }));
+        self.push(Expr::KeyMapping(KeyMapping {
+            from: KeyActionWithMods {
+                key: from.key,
+                value: TYPE_UP,
+                modifiers: from.modifiers,
+            },
+            to: Block::new(),
+        }));
+        self.push(Expr::KeyMapping(KeyMapping {
+            from: KeyActionWithMods {
+                key: from.key,
+                value: TYPE_REPEAT,
+                modifiers: from.modifiers,
+            },
+            to: Block::new(),
+        }));
     }
 }
 
