@@ -12,6 +12,7 @@ use nom::sequence::*;
 use crate::*;
 use anyhow::*;
 use crate::block_ext::ExprVecExt;
+use tap::Tap;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -34,23 +35,22 @@ fn boolean(input: &str) -> Res<&str, Expr> {
         (next, match v {
             "true" => Expr::Boolean(true),
             "false" => Expr::Boolean(false),
-            _ => panic!(),
+            _ => unreachable!(),
         })
     )
 }
 
-fn variable_declaration(input: &str) -> Res<&str, Expr> {
+fn variable_assignment(input: &str) -> Res<&str, Expr> {
     context(
         "variable_declaration",
         tuple((
             tag("let"),
-            multispace1,
+            multispace0,
             variable_name,
-            multispace1,
+            multispace0,
             tag("="),
-            multispace1,
+            multispace0,
             boolean,
-            tag(";")
         )),
     )(input).map(|(next, parts)|
         (next, Expr::Assign(parts.2, Box::new(parts.6)))
@@ -132,8 +132,6 @@ fn key_mapping_inline(input: &str) -> Res<&str, Vec<Expr>> {
             key_action,
             tag("::"),
             key_action,
-            multispace0,
-            tag(";"),
         )),
     )(input).and_then(|(next, v)| {
         let mut vec = vec![];
@@ -158,11 +156,50 @@ fn expr(input: &str) -> Res<&str, Vec<Expr>> {
     context(
         "expr",
         tuple((
-            multispace0,
-            alt((map(variable_declaration, |v| vec![v]), key_mapping_inline)),
+            alt((
+                map(variable_assignment, |v| vec![v]),
+                key_mapping_inline,
+            )),
             multispace0,
         )),
-    )(input).map(|(next, v)| (next, v.1))
+    )(input).map(|(next, v)| (next, v.0))
+}
+
+fn stmt(input: &str) -> Res<&str, Vec<Stmt>> {
+    context(
+        "stmt",
+        tuple((
+            alt((
+                map(expr, |e| e.into_iter().map(|e| Stmt::Expr(e)).collect()),
+                map(block, |b| vec![Stmt::Block(b)]),
+            )),
+            tag(";"),
+        )),
+    )(input).map(|(next, val)| (next, val.0))
+}
+
+fn block_body(input: &str) -> Res<&str, Block> {
+    context(
+        "block_body",
+        opt(tuple((
+            stmt,
+            many0(tuple((
+                multispace0,
+                stmt,
+            ))),
+        ))),
+    )(input).map(|(next, v)| {
+        match v {
+            Some((s1, s2)) => {
+                (next, Block::new().tap_mut(|b| {
+                    b.statements = s1.tap_mut(|v| {
+                        v.extend(s2.into_iter().map(|x| x.1).flatten());
+                    });
+                }))
+            }
+            _ => (next, Block::new())
+        }
+    })
 }
 
 fn block(input: &str) -> Res<&str, Block> {
@@ -170,23 +207,16 @@ fn block(input: &str) -> Res<&str, Block> {
         "block",
         tuple((
             tag("{"),
-            map(many0(expr), |mut v| v.into_iter().flatten().collect()),
+            multispace0,
+            block_body,
+            multispace0,
             tag("}")
         )),
-    )(input)
-        .map(|(next, v)| (next, Block::new().extend_with(v.1)))
-}
-
-fn global_block(input: &str) -> Res<&str, Block> {
-    context(
-        "global_block",
-        map(many1(expr), |mut v| v.into_iter().flatten().collect()),
-    )(input)
-        .map(|(next, v)| (next, Block::new().extend_with(v)))
+    )(input).map(|(next, v)| (next, v.2))
 }
 
 pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
-    match global_block(raw_script) {
+    match block_body(raw_script) {
         Ok(v) => Ok(v.1),
         Err(_) => Err(anyhow!("parsing failed"))
     }
@@ -260,13 +290,13 @@ mod tests {
 
     #[test]
     fn test_key_mapping_inline() {
-        assert_eq!(key_mapping_inline("a::b;"), Ok(("", vec![]
+        assert_eq!(key_mapping_inline("a::b"), Ok(("", vec![]
             .tap_mut(|v| v.map_key_click(
                 KeyClickActionWithMods::new(KEY_A),
                 KeyClickActionWithMods::new(KEY_B),
             )))));
 
-        assert_eq!(key_mapping_inline("A::b;"), Ok(("", vec![]
+        assert_eq!(key_mapping_inline("A::b"), Ok(("", vec![]
             .tap_mut(|v| v.map_key_click(
                 KeyClickActionWithMods::new(KEY_A).tap_mut(|v| { v.modifiers.shift(); }),
                 KeyClickActionWithMods::new(KEY_B),
@@ -275,25 +305,32 @@ mod tests {
 
     #[test]
     fn test_block() {
-        assert!(matches!(block("{ let foo = true; }"), Ok(("", ..))));
-    }
+        assert_eq!(block_body("a::b;"), Ok(("", Block::new()
+            .tap_mut(|b| { b.statements = stmt("a::b;").unwrap().1; })
+        )));
 
-    #[test]
-    fn test_global_block() {
-        assert_eq!(global_block("a::b;"), Ok(("", Block::new()
+        assert_eq!(block("{ let foo = true; }"), Ok(("", Block::new()
+            .tap_mut(|b| { b.statements = stmt("let foo = true;").unwrap().1; })
+        )));
+
+        assert_eq!(block("{ let foo = true; a::b; b::c; }"), Ok(("", Block::new()
             .tap_mut(|b| {
-                b.statements.extend(
-                    key_mapping_inline("a::b;").unwrap().1.into_iter().map(|e| Stmt::Expr(e))
-                );
+                b.statements = stmt("let foo = true;").unwrap().1
+                    .into_iter()
+                    .chain(stmt("a::b;").unwrap().1)
+                    .chain(stmt("b::c;").unwrap().1)
+                    .collect();
             })
-        )))
+        )));
     }
 
     #[test]
     fn test_assignment() {
         assert_eq!(variable_name("hello2"), Ok(("", "hello2".to_string())));
-        assert!(matches!(variable_name("2hello"), Err(..)));
+        assert_eq!(variable_assignment("let foo = true"),
+                   Ok(("", Expr::Assign("foo".to_string(), Box::new(boolean("true").unwrap().1))))
+        );
 
-        // assert!(matches!(variable_declaration("let hello2 = true;"), Ok(("", Expr::Assign("hello2".to_string(), Box::new(Expr::Boolean(true)))))));
+        assert!(matches!(variable_name("2hello"), Err(..)));
     }
 }
