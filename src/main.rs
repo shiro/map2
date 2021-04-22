@@ -37,6 +37,7 @@ mod mappings;
 mod block_ext;
 mod key_primitives;
 mod parsing;
+mod device;
 
 struct IgnoreList(Vec<KeyAction>);
 

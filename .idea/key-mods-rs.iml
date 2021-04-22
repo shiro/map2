@@ -48,6 +48,7 @@
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/num-traits-c6ad5b6e4a65da32/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/nom-f53f86967e2f6af3/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/radium-1bcd19ad552590a8/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/evdev-sys-b2e844ecfc8dce50/out" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
