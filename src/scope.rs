@@ -241,7 +241,7 @@ pub(crate) enum Expr {
     Boolean(bool),
     String(String),
 
-    FunctionCall(String, Vec<ValueType>),
+    FunctionCall(String, Vec<Expr>),
 
     KeyAction(KeyAction),
     EatKeyAction(KeyAction),

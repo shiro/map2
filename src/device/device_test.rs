@@ -1,4 +1,3 @@
-#[macro_use]
 use std::{io, time};
 use std::collections::HashMap;
 use std::fs::File;

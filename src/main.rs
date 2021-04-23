@@ -8,28 +8,27 @@
 extern crate lazy_static;
 extern crate regex;
 
-use std::{io, mem, thread, time};
-use std::io::{stdout, Write};
+use std::{io, time};
+use std::io::{Write};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
+use evdev_rs::enums::EventCode;
+use evdev_rs::InputEvent;
 use nom::lib::std::collections::HashMap;
 use tokio::prelude::*;
+use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 
+use crate::device::device_test::bind_udev_inputs;
 use crate::key_defs::*;
 use crate::key_primitives::*;
 use crate::scope::*;
 use crate::state::*;
 use crate::x11::{x11_initialize, x11_test};
 use crate::x11::ActiveWindowInfo;
-use evdev_rs::InputEvent;
-use tokio::sync::{mpsc, oneshot};
-use crate::device::device_test::bind_udev_inputs;
-use evdev_rs::enums::EventCode;
-
 
 mod tab_mod;
 mod caps_mod;

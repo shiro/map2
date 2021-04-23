@@ -4,7 +4,7 @@ use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::combinator::{map, opt};
-use nom::Err as NomErr;
+use nom::{Err as NomErr, InputLength, InputIter, InputTakeAtPosition};
 use nom::error::{context, VerboseError};
 use nom::IResult;
 use nom::multi::{many0, many1};
@@ -19,6 +19,8 @@ type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
 fn make_generic_nom_err<'a>() -> NomErr<VerboseError<&'a str>> { NomErr::Error(VerboseError { errors: vec![] }) }
 
+static STACK_SIZE: usize = 255;
+
 
 fn variable_name(input: &str) -> Res<&str, String> {
     context(
@@ -26,6 +28,14 @@ fn variable_name(input: &str) -> Res<&str, String> {
         tuple((alpha1, alphanumeric0)),
     )(input)
         .map(|(a, b)| (a, [b.0, b.1].join("")))
+}
+
+fn string(input: &str) -> Res<&str, Expr> {
+    context(
+        "string",
+        tuple((tag("\""), take_until("\""), tag("\""))),
+    )(input)
+        .map(|(next, v)| (next, Expr::String(v.1.to_string())))
 }
 
 fn boolean(input: &str) -> Res<&str, Expr> {
@@ -177,14 +187,32 @@ fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
     })
 }
 
+fn op_equal(input: &str) -> Res<&str, Expr> {
+    context(
+        "op_equal",
+        tuple((
+            expr,
+            multispace0,
+            tag("=="),
+            multispace0,
+            expr,
+        )),
+    )(input).map(|(next, v)|
+        (next, Expr::Eq(Box::new(v.0), Box::new(v.4)))
+    )
+}
+
 fn expr(input: &str) -> Res<&str, Expr> {
     context(
         "expr",
         tuple((
             alt((
                 boolean,
+                string,
                 variable_assignment,
+                function_call,
                 key_mapping_inline,
+                op_equal,
             )),
             multispace0,
         )),
@@ -203,9 +231,52 @@ fn if_stmt(input: &str) -> Res<&str, Stmt> {
             multispace0,
             tag(")"),
             multispace0,
-            block,
+            block(0),
         )),
     )(input).map(|(next, v)| (next, Stmt::If(v.4, v.8)))
+}
+
+
+fn function_name(input: &str) -> Res<&str, String> {
+    context(
+        "function_name",
+        variable_name, // same rules as for variable names
+    )(input)
+}
+
+fn function_arg(input: &str) -> Res<&str, Expr> {
+    context("function_arg", expr)(input)
+}
+
+fn function_call(input: &str) -> Res<&str, Expr> {
+    context(
+        "function_call",
+        tuple((
+            function_name,
+            tag("("),
+            multispace0,
+            opt(tuple((
+                function_arg,
+                multispace0,
+                many0(tuple((
+                    tag(","),
+                    multispace0,
+                    function_arg,
+                    multispace0,
+                ))),
+            ))),
+            tag(")"),
+        )),
+    )(input).map(|(next, v)| {
+        match v.3 {
+            Some(arg_v) => {
+                let mut args: Vec<Expr> = arg_v.2.into_iter().map(|x| x.2).collect();
+                args.insert(0, arg_v.0);
+                (next, Expr::FunctionCall(v.0, args))
+            }
+            _ => (next, Expr::FunctionCall(v.0, vec![]))
+        }
+    })
 }
 
 fn stmt(input: &str) -> Res<&str, Stmt> {
@@ -215,52 +286,58 @@ fn stmt(input: &str) -> Res<&str, Stmt> {
             alt((
                 if_stmt,
                 map(tuple((expr, tag(";"))), |v| Stmt::Expr(v.0)),
-                map(block, Stmt::Block),
+                map(block(0), Stmt::Block),
             )),
         )),
     )(input).map(|(next, val)| (next, val.0))
 }
 
-fn block_body(input: &str) -> Res<&str, Block> {
-    context(
-        "block_body",
-        opt(tuple((
-            stmt,
-            many0(tuple((
-                multispace0,
+fn block_body(depth: usize) -> impl Fn(&str) -> Res<&str, Block> {
+    move |input: &str| {
+        if depth > STACK_SIZE { return Err(make_generic_nom_err()); }
+        context(
+            "block_body",
+            opt(tuple((
                 stmt,
+                many0(tuple((
+                    multispace0,
+                    stmt,
+                ))),
             ))),
-        ))),
-    )(input).map(|(next, v)| {
-        match v {
-            Some((s1, s2)) => {
-                (next, Block::new().tap_mut(|b| {
-                    let mut statements: Vec<Stmt> = s2.into_iter().map(|x| x.1).collect();
-                    statements.insert(0, s1);
-                    b.statements = statements;
-                }))
+        )(input).map(|(next, v)| {
+            match v {
+                Some((s1, s2)) => {
+                    (next, Block::new().tap_mut(|b| {
+                        let mut statements: Vec<Stmt> = s2.into_iter().map(|x| x.1).collect();
+                        statements.insert(0, s1);
+                        b.statements = statements;
+                    }))
+                }
+                _ => (next, Block::new())
             }
-            _ => (next, Block::new())
-        }
-    })
+        })
+    }
 }
 
-fn block(input: &str) -> Res<&str, Block> {
-    context(
-        "block",
-        tuple((
-            tag("{"),
-            multispace0,
-            block_body,
-            multispace0,
-            tag("}")
-        )),
-    )(input).map(|(next, v)| (next, v.2))
+fn block(depth: usize) -> impl Fn(&str) -> Res<&str, Block> {
+    move |input: &str| {
+        if depth > STACK_SIZE { return Err(make_generic_nom_err()); }
+        context(
+            "block",
+            tuple((
+                tag("{"),
+                multispace0,
+                block_body(depth + 1),
+                multispace0,
+                tag("}")
+            )),
+        )(input).map(|(next, v)| (next, v.2))
+    }
 }
 
 
 pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
-    match block_body(raw_script) {
+    match block_body(0)(raw_script) {
         Ok(v) => Ok(v.1),
         Err(_) => Err(anyhow!("parsing failed"))
     }
@@ -275,15 +352,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_function_call() {
+        assert_eq!(function_call("foobar()"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![]))));
+        assert_eq!(function_call("foobar(\"hello\", true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
+            Expr::String("hello".to_string()),
+            Expr::Boolean(true),
+        ]))));
+        assert_eq!(function_call("foobar(true == true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
+            op_equal("true == true").unwrap().1
+        ]))));
+    }
+
+    #[test]
     fn test_if_stmt() {
         assert_eq!(if_stmt("if(true){ a::b; }"), Ok(("", Stmt::If(
             expr("true").unwrap().1,
-            block("{a::b;}").unwrap().1,
+            block(0)("{a::b;}").unwrap().1,
         ))));
 
         assert_eq!(stmt("if(true){ a::b; }"), Ok(("", Stmt::If(
             expr("true").unwrap().1,
-            block("{a::b;}").unwrap().1,
+            block(0)("{a::b;}").unwrap().1,
         ))));
     }
 
@@ -292,6 +381,24 @@ mod tests {
         assert!(matches!(boolean("true"), Ok(("", Expr::Boolean(true)))));
         assert!(matches!(boolean("false"), Ok(("", Expr::Boolean(false)))));
         assert!(matches!(boolean("foo"), Err(..)));
+
+        assert_eq!(string("\"hello world\""), Ok(("", Expr::String("hello world".to_string()))));
+    }
+
+    #[test]
+    fn test_operator_equal() {
+        assert_eq!(op_equal("true == true"), Ok(("", Expr::Eq(
+            Box::new(Expr::Boolean(true)),
+            Box::new(Expr::Boolean(true)),
+        ))));
+        assert_eq!(op_equal("\"hello world\" == \"hello world\""), Ok(("", Expr::Eq(
+            Box::new(Expr::String("hello world".to_string())),
+            Box::new(Expr::String("hello world".to_string())),
+        ))));
+        assert_eq!(op_equal("\"22hello\" == true"), Ok(("", Expr::Eq(
+            Box::new(Expr::String("22hello".to_string())),
+            Box::new(Expr::Boolean(true)),
+        ))));
     }
 
     #[test]
@@ -368,15 +475,15 @@ mod tests {
 
     #[test]
     fn test_block() {
-        assert_eq!(block_body("a::b;"), Ok(("", Block::new()
+        assert_eq!(block_body(0)("a::b;"), Ok(("", Block::new()
             .tap_mut(|b| { b.statements.push(stmt("a::b;").unwrap().1); })
         )));
 
-        assert_eq!(block("{ let foo = true; }"), Ok(("", Block::new()
+        assert_eq!(block(0)("{ let foo = true; }"), Ok(("", Block::new()
             .tap_mut(|b| { b.statements.push(stmt("let foo = true;").unwrap().1); })
         )));
 
-        assert_eq!(block("{ let foo = true; a::b; b::c; }"), Ok(("", Block::new()
+        assert_eq!(block(0)("{ let foo = true; a::b; b::c; }"), Ok(("", Block::new()
             .tap_mut(|b| {
                 b.statements.push(stmt("let foo = true;").unwrap().1);
                 b.statements.push(stmt("a::b;").unwrap().1);
@@ -384,7 +491,7 @@ mod tests {
             })
         )));
 
-        assert_eq!(block_body("if(true){a::b;}"), Ok(("", Block::new().tap_mut(|b| {
+        assert_eq!(block_body(0)("if(true){a::b;}"), Ok(("", Block::new().tap_mut(|b| {
             b.statements = vec![
                 if_stmt("if(true){a::b;}").unwrap().1
             ];
