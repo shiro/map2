@@ -63,7 +63,6 @@ impl Expr {
 
         {
             let mut block = Block::new();
-            block.push_expr(Expr::SleepAction(time::Duration::from_micros(20000)));
             block.push_expr(Expr::KeyAction(KeyAction { key: to.key, value: TYPE_UP }));
 
             if to.modifiers.ctrl && !from.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
