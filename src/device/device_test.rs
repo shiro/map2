@@ -123,29 +123,6 @@ pub fn print_event_debug(ev: &InputEvent) {
     }
 }
 
-// #[tokio::main]
-// async fn main() {
-//     let patterns = vec![
-//         "/dev/input/by-id/.*-event-mouse",
-//         "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
-//     ];
-//
-//     let (mut reader_init_tx, mut reader_init_rx) = oneshot::channel();
-//     let (mut writer_tx, mut writer_rx) = mpsc::channel(128);
-//
-//     // start coroutine
-//     dev(patterns, reader_init_tx, writer_tx).await;
-//
-//     let reader_tx = reader_init_rx.await.unwrap();
-//
-//     loop {
-//         let ev = writer_rx.recv().await.unwrap();
-//         // println!("wow");
-//         print_event(&ev);
-//         reader_tx.send(ev).await;
-//     }
-// }
-
 
 fn get_fd_list(patterns: &Vec<Regex>) -> Vec<String> {
     let mut list = vec![];
@@ -242,18 +219,7 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
         }
 
 
-        // for fd_path in list
         for device in devices {
-            // if fd_path in map, continue
-            // if fd_map.get(&fd_path).is_some() { continue; }
-            // // add fd_path to the map
-            // fd_map.insert(fd_path.clone(), true);
-            //
-            // // grab fd_path as fd
-            // let fd_file = File::open(fd_path).unwrap();
-            // let mut device = Device::new_from_file(fd_file).unwrap();
-            // device.grab(GrabMode::Grab).unwrap();
-
             // spawn virtual device and write to it
             if let Some(mut reader_rx) = reader_rx_box {
                 let reader_init = reader_init_box.unwrap();
@@ -307,69 +273,4 @@ pub(crate) async fn bind_udev_inputs(fd_patterns: Vec<&str>, reader_init_tx: one
     });
 
     Ok(())
-
-
-    // let fd_list = get_fd_list();
-    // if fd_list.len() < 1 { return Err(anyhow!("no matching fd found")); }
-
-
-    // let first_fd_path = fd_list.remove(0);
-
-    // let f = File::open(first_fd_path).unwrap();
-
-    // let mut device = Device::new_from_file(f).unwrap();
-    // device.grab(GrabMode::Grab).unwrap();
-    //
-    //
-    // let (tx, rx) = mpsc::channel(128);
-    //
-    //
-    // let input_device = UInputDevice::create_from_device(&device).unwrap();
-    //
-    //
-    // println!("name: {:?}", device.name());
-    //
-    //
-    // println!(
-    //     "Input device ID: bus 0x{:x} vendor 0x{:x} product 0x{:x}",
-    //     device.bustype(),
-    //     device.vendor_id(),
-    //     device.product_id()
-    // );
-    //
-    // print_bits(&device);
-    // print_props(&device);
-    //
-    // let mut a: io::Result<(ReadStatus, InputEvent)>;
-    // loop {
-    //     a = device.next_event(ReadFlag::NORMAL | ReadFlag::BLOCKING);
-    //     if a.is_ok() {
-    //         let mut result = a.ok().unwrap();
-    //         match result.0 {
-    //             ReadStatus::Sync => { // dropped, need to sync
-    //                 while result.0 == ReadStatus::Sync {
-    //                     a = device.next_event(ReadFlag::SYNC);
-    //                     if a.is_ok() {
-    //                         result = a.ok().unwrap();
-    //                     } else { // something failed, abort sync and carry on
-    //                         break;
-    //                     }
-    //                 }
-    //             }
-    //             ReadStatus::Success => {
-    //                 print_event(&result.1);
-    //                 input_device.write_event(&result.1).unwrap();
-    //             }
-    //         }
-    //     } else {
-    //         let err = a.err().unwrap();
-    //         match err.raw_os_error() {
-    //             Some(libc::EAGAIN) => continue,
-    //             _ => {
-    //                 println!("{}", err);
-    //                 break;
-    //             }
-    //         }
-    //     }
-    // }
 }

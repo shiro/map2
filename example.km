@@ -1,2 +1,3 @@
-b::c;
-c::"hello world";
+if(false){
+  a::d;
+}

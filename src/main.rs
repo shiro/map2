@@ -112,14 +112,6 @@ async fn main() -> Result<()> {
         }
     });
 
-    // input ev thread
-    // tokio::spawn(async move {
-    //     loop {
-    //         listen_to_key_events(&mut read_ev, &mut stdin).await;
-    //         input_ev_tx.send(read_ev).await.unwrap();
-    //     }
-    // });
-
 
     let mut state = State::new();
     let mut global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings()));
@@ -287,3 +279,11 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent, mappings: &mut C
 
     Ok(())
 }
+
+// input ev thread
+// tokio::spawn(async move {
+//     loop {
+//         listen_to_key_events(&mut read_ev, &mut stdin).await;
+//         input_ev_tx.send(read_ev).await.unwrap();
+//     }
+// });

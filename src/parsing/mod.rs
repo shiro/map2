@@ -182,6 +182,7 @@ fn expr(input: &str) -> Res<&str, Expr> {
         "expr",
         tuple((
             alt((
+                boolean,
                 variable_assignment,
                 key_mapping_inline,
             )),
@@ -190,15 +191,32 @@ fn expr(input: &str) -> Res<&str, Expr> {
     )(input).map(|(next, v)| (next, v.0))
 }
 
+fn if_stmt(input: &str) -> Res<&str, Stmt> {
+    context(
+        "if_stmt",
+        tuple((
+            tag("if"),
+            multispace0,
+            tag("("),
+            multispace0,
+            expr,
+            multispace0,
+            tag(")"),
+            multispace0,
+            block,
+        )),
+    )(input).map(|(next, v)| (next, Stmt::If(v.4, v.8)))
+}
+
 fn stmt(input: &str) -> Res<&str, Stmt> {
     context(
         "stmt",
         tuple((
             alt((
-                map(expr, Stmt::Expr),
+                if_stmt,
+                map(tuple((expr, tag(";"))), |v| Stmt::Expr(v.0)),
                 map(block, Stmt::Block),
             )),
-            tag(";"),
         )),
     )(input).map(|(next, val)| (next, val.0))
 }
@@ -240,6 +258,7 @@ fn block(input: &str) -> Res<&str, Block> {
     )(input).map(|(next, v)| (next, v.2))
 }
 
+
 pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
     match block_body(raw_script) {
         Ok(v) => Ok(v.1),
@@ -254,6 +273,19 @@ mod tests {
     use tap::Tap;
 
     use super::*;
+
+    #[test]
+    fn test_if_stmt() {
+        assert_eq!(if_stmt("if(true){ a::b; }"), Ok(("", Stmt::If(
+            expr("true").unwrap().1,
+            block("{a::b;}").unwrap().1,
+        ))));
+
+        assert_eq!(stmt("if(true){ a::b; }"), Ok(("", Stmt::If(
+            expr("true").unwrap().1,
+            block("{a::b;}").unwrap().1,
+        ))));
+    }
 
     #[test]
     fn test_value() {
@@ -351,6 +383,12 @@ mod tests {
                 b.statements.push(stmt("b::c;").unwrap().1);
             })
         )));
+
+        assert_eq!(block_body("if(true){a::b;}"), Ok(("", Block::new().tap_mut(|b| {
+            b.statements = vec![
+                if_stmt("if(true){a::b;}").unwrap().1
+            ];
+        }))));
     }
 
     #[test]
