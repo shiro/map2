@@ -6,25 +6,30 @@
 
 #[macro_use]
 extern crate lazy_static;
+extern crate regex;
 
 use std::{io, mem, thread, time};
 use std::io::{stdout, Write};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use async_recursion::async_recursion;
 use nom::lib::std::collections::HashMap;
 use tokio::prelude::*;
 use tokio::task;
 
 use crate::key_defs::*;
-use crate::key_defs::input_event;
 use crate::key_primitives::*;
 use crate::scope::*;
 use crate::state::*;
 use crate::x11::{x11_initialize, x11_test};
 use crate::x11::ActiveWindowInfo;
+use evdev_rs::InputEvent;
+use tokio::sync::{mpsc, oneshot};
+use crate::device::device_test::bind_udev_inputs;
+use evdev_rs::enums::EventCode;
+
 
 mod tab_mod;
 mod caps_mod;
@@ -38,6 +43,8 @@ mod block_ext;
 mod key_primitives;
 mod parsing;
 mod device;
+mod udevmon;
+
 
 struct IgnoreList(Vec<KeyAction>);
 
@@ -64,30 +71,6 @@ impl IgnoreList {
     }
 }
 
-unsafe fn any_as_u8_slice_mut<T: Sized>(p: &mut T) -> &mut [u8] {
-    ::std::slice::from_raw_parts_mut(
-        (p as *const T) as *mut u8,
-        ::std::mem::size_of::<T>(),
-    )
-}
-
-unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    ::std::slice::from_raw_parts(
-        (p as *const T) as *const u8,
-        ::std::mem::size_of::<T>(),
-    )
-}
-
-fn print_event(ev: &input_event) {
-    unsafe {
-        stdout().write_all(any_as_u8_slice(ev)).unwrap();
-        // if ev.type_ == EV_KEY as u16 {
-        //     log_msg(format!("{:?}", ev).as_str());
-        // }
-        stdout().flush().unwrap();
-    }
-}
-
 fn log_msg(msg: &str) {
     let out_msg = format!("[DEBUG] {}\n", msg);
 
@@ -107,10 +90,10 @@ pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMess
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut stdin = tokio::io::stdin();
-    let mut read_ev: input_event = unsafe { mem::zeroed() };
+    // let mut read_ev: input_event = unsafe { mem::zeroed() };
 
     let (window_ev_tx, mut window_ev_rx) = tokio::sync::mpsc::channel(128);
-    let (input_ev_tx, mut input_ev_rx) = tokio::sync::mpsc::channel(128);
+    // let (input_ev_tx, mut input_ev_rx) = tokio::sync::mpsc::channel(128);
     let (mut message_tx, mut message_rx) = tokio::sync::mpsc::channel(128);
 
     // x11 thread
@@ -130,39 +113,56 @@ async fn main() -> Result<()> {
     });
 
     // input ev thread
-    tokio::spawn(async move {
-        loop {
-            listen_to_key_events(&mut read_ev, &mut stdin).await;
-            input_ev_tx.send(read_ev).await.unwrap();
-        }
-    });
+    // tokio::spawn(async move {
+    //     loop {
+    //         listen_to_key_events(&mut read_ev, &mut stdin).await;
+    //         input_ev_tx.send(read_ev).await.unwrap();
+    //     }
+    // });
 
 
     let mut state = State::new();
     let mut global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings()));
-    let window_cycle_token: usize = 0;
-
+    let mut window_cycle_token: usize = 0;
     let mut mappings = CompiledKeyMappings::new();
+
+
+    // experimental udev stuff
+    let patterns = vec![
+        "/dev/input/by-id/.*-event-mouse",
+        "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
+    ];
+
+    let (mut ev_reader_init_tx, mut ev_reader_init_rx) = oneshot::channel();
+    let (mut ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
+    // start coroutine
+    bind_udev_inputs(patterns, ev_reader_init_tx, ev_writer_tx).await;
+    let mut ev_reader_tx = ev_reader_init_rx.await.unwrap();
+
 
     {
         let mut message_tx = message_tx.clone();
         let global_scope = global_scope.clone();
+        let ev_reader_tx = ev_reader_tx.clone();
         task::spawn(async move {
             eval_block(&mut *global_scope.lock().await, &mut Ambient {
+                ev_writer_tx: ev_reader_tx,
                 window_cycle_token,
                 message_tx: Some(&mut message_tx),
             }).await;
         });
     }
 
-    fn handle_active_window_change(block: &mut Arc<tokio::sync::Mutex<Block>>, message_tx: &mut ExecutionMessageSender, mappings: &mut CompiledKeyMappings, window_cycle_token: usize) {
+    fn handle_active_window_change(block: &mut Arc<tokio::sync::Mutex<Block>>, ev_writer_tx: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender, mappings: &mut CompiledKeyMappings, window_cycle_token: usize) {
         *mappings = CompiledKeyMappings::new();
 
         let mut message_tx = message_tx.clone();
         let mut block = block.clone();
+        let ev_writer_tx = ev_writer_tx.clone();
         task::spawn(async move {
             eval_block(&mut *block.lock().await,
                        &mut Ambient {
+                           ev_writer_tx,
                            message_tx: Some(&mut message_tx),
                            window_cycle_token,
                        },
@@ -190,10 +190,11 @@ async fn main() -> Result<()> {
         tokio::select! {
             Some(window) = window_ev_rx.recv() => {
                 state.active_window = Some(window);
-                handle_active_window_change(&mut global_scope, &mut message_tx, &mut mappings, window_cycle_token + 1);
+                window_cycle_token = window_cycle_token + 1;
+                handle_active_window_change(&mut global_scope, &mut ev_reader_tx, &mut message_tx, &mut mappings, window_cycle_token);
             }
-            Some(ev) = input_ev_rx.recv() => {
-                handle_stdin_ev(&mut state, &ev, &mut mappings, &mut message_tx, window_cycle_token).unwrap();
+            Some(ev) = ev_writer_rx.recv() => {
+                handle_stdin_ev(&mut state, ev, &mut mappings, &mut ev_reader_tx, &mut message_tx, window_cycle_token).await.unwrap();
             }
             Some(msg) = message_rx.recv() => {
                 handle_execution_message(window_cycle_token, msg, &mut state, &mut mappings).await;
@@ -205,64 +206,59 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn listen_to_key_events(ev: &mut input_event, input: &mut tokio::io::Stdin) {
-    unsafe {
-        let slice = any_as_u8_slice_mut(ev);
-        match input.read_exact(slice).await {
-            Ok(_) => (),
-            Err(_) => {
-                ::std::mem::forget(slice);
-                panic!("error reading stdin");
-            }
-        }
-    }
-}
 
+// fn update_modifiers(state: &mut State, ev: &input_event) {
+//     vec![
+//         (INPUT_EV_LEFTMETA, state.meta_is_down),
+//         // (INPUT_EV_RIGHTMETA, ModifierName::RightMeta),
+//     ]
+//         .iter_mut()
+//         .for_each(|(a, b)| {
+//             if *ev == a.down {
+//                 // *state.get_modifier_state(b) = true;
+//                 *b = true;
+//             } else if *ev == a.up {
+//                 // *state.get_modifier_state(b) = false;
+//                 *b = false;
+//                 if state.ignore_list.is_ignored(&KeyAction::new(a.to_key(), TYPE_UP)) {
+//                     state.ignore_list.unignore(&KeyAction::new(a.to_key(), TYPE_UP));
+//                     return;
+//                 }
+//             }
+//         });
+// }
 
-fn update_modifiers(state: &mut State, ev: &input_event) {
-    vec![
-        (INPUT_EV_LEFTMETA, state.meta_is_down),
-        // (INPUT_EV_RIGHTMETA, ModifierName::RightMeta),
-    ]
-        .iter_mut()
-        .for_each(|(a, b)| {
-            if *ev == a.down {
-                // *state.get_modifier_state(b) = true;
-                *b = true;
-            } else if *ev == a.up {
-                // *state.get_modifier_state(b) = false;
-                *b = false;
-                if state.ignore_list.is_ignored(&KeyAction::new(a.to_key(), TYPE_UP)) {
-                    state.ignore_list.unignore(&KeyAction::new(a.to_key(), TYPE_UP));
-                    return;
-                }
-            }
-        });
-}
-
-fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut CompiledKeyMappings, message_tx: &mut ExecutionMessageSender, window_cycle_token: usize) -> Result<()> {
-    if ev.type_ != input_linux_sys::EV_KEY as u16 {
-        print_event(&ev);
-        return Ok(());
-    }
-
-    update_modifiers(&mut state, &ev);
-
-    if crate::tab_mod::tab_mod(&ev, &mut *state) {
-        return Ok(());
-    }
-
-    if !state.leftcontrol_is_down {
-        if crate::caps_mod::caps_mod(&ev, &mut *state) {
+async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent, mappings: &mut CompiledKeyMappings, ev_writer: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender, window_cycle_token: usize) -> Result<()> {
+    match ev.event_code {
+        EventCode::EV_KEY(_) => {}
+        _ => {
+            ev_writer.send(ev).await;
             return Ok(());
         }
     }
 
-    if !state.disable_alt_mod {
-        if crate::rightalt_mod::rightalt_mod(&ev, &mut *state) {
-            return Ok(());
-        }
-    }
+    // if ev.type_ != input_linux_sys::EV_KEY as u16 {
+    //     // print_event(&ev);
+    //     return Ok(());
+    // }
+
+    // update_modifiers(&mut state, &ev);
+
+    // if crate::tab_mod::tab_mod(&ev, &mut *state) {
+    //     return Ok(());
+    // }
+    //
+    // if !state.leftcontrol_is_down {
+    //     if crate::caps_mod::caps_mod(&ev, &mut *state) {
+    //         return Ok(());
+    //     }
+    // }
+    //
+    // if !state.disable_alt_mod {
+    //     if crate::rightalt_mod::rightalt_mod(&ev, &mut *state) {
+    //         return Ok(());
+    //     }
+    // }
 
     let mut from_modifiers = KeyModifierFlags::new();
     from_modifiers.ctrl = state.leftcontrol_is_down.clone();
@@ -271,7 +267,7 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut Compi
     from_modifiers.meta = state.meta_is_down.clone();
 
     let from_key_action = KeyActionWithMods {
-        key: Key { key_type: ev.type_ as i32, code: ev.code as i32 },
+        key: Key { event_code: ev.event_code },
         value: ev.value,
         modifiers: from_modifiers,
     };
@@ -279,14 +275,15 @@ fn handle_stdin_ev(mut state: &mut State, ev: &input_event, mappings: &mut Compi
     if let Some(block) = mappings.0.get(&from_key_action) {
         let block = block.clone();
         let mut message_tx = message_tx.clone();
+        let ev_writer = ev_writer.clone();
         task::spawn(async move {
             let block_guard = block.lock().await;
-            eval_block(&*block_guard, &mut Ambient { message_tx: Some(&mut message_tx), window_cycle_token }).await;
+            eval_block(&*block_guard, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
         });
         return Ok(());
     }
 
-    print_event(&ev);
+    ev_writer.send(ev).await;
 
     Ok(())
 }

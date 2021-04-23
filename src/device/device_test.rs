@@ -1,7 +1,4 @@
 #[macro_use]
-extern crate lazy_static;
-extern crate regex;
-
 use std::{io, time};
 use std::collections::HashMap;
 use std::fs::File;
@@ -14,7 +11,8 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::sync::mpsc::Sender;
 use tokio::task;
 use walkdir::{DirEntry, WalkDir};
-
+use crate::device::device_util;
+use crate::log_msg;
 
 fn usage() {
     println!("Usage: evtest /path/to/device");
@@ -104,7 +102,7 @@ fn print_props(dev: &Device) {
     }
 }
 
-fn print_event(ev: &InputEvent) {
+pub fn print_event_debug(ev: &InputEvent) {
     match ev.event_code {
         EventCode::EV_SYN(_) => println!(
             "Event: time {}.{}, ++++++++++++++++++++ {} +++++++++++++++",
@@ -125,28 +123,28 @@ fn print_event(ev: &InputEvent) {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    let patterns = vec![
-        "/dev/input/by-id/.*-event-mouse",
-        "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
-    ];
-
-    let (mut reader_init_tx, mut reader_init_rx) = oneshot::channel();
-    let (mut writer_tx, mut writer_rx) = mpsc::channel(128);
-
-    // start coroutine
-    dev(patterns, reader_init_tx, writer_tx).await;
-
-    let reader_tx = reader_init_rx.await.unwrap();
-
-    loop {
-        let ev = writer_rx.recv().await.unwrap();
-        // println!("wow");
-        print_event(&ev);
-        reader_tx.send(ev).await;
-    }
-}
+// #[tokio::main]
+// async fn main() {
+//     let patterns = vec![
+//         "/dev/input/by-id/.*-event-mouse",
+//         "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
+//     ];
+//
+//     let (mut reader_init_tx, mut reader_init_rx) = oneshot::channel();
+//     let (mut writer_tx, mut writer_rx) = mpsc::channel(128);
+//
+//     // start coroutine
+//     dev(patterns, reader_init_tx, writer_tx).await;
+//
+//     let reader_tx = reader_init_rx.await.unwrap();
+//
+//     loop {
+//         let ev = writer_rx.recv().await.unwrap();
+//         // println!("wow");
+//         print_event(&ev);
+//         reader_tx.send(ev).await;
+//     }
+// }
 
 
 fn get_fd_list(patterns: &Vec<Regex>) -> Vec<String> {
@@ -201,7 +199,6 @@ async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>
 }
 
 
-// oneshot<Sender<Ev>>
 async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer: mpsc::Sender<InputEvent>) {
     // make empty map
     let mut fd_map = HashMap::new();
@@ -211,10 +208,9 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
     let (reader_tx, reader_rx) = mpsc::channel(128);
     let mut reader_rx_box = Some(reader_rx);
 
-
-    // on change
-    loop {
-        // list = fs_list()
+    // TODO on change
+    let mut ran = false;
+    while ran == false {
         let input_fd_path_list = get_fd_list(&fd_pattens);
         if input_fd_path_list.len() < 1 {
             // out_ev_tx.send(Err(anyhow!("no matching fd found"))).await;
@@ -223,18 +219,40 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
 
         println!("{:?}", input_fd_path_list);
 
-        // for fd_path in list
+
+        let mut devices = vec![];
         for fd_path in input_fd_path_list {
-            // if fd_path in map, continue
             if fd_map.get(&fd_path).is_some() { continue; }
-            // add fd_path to the map
             fd_map.insert(fd_path.clone(), true);
 
             // grab fd_path as fd
             let fd_file = File::open(fd_path).unwrap();
             let mut device = Device::new_from_file(fd_file).unwrap();
             device.grab(GrabMode::Grab).unwrap();
+            devices.push(device);
+        }
 
+        {
+            let mut it = devices.iter_mut();
+            let main_dev = it.next().unwrap();
+
+            for device in it {
+                device_util::clone_device(device, main_dev);
+            }
+        }
+
+
+        // for fd_path in list
+        for device in devices {
+            // if fd_path in map, continue
+            // if fd_map.get(&fd_path).is_some() { continue; }
+            // // add fd_path to the map
+            // fd_map.insert(fd_path.clone(), true);
+            //
+            // // grab fd_path as fd
+            // let fd_file = File::open(fd_path).unwrap();
+            // let mut device = Device::new_from_file(fd_file).unwrap();
+            // device.grab(GrabMode::Grab).unwrap();
 
             // spawn virtual device and write to it
             if let Some(mut reader_rx) = reader_rx_box {
@@ -247,15 +265,17 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
                 // let reader = reader_rx.clone();
                 task::spawn(async move {
                     loop {
-                        let msg = match reader_rx.recv().await {
+                        let msg: InputEvent = match reader_rx.recv().await {
                             Some(v) => v,
                             None => break,
                         };
+                        // print_event_debug(&msg);
+                        // log_msg(&format!("{}, {}", &msg.event_code, &msg.value));
                         input_device.write_event(&msg);
                     }
                 });
 
-                // oneshot.send tx
+                // send the reader to the client
                 reader_init.send(reader_tx.clone());
             }
             // unset moved values
@@ -271,13 +291,13 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
             }
         }
 
-
-        tokio::time::sleep(time::Duration::from_millis(5000)).await;
+        // tokio::time::sleep(time::Duration::from_millis(5000)).await;
+        ran = true;
     }
 }
 
 
-async fn dev(fd_patterns: Vec<&str>, reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
+pub(crate) async fn bind_udev_inputs(fd_patterns: Vec<&str>, reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
     if fd_patterns.len() < 1 { bail!(anyhow!("need at least 1 pattern")); }
 
     let fd_patterns_regex = fd_patterns.into_iter().map(|v| Regex::new(v).unwrap()).collect();

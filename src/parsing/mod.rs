@@ -13,6 +13,7 @@ use tap::Tap;
 
 use crate::*;
 use crate::block_ext::ExprVecExt;
+use evdev_rs::enums::EventType;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -82,8 +83,11 @@ enum ParsedSingleKey {
 fn key(input: &str) -> Res<&str, ParsedSingleKey> {
     context("key", alphanumeric1)(input)
         .and_then(|(next, val)| {
-            let key = KEY_LOOKUP.get(val.to_lowercase().as_str())
-                .ok_or(make_generic_nom_err())?;
+            let key_name = "KEY_".to_string()
+                .tap_mut(|s| s.push_str(&val.to_uppercase()));
+
+            let key = Key::from_str(&EventType::EV_KEY, key_name.as_str())
+                .map_err(|_| make_generic_nom_err())?;
 
             // only 1 char and it's uppercase
             let mut it = val.chars();

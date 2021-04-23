@@ -1,7 +1,18 @@
 use crate::*;
+use evdev_rs::enums::{EventCode, EventType};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub struct Key { pub(crate) key_type: i32, pub(crate) code: i32 }
+pub struct Key { pub(crate) event_code: EventCode }
+
+impl Key {
+    pub(crate) fn from_str(ev_type: &EventType, s: &str) -> Result<Self> {
+        match EventCode::from_str(ev_type, s){
+            Some(event_code) => {Ok(Key{event_code})}
+            None => {Err(anyhow!("key not found: '{}'", s))}
+        }
+    }
+}
+
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub(crate) enum KeyValue { KEEP, UP, DOWN }
@@ -52,8 +63,8 @@ pub(crate) struct KeyActionWithMods { pub(crate) key: Key, pub(crate) value: i32
 
 impl KeyAction {
     pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value } }
-    pub fn to_input_ev(&self) -> input_event {
-        input_event { type_: self.key.key_type as u16, code: self.key.code as u16, value: self.value, time: INPUT_EV_DUMMY_TIME }
+    pub fn to_input_ev(&self) -> InputEvent {
+        InputEvent { event_code: self.key.event_code, value: self.value, time: INPUT_EV_DUMMY_TIME }
     }
 }
 

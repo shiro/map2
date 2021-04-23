@@ -26,6 +26,6 @@ regex = "1.4.5"
 name = "key-mods-rs"
 path = "src/main.rs"
 
-[[bin]]
-name = "dev-test"
-path = "src/device/device-test.rs"
+#[[bin]]
+#name = "dev-test"
+#path = "src/device/device-test.rs"

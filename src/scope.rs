@@ -1,6 +1,7 @@
 use std::borrow::{Borrow, BorrowMut};
 
 use crate::*;
+use crate::device::device_test::print_event_debug;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
@@ -112,9 +113,10 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             return ExprRet::Value(ValueType::Bool(*value));
         }
         Expr::KeyAction(action) => {
-            print_event(&action.to_input_ev());
-            print_event(&INPUT_EV_SYN);
-            thread::sleep(time::Duration::from_micros(20000));
+            amb.ev_writer_tx.send(action.to_input_ev()).await;
+            amb.ev_writer_tx.send(SYN_REPORT.clone()).await;
+
+            // tokio::time::sleep(time::Duration::from_micros(20000)).await;
 
             return ExprRet::Void;
         }
@@ -135,6 +137,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
 pub(crate) type SleepSender = tokio::sync::mpsc::Sender<Block>;
 
 pub(crate) struct Ambient<'a> {
+    pub(crate) ev_writer_tx: mpsc::Sender<InputEvent>,
     pub(crate) message_tx: Option<&'a mut ExecutionMessageSender>,
     pub(crate) window_cycle_token: usize,
 }
