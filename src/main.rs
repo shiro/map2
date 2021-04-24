@@ -29,6 +29,7 @@ use crate::scope::*;
 use crate::state::*;
 use crate::x11::{x11_initialize, x11_test};
 use crate::x11::ActiveWindowInfo;
+use std::ops::DerefMut;
 
 mod tab_mod;
 mod caps_mod;
@@ -80,7 +81,7 @@ fn log_msg(msg: &str) {
 #[derive(Debug)]
 pub(crate) enum ExecutionMessage {
     EatEv(KeyAction),
-    AddMapping(usize, KeyActionWithMods, Block),
+    AddMapping(usize, KeyActionWithMods, Block, GuardedVarMap),
     GetFocusedWindowInfo(mpsc::Sender<Option<ActiveWindowInfo>>),
     RegisterWindowChangeCallback(Block, GuardedVarMap),
 }
@@ -176,9 +177,9 @@ async fn main() -> Result<()> {
             ExecutionMessage::EatEv(action) => {
                 state.ignore_list.ignore(&action);
             }
-            ExecutionMessage::AddMapping(token, from, block) => {
+            ExecutionMessage::AddMapping(token, from, to, var_map) => {
                 if token == current_token {
-                    mappings.0.insert(from, Arc::new(tokio::sync::Mutex::new(block)));
+                    mappings.0.insert(from, Arc::new(tokio::sync::Mutex::new((to, var_map))));
                 }
             }
             ExecutionMessage::GetFocusedWindowInfo(tx) => {
@@ -285,10 +286,11 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         let block = block.clone();
         let mut message_tx = message_tx.clone();
         let ev_writer = ev_writer.clone();
-        let mut var_map = var_map.clone();
+        // let mut var_map = var_map.clone();
         task::spawn(async move {
-            let block_guard = block.lock().await;
-            eval_block(&*block_guard, &mut var_map, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
+            let mut guard = block.lock().await;
+            let mut foo = guard.deref_mut();
+            eval_block(&foo.0, &mut foo.1, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
         });
         return Ok(());
     }

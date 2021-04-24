@@ -1,6 +1,11 @@
 let foo = true;
 print(foo);
 
+a::{
+  print(foo);
+};
+
+
 on_window_change(||{
   print(foo);
   a::a;

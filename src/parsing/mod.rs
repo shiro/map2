@@ -15,6 +15,7 @@ use tap::Tap;
 use variable::*;
 use identifier::*;
 use lambda::*;
+use key_mapping::*;
 
 use crate::*;
 use crate::block_ext::ExprVecExt;
@@ -23,6 +24,7 @@ use crate::parsing::identifier::ident;
 
 mod custom_combinators;
 mod identifier;
+mod key_mapping;
 mod lambda;
 mod variable;
 
@@ -138,40 +140,6 @@ fn key_sequence(input: &str) -> Res<&str, Vec<Expr>> {
     })
 }
 
-fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
-    context(
-        "key_mapping_inline",
-        tuple((
-            key_action,
-            tag("::"),
-            alt((
-                map(key_sequence, |seq| ParsedKeyAction::KeySequence(seq)),
-                key_action,
-            ))
-        )),
-    )(input).and_then(|(next, v)| {
-        let (from, to) = (v.0, v.2);
-
-        Ok((next, match from {
-            ParsedKeyAction::KeyAction(_) => { unimplemented!() }
-            ParsedKeyAction::KeyClickAction(from) => {
-                match to {
-                    ParsedKeyAction::KeyAction(_) => { unimplemented!() }
-                    ParsedKeyAction::KeyClickAction(to) => {
-                        Expr::map_key_click(from, to)
-                    }
-                    ParsedKeyAction::KeySequence(expr) => {
-                        Expr::map_key_block(from, Block::new()
-                            .tap_mut(|b| b.statements = expr.into_iter().map(Stmt::Expr).collect()),
-                        )
-                    }
-                }
-            }
-            ParsedKeyAction::KeySequence(_) => return Err(make_generic_nom_err())
-        }))
-    })
-}
-
 
 fn expr_simple(input: &str) -> Res<&str, Expr> {
     context(
@@ -185,6 +153,7 @@ fn expr_simple(input: &str) -> Res<&str, Expr> {
                 variable_assignment,
                 function_call,
                 key_mapping_inline,
+                key_mapping,
                 variable,
             )),
             multispace0,
@@ -460,19 +429,6 @@ mod tests {
         assert!(matches!(key_action("+al"), Err(..)));
 
         assert!(matches!(key_action("++a"), Err(..)));
-    }
-
-    #[test]
-    fn test_key_mapping_inline() {
-        assert_eq!(key_mapping_inline("a::b"), Ok(("", Expr::map_key_click(
-            KeyClickActionWithMods::new(*KEY_A),
-            KeyClickActionWithMods::new(*KEY_B),
-        ))));
-
-        assert_eq!(key_mapping_inline("A::b"), Ok(("", Expr::map_key_click(
-            KeyClickActionWithMods::new(*KEY_A).tap_mut(|v| { v.modifiers.shift(); }),
-            KeyClickActionWithMods::new(*KEY_B),
-        ))));
     }
 
     #[test]

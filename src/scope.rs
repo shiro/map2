@@ -117,7 +117,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 // mapping.to.var_map = var_map.clone();
 
                 amb.message_tx.borrow_mut().as_ref().unwrap()
-                    .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to)).await
+                    .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to, var_map.clone())).await
                     .unwrap();
             }
 
@@ -250,13 +250,6 @@ pub(crate) struct Block {
     pub(crate) statements: Vec<Stmt>,
 }
 
-// impl PartialEq for Block {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.statements == other.statements &&
-//             arc_mutexes_are_equal(&self.var_map, &other.var_map)
-//     }
-// }
-
 impl Block {
     pub(crate) fn new() -> Self {
         Block {
@@ -264,15 +257,6 @@ impl Block {
             statements: vec![],
         }
     }
-
-    // pub(crate) fn attach_underlying_scope(&mut self, block: &mut Block) {
-    //     block.var_map.lock().unwrap().parent = Some(self.var_map.clone());
-    // }
-
-    // pub(crate) fn push_block(&mut self, mut block: Block) {
-    //     self.attach_underlying_scope(&mut block);
-    //     self.statements.push(Stmt::Block(block));
-    // }
 }
 
 
