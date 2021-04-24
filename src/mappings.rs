@@ -18,7 +18,7 @@ pub(crate) fn bind_mappings() -> Block {
     if args.len() < 2 { panic!("no script file arg given"); }
 
     let script_filename = &args[1];
-    log_msg(script_filename);
+    // log_msg(script_filename);
 
     let script = std::fs::read_to_string(script_filename).expect("failed to read file");
 

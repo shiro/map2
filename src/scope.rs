@@ -117,6 +117,9 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         Expr::String(value) => {
             return ExprRet::Value(ValueType::String(value.clone()));
         }
+        Expr::Lambda(block) => {
+            return ExprRet::Value(ValueType::Lambda(block.clone()));
+        }
         Expr::KeyAction(action) => {
             amb.ev_writer_tx.send(action.to_input_ev()).await;
             amb.ev_writer_tx.send(SYN_REPORT.clone()).await;
@@ -145,7 +148,16 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     ExprRet::Void
                 }
                 "on_window_change" => {
-                    // register to main
+                    if args.len() != 1 { panic!("function takes 1 argument") }
+
+                    let block;
+                    if let ExprRet::Value(ValueType::Lambda(v)) = eval_expr(args.get(0).unwrap(), var_map, amb).await {
+                        block = v;
+                    } else {
+                        panic!("type mismatch, function takes lambda argument");
+                    }
+
+                    amb.message_tx.as_ref().unwrap().send(ExecutionMessage::RegisterWindowChangeCallback(block)).await.unwrap();
                     ExprRet::Void
                 }
                 _ => ExprRet::Void
@@ -241,6 +253,7 @@ pub(crate) enum Expr {
     Name(String),
     Boolean(bool),
     String(String),
+    Lambda(Block),
 
     FunctionCall(String, Vec<Expr>),
 

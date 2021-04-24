@@ -81,7 +81,8 @@ fn log_msg(msg: &str) {
 pub(crate) enum ExecutionMessage {
     EatEv(KeyAction),
     AddMapping(usize, KeyActionWithMods, Block),
-    GetFocusedWindowInfo(tokio::sync::mpsc::Sender<Option<ActiveWindowInfo>>),
+    GetFocusedWindowInfo(mpsc::Sender<Option<ActiveWindowInfo>>),
+    RegisterWindowChangeCallback(Block),
 }
 
 pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMessage>;
@@ -130,6 +131,8 @@ async fn main() -> Result<()> {
     bind_udev_inputs(patterns, ev_reader_init_tx, ev_writer_tx).await;
     let mut ev_reader_tx = ev_reader_init_rx.await.unwrap();
 
+    let mut window_change_handlers = vec![];
+
 
     {
         let mut message_tx = message_tx.clone();
@@ -144,24 +147,26 @@ async fn main() -> Result<()> {
         });
     }
 
-    fn handle_active_window_change(block: &mut Arc<tokio::sync::Mutex<Block>>, ev_writer_tx: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender, mappings: &mut CompiledKeyMappings, window_cycle_token: usize) {
-        // *mappings = CompiledKeyMappings::new();
-        //
-        // let mut message_tx = message_tx.clone();
-        // let mut block = block.clone();
-        // let ev_writer_tx = ev_writer_tx.clone();
-        // task::spawn(async move {
-        //     eval_block(&mut *block.lock().await,
-        //                &mut Ambient {
-        //                    ev_writer_tx,
-        //                    message_tx: Some(&mut message_tx),
-        //                    window_cycle_token,
-        //                },
-        //     ).await;
-        // });
+    fn handle_active_window_change(block: &mut Arc<tokio::sync::Mutex<Block>>, ev_writer_tx: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender, mappings: &mut CompiledKeyMappings,
+                                   window_cycle_token: usize, window_change_handlers: &mut Vec<Block>) {
+        for handler in window_change_handlers {
+            let mut message_tx = message_tx.clone();
+            let ev_writer_tx = ev_writer_tx.clone();
+            let handler = handler.clone();
+            task::spawn(async move {
+                eval_block(&handler,
+                           &mut Ambient {
+                               ev_writer_tx,
+                               message_tx: Some(&mut message_tx),
+                               window_cycle_token,
+                           },
+                ).await;
+            });
+        }
     }
 
-    async fn handle_execution_message(current_token: usize, msg: ExecutionMessage, state: &mut State, mappings: &mut CompiledKeyMappings) {
+    async fn handle_execution_message(current_token: usize, msg: ExecutionMessage, state: &mut State, mappings: &mut CompiledKeyMappings,
+                                      window_change_handlers: &mut Vec<Block>) {
         match msg {
             ExecutionMessage::EatEv(action) => {
                 state.ignore_list.ignore(&action);
@@ -174,6 +179,9 @@ async fn main() -> Result<()> {
             ExecutionMessage::GetFocusedWindowInfo(tx) => {
                 tx.send(state.active_window.clone()).await.unwrap();
             }
+            ExecutionMessage::RegisterWindowChangeCallback(block) => {
+                window_change_handlers.push(block);
+            }
         }
     }
 
@@ -182,13 +190,13 @@ async fn main() -> Result<()> {
             Some(window) = window_ev_rx.recv() => {
                 state.active_window = Some(window);
                 window_cycle_token = window_cycle_token + 1;
-                handle_active_window_change(&mut global_scope, &mut ev_reader_tx, &mut message_tx, &mut mappings, window_cycle_token);
+                handle_active_window_change(&mut global_scope, &mut ev_reader_tx, &mut message_tx, &mut mappings, window_cycle_token, &mut window_change_handlers);
             }
             Some(ev) = ev_writer_rx.recv() => {
                 handle_stdin_ev(&mut state, ev, &mut mappings, &mut ev_reader_tx, &mut message_tx, window_cycle_token).await.unwrap();
             }
             Some(msg) = message_rx.recv() => {
-                handle_execution_message(window_cycle_token, msg, &mut state, &mut mappings).await;
+                handle_execution_message(window_cycle_token, msg, &mut state, &mut mappings, &mut window_change_handlers).await;
             }
             else => { break }
         }

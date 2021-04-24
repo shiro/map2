@@ -191,7 +191,7 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
             break;
         }
 
-        println!("{:?}", input_fd_path_list);
+        // println!("{:?}", input_fd_path_list);
 
 
         let mut devices = vec![];

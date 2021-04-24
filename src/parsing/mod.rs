@@ -11,6 +11,9 @@ use nom::IResult;
 use nom::multi::many0;
 use nom::sequence::*;
 use tap::Tap;
+use identifier::*;
+use assignment::*;
+use lambda::*;
 
 use crate::*;
 use crate::block_ext::ExprVecExt;
@@ -20,6 +23,7 @@ use crate::parsing::identifier::ident;
 mod custom_combinators;
 mod identifier;
 mod lambda;
+mod assignment;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -45,23 +49,6 @@ fn boolean(input: &str) -> Res<&str, Expr> {
             "false" => Expr::Boolean(false),
             _ => unreachable!(),
         })
-    )
-}
-
-fn variable_assignment(input: &str) -> Res<&str, Expr> {
-    context(
-        "variable_declaration",
-        tuple((
-            tag("let"),
-            multispace0,
-            ident,
-            multispace0,
-            tag("="),
-            multispace0,
-            boolean,
-        )),
-    )(input).map(|(next, parts)|
-        (next, Expr::Assign(parts.2, Box::new(parts.6)))
     )
 }
 
@@ -192,6 +179,7 @@ fn expr_simple(input: &str) -> Res<&str, Expr> {
             alt((
                 boolean,
                 string,
+                lambda,
                 variable_assignment,
                 function_call,
                 key_mapping_inline,
@@ -503,15 +491,5 @@ mod tests {
                 if_stmt("if(true){a::b;}").unwrap().1
             ];
         }))));
-    }
-
-    #[test]
-    fn test_assignment() {
-        assert_eq!(ident("hello2"), Ok(("", "hello2".to_string())));
-        assert_eq!(variable_assignment("let foo = true"),
-                   Ok(("", Expr::Assign("foo".to_string(), Box::new(boolean("true").unwrap().1))))
-        );
-
-        assert!(matches!(ident("2hello"), Err(..)));
     }
 }
