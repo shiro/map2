@@ -1,6 +1,8 @@
 use std::borrow::{Borrow, BorrowMut};
+use std::fmt;
 
 use crate::*;
+use std::fmt::Formatter;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
@@ -10,6 +12,16 @@ pub(crate) enum ValueType {
     Bool(bool),
     String(String),
     Lambda(Block),
+}
+
+impl fmt::Display for ValueType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ValueType::Bool(v) => write!(f, "{}", v),
+            ValueType::String(v) => write!(f, "{}", v),
+            ValueType::Lambda(v) => write!(f, "Lambda"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -140,7 +152,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         Expr::FunctionCall(name, args) => {
             match &**name {
                 "active_window_class" => {
-                    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+                    let (tx, mut rx) = mpsc::channel(1);
                     amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await.unwrap();
                     if let Some(active_window) = rx.recv().await.unwrap() {
                         return ExprRet::Value(ValueType::String(active_window.class));
@@ -158,6 +170,11 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     }
 
                     amb.message_tx.as_ref().unwrap().send(ExecutionMessage::RegisterWindowChangeCallback(block)).await.unwrap();
+                    ExprRet::Void
+                }
+                "print" => {
+                    let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
+                    println!("{}", val);
                     ExprRet::Void
                 }
                 _ => ExprRet::Void
@@ -238,6 +255,15 @@ impl Block {
 pub(crate) enum ExprRet {
     Void,
     Value(ValueType),
+}
+
+impl fmt::Display for ExprRet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ExprRet::Void => write!(f, "Void"),
+            ExprRet::Value(v) => write!(f, "{}", v),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

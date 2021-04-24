@@ -1,4 +1,5 @@
 on_window_change(||{
+  print("switch");
   a::a;
   if(active_window_class() == "Alacritty"){
     a::d;
