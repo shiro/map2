@@ -1,4 +1,3 @@
-use evdev_rs::enums::EventCode::{EV_KEY};
 use evdev_rs::enums::{EventType, EventCode, EV_SYN};
 use evdev_rs::TimeVal;
 

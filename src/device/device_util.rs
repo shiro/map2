@@ -1,6 +1,4 @@
-use std::{io, time};
 use std::collections::HashMap;
-use std::fs::File;
 
 use anyhow::{anyhow, bail, Result};
 use evdev_rs::*;
@@ -8,7 +6,6 @@ use evdev_rs::Device;
 use evdev_rs::enums::*;
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
-use tokio::sync::mpsc::Sender;
 use tokio::task;
 use walkdir::{DirEntry, WalkDir};
 

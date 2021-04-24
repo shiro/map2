@@ -1,4 +1,4 @@
-use std::{io, time};
+use std::{io};
 use std::collections::HashMap;
 use std::fs::File;
 
@@ -7,11 +7,9 @@ use evdev_rs::*;
 use evdev_rs::enums::*;
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
-use tokio::sync::mpsc::Sender;
 use tokio::task;
 use walkdir::{DirEntry, WalkDir};
 use crate::device::device_util;
-use crate::log_msg;
 
 fn usage() {
     println!("Usage: evtest /path/to/device");

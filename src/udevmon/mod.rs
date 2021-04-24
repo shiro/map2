@@ -1,6 +1,5 @@
 use std::io::{stdout, Write};
 use tokio::io::AsyncReadExt;
-use crate::key_primitives::Key;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]

@@ -5,7 +5,7 @@ use crate::*;
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ValueType {
     Bool(bool),
     String(String),
@@ -179,7 +179,6 @@ pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
                 if eval_expr(expr, &block.var_map, amb).await == ExprRet::Value(ValueType::Bool(true)) {
                     eval_block(block, amb).await;
                 }
-                aa
             }
         }
     }
@@ -223,7 +222,7 @@ impl Block {
 }
 
 
-#[derive(Eq, PartialEq)]
+#[derive(PartialEq)]
 pub(crate) enum ExprRet {
     Void,
     Value(ValueType),

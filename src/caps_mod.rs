@@ -1,5 +1,5 @@
-use crate::*;
-use std::{thread, time};
+// use crate::*;
+// use std::{thread, time};
 
 // pub fn caps_mod(ev: &input_event, state: &mut State) -> bool {
 //     if state.capslock_is_down {
