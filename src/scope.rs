@@ -45,25 +45,6 @@ pub(crate) type GuardedVarMap = Arc<Mutex<VarMap>>;
 
 
 #[async_recursion]
-pub(crate) async fn eval_conditional_block(condition: &KeyActionCondition, block: &Block, amb: &mut Ambient) {
-    // check condition
-    if let Some(window_class_name) = &condition.window_class_name {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(0);
-        amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await.unwrap();
-
-        if let Some(active_window) = rx.recv().await.unwrap() {
-            if *window_class_name != active_window.class {
-                return;
-            }
-        } else {
-            return;
-        }
-    }
-
-    eval_block(block, amb).await;
-}
-
-#[async_recursion]
 pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mut Ambient<'_>) -> ExprRet {
     match expr {
         Expr::Eq(left, right) => {
@@ -200,10 +181,6 @@ pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
             Stmt::Block(nested_block) => {
                 eval_block(nested_block, amb).await;
             }
-            Stmt::ConditionalBlock(condition, nested_block) => {
-                // nested_block.var_map = Arc::new(Mutex::new(VarMap { scope_values: Default::default(), parent: Some(block.var_map.clone()) }));
-                eval_conditional_block(condition, nested_block, amb).await;
-            }
             Stmt::If(expr, block) => {
                 if eval_expr(expr, &block.var_map, amb).await == ExprRet::Value(ValueType::Bool(true)) {
                     eval_block(block, amb).await;
@@ -292,7 +269,6 @@ pub(crate) enum Expr {
 pub(crate) enum Stmt {
     Expr(Expr),
     Block(Block),
-    ConditionalBlock(KeyActionCondition, Block),
     If(Expr, Block),
     // While
     // For(Expr::Assign, Expr, Expr, Stmt::Block)

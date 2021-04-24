@@ -83,12 +83,13 @@ fn clone_bits(src: &Device, dst: &mut Device) {
     }
 }
 
-fn clone_props(src: &Device, dst: &mut Device) {
+fn clone_props(src: &Device, dst: &mut Device) -> Result<()> {
     for input_prop in InputProp::INPUT_PROP_POINTER.iter() {
         if src.has(&input_prop) {
-            dst.enable(&input_prop);
+            dst.enable(&input_prop)?;
         }
     }
+    Ok(())
 }
 
 pub(crate) fn clone_device(src: &Device, dst: &mut Device) {

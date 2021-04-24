@@ -11,8 +11,9 @@ use nom::IResult;
 use nom::multi::many0;
 use nom::sequence::*;
 use tap::Tap;
-use identifier::*;
+
 use assignment::*;
+use identifier::*;
 use lambda::*;
 
 use crate::*;
