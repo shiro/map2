@@ -1,3 +1,5 @@
+mod custom_combinators;
+
 use anyhow::*;
 use futures::StreamExt;
 use nom::branch::*;
@@ -5,15 +7,16 @@ use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::combinator::{map, opt};
 use nom::{Err as NomErr, InputLength, InputIter, InputTakeAtPosition};
-use nom::error::{context, VerboseError};
+use nom::error::{context, VerboseError, ParseError, ErrorKind};
 use nom::IResult;
-use nom::multi::{many0, many1};
+use nom::multi::{many0, many1, fold_many0};
 use nom::sequence::*;
 use tap::Tap;
 
 use crate::*;
 use crate::block_ext::ExprVecExt;
 use evdev_rs::enums::EventType;
+use crate::parsing::custom_combinators::fold_many0_once;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -187,24 +190,10 @@ fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
     })
 }
 
-fn op_equal(input: &str) -> Res<&str, Expr> {
-    context(
-        "op_equal",
-        tuple((
-            expr,
-            multispace0,
-            tag("=="),
-            multispace0,
-            expr,
-        )),
-    )(input).map(|(next, v)|
-        (next, Expr::Eq(Box::new(v.0), Box::new(v.4)))
-    )
-}
 
-fn expr(input: &str) -> Res<&str, Expr> {
+fn expr_simple(input: &str) -> Res<&str, Expr> {
     context(
-        "expr",
+        "expr_simple",
         tuple((
             alt((
                 boolean,
@@ -212,11 +201,36 @@ fn expr(input: &str) -> Res<&str, Expr> {
                 variable_assignment,
                 function_call,
                 key_mapping_inline,
-                op_equal,
             )),
             multispace0,
         )),
     )(input).map(|(next, v)| (next, v.0))
+}
+
+fn expr(i: &str) -> Res<&str, Expr> {
+    let (i, init) = expr_simple(i)?;
+    fold_many0_once(
+        |i: &str| {
+            context(
+                "expr",
+                tuple((
+                    multispace0,
+                    alt((tag("=="), tag("!="))),
+                    multispace0,
+                    expr_simple,
+                )),
+            )(i)
+        },
+        init,
+        |acc, (_, op, _, val)| {
+            match op {
+                "==" => Expr::Eq(Box::new(acc), Box::new(val)),
+                // TODO implement neq
+                "!=" => Expr::Eq(Box::new(acc), Box::new(val)),
+                _ => unreachable!()
+            }
+        },
+    )(i)
 }
 
 fn if_stmt(input: &str) -> Res<&str, Stmt> {
@@ -359,7 +373,7 @@ mod tests {
             Expr::Boolean(true),
         ]))));
         assert_eq!(function_call("foobar(true == true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
-            op_equal("true == true").unwrap().1
+            expr("true == true").unwrap().1
         ]))));
     }
 
@@ -387,15 +401,15 @@ mod tests {
 
     #[test]
     fn test_operator_equal() {
-        assert_eq!(op_equal("true == true"), Ok(("", Expr::Eq(
+        assert_eq!(expr("true == true"), Ok(("", Expr::Eq(
             Box::new(Expr::Boolean(true)),
             Box::new(Expr::Boolean(true)),
         ))));
-        assert_eq!(op_equal("\"hello world\" == \"hello world\""), Ok(("", Expr::Eq(
+        assert_eq!(expr("\"hello world\" == \"hello world\""), Ok(("", Expr::Eq(
             Box::new(Expr::String("hello world".to_string())),
             Box::new(Expr::String("hello world".to_string())),
         ))));
-        assert_eq!(op_equal("\"22hello\" == true"), Ok(("", Expr::Eq(
+        assert_eq!(expr("\"22hello\" == true"), Ok(("", Expr::Eq(
             Box::new(Expr::String("22hello".to_string())),
             Box::new(Expr::Boolean(true)),
         ))));
