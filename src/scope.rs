@@ -7,11 +7,22 @@ use std::fmt::Formatter;
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) enum ValueType {
     Bool(bool),
     String(String),
-    Lambda(Block),
+    Lambda(Block, GuardedVarMap),
+}
+
+impl PartialEq for ValueType {
+    fn eq(&self, other: &Self) -> bool {
+        use ValueType::*;
+        match (self, other) {
+            (String(l), String(r)) => l == r,
+            (Bool(l), Bool(r)) => l == r,
+            (_, _) => false,
+        }
+    }
 }
 
 impl fmt::Display for ValueType {
@@ -19,7 +30,7 @@ impl fmt::Display for ValueType {
         match self {
             ValueType::Bool(v) => write!(f, "{}", v),
             ValueType::String(v) => write!(f, "{}", v),
-            ValueType::Lambda(v) => write!(f, "Lambda"),
+            ValueType::Lambda(_, _) => write!(f, "Lambda"),
         }
     }
 }
@@ -28,6 +39,12 @@ impl fmt::Display for ValueType {
 pub(crate) struct VarMap {
     pub(crate) scope_values: HashMap<String, ValueType>,
     pub(crate) parent: Option<GuardedVarMap>,
+}
+
+impl VarMap {
+    pub fn new(parent: Option<GuardedVarMap>) -> Self {
+        VarMap { scope_values: Default::default(), parent }
+    }
 }
 
 impl PartialEq for VarMap {
@@ -60,7 +77,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 (_, _) => ExprRet::Value(Bool(false)),
             }
         }
-        Expr::Assign(var_name, value) => {
+        Expr::Init(var_name, value) => {
             let value = match eval_expr(value, var_map, amb).await {
                 ExprRet::Value(v) => v,
                 ExprRet::Void => panic!("unexpected value")
@@ -69,10 +86,35 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             var_map.lock().unwrap().scope_values.insert(var_name.clone(), value);
             return ExprRet::Void;
         }
+        Expr::Assign(var_name, value) => {
+            let value = match eval_expr(value, var_map, amb).await {
+                ExprRet::Value(v) => v,
+                ExprRet::Void => panic!("unexpected value")
+            };
+
+            let mut map = var_map.clone();
+            loop {
+                let tmp;
+                let mut map_guard = map.lock().unwrap();
+                match map_guard.scope_values.get_mut(var_name) {
+                    Some(v) => {
+                        *v = value;
+                        break;
+                    }
+                    None => match &map_guard.parent {
+                        Some(parent) => tmp = parent.clone(),
+                        None => { panic!("variable '{}' does not exist", var_name); }
+                    }
+                }
+                drop(map_guard);
+                map = tmp;
+            }
+            ExprRet::Void
+        }
         Expr::KeyMapping(mappings) => {
             for mapping in mappings {
                 let mut mapping = mapping.clone();
-                mapping.to.var_map = var_map.clone();
+                // mapping.to.var_map = var_map.clone();
 
                 amb.message_tx.borrow_mut().as_ref().unwrap()
                     .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to)).await
@@ -95,14 +137,17 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     }
                     None => match &map_guard.parent {
                         Some(parent) => tmp = parent.clone(),
-                        None => { panic!(format!("variable '{}' not found", var_name)); }
+                        None => { break; }
                     }
                 }
                 drop(map_guard);
                 map = tmp;
             }
 
-            return ExprRet::Value(value.unwrap());
+            match value {
+                Some(value) => ExprRet::Value(value),
+                None => ExprRet::Void,
+            }
         }
         Expr::Boolean(value) => {
             return ExprRet::Value(ValueType::Bool(*value));
@@ -111,7 +156,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             return ExprRet::Value(ValueType::String(value.clone()));
         }
         Expr::Lambda(block) => {
-            return ExprRet::Value(ValueType::Lambda(block.clone()));
+            return ExprRet::Value(ValueType::Lambda(block.clone(), var_map.clone()));
         }
         Expr::KeyAction(action) => {
             amb.ev_writer_tx.send(action.to_input_ev()).await;
@@ -143,14 +188,16 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 "on_window_change" => {
                     if args.len() != 1 { panic!("function takes 1 argument") }
 
-                    let block;
-                    if let ExprRet::Value(ValueType::Lambda(v)) = eval_expr(args.get(0).unwrap(), var_map, amb).await {
-                        block = v;
+                    let inner_block;
+                    let inner_var_map;
+                    if let ExprRet::Value(ValueType::Lambda(_block, _var_map)) = eval_expr(args.get(0).unwrap(), var_map, amb).await {
+                        inner_block = _block;
+                        inner_var_map = _var_map;
                     } else {
                         panic!("type mismatch, function takes lambda argument");
                     }
 
-                    amb.message_tx.as_ref().unwrap().send(ExecutionMessage::RegisterWindowChangeCallback(block)).await.unwrap();
+                    amb.message_tx.as_ref().unwrap().send(ExecutionMessage::RegisterWindowChangeCallback(inner_block, inner_var_map)).await.unwrap();
                     ExprRet::Void
                 }
                 "print" => {
@@ -173,17 +220,18 @@ pub(crate) struct Ambient<'a> {
 }
 
 #[async_recursion]
-pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
-    // let var_map = block.var_map.clone();
+pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) {
+    let mut var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
+
     for stmt in &block.statements {
         match stmt {
-            Stmt::Expr(expr) => { eval_expr(expr, &block.var_map, amb).await; }
+            Stmt::Expr(expr) => { eval_expr(expr, &mut var_map, amb).await; }
             Stmt::Block(nested_block) => {
-                eval_block(nested_block, amb).await;
+                eval_block(nested_block, &mut var_map, amb).await;
             }
             Stmt::If(expr, block) => {
-                if eval_expr(expr, &block.var_map, amb).await == ExprRet::Value(ValueType::Bool(true)) {
-                    eval_block(block, amb).await;
+                if eval_expr(expr, &mut var_map, amb).await == ExprRet::Value(ValueType::Bool(true)) {
+                    eval_block(block, &mut var_map, amb).await;
                 }
             }
         }
@@ -196,35 +244,35 @@ fn mutexes_are_equal<T>(first: &Mutex<T>, second: &Mutex<T>) -> bool
 fn arc_mutexes_are_equal<T>(first: &Arc<Mutex<T>>, second: &Arc<Mutex<T>>) -> bool
     where T: PartialEq { Arc::ptr_eq(first, second) || *first.lock().unwrap() == *second.lock().unwrap() }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Block {
-    pub(crate) var_map: GuardedVarMap,
+    // pub(crate) var_map: GuardedVarMap,
     pub(crate) statements: Vec<Stmt>,
 }
 
-impl PartialEq for Block {
-    fn eq(&self, other: &Self) -> bool {
-        self.statements == other.statements &&
-            arc_mutexes_are_equal(&self.var_map, &other.var_map)
-    }
-}
+// impl PartialEq for Block {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.statements == other.statements &&
+//             arc_mutexes_are_equal(&self.var_map, &other.var_map)
+//     }
+// }
 
 impl Block {
     pub(crate) fn new() -> Self {
         Block {
-            var_map: Arc::new(Mutex::new(VarMap { scope_values: Default::default(), parent: None })),
+            // var_map: Arc::new(Mutex::new(VarMap { scope_values: Default::default(), parent: None })),
             statements: vec![],
         }
     }
 
-    pub(crate) fn attach_underlying_scope(&mut self, block: &mut Block) {
-        block.var_map.lock().unwrap().parent = Some(self.var_map.clone());
-    }
+    // pub(crate) fn attach_underlying_scope(&mut self, block: &mut Block) {
+    //     block.var_map.lock().unwrap().parent = Some(self.var_map.clone());
+    // }
 
-    pub(crate) fn push_block(&mut self, mut block: Block) {
-        self.attach_underlying_scope(&mut block);
-        self.statements.push(Stmt::Block(block));
-    }
+    // pub(crate) fn push_block(&mut self, mut block: Block) {
+    //     self.attach_underlying_scope(&mut block);
+    //     self.statements.push(Stmt::Block(block));
+    // }
 }
 
 
@@ -250,6 +298,7 @@ pub(crate) enum Expr {
     // GT(Expr, Expr),
     // INC(Expr),
     // Add(Expr, Expr),
+    Init(String, Box<Expr>),
     Assign(String, Box<Expr>),
     KeyMapping(Vec<KeyMapping>),
 

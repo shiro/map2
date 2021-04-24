@@ -12,7 +12,7 @@ use nom::multi::many0;
 use nom::sequence::*;
 use tap::Tap;
 
-use assignment::*;
+use variable::*;
 use identifier::*;
 use lambda::*;
 
@@ -24,7 +24,7 @@ use crate::parsing::identifier::ident;
 mod custom_combinators;
 mod identifier;
 mod lambda;
-mod assignment;
+mod variable;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -181,9 +181,11 @@ fn expr_simple(input: &str) -> Res<&str, Expr> {
                 boolean,
                 string,
                 lambda,
+                variable_initialization,
                 variable_assignment,
                 function_call,
                 key_mapping_inline,
+                variable,
             )),
             multispace0,
         )),
@@ -345,6 +347,10 @@ mod tests {
         ]))));
         assert_eq!(function_call("foobar(true == true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
             expr("true == true").unwrap().1
+        ]))));
+
+        assert_eq!(function_call("print(variable)"), Ok(("", Expr::FunctionCall("print".to_string(), vec![
+            variable("variable").unwrap().1
         ]))));
     }
 

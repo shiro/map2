@@ -1,7 +1,12 @@
+let foo = true;
+print(foo);
+
 on_window_change(||{
-  print("switch");
+  print(foo);
   a::a;
   if(active_window_class() == "Alacritty"){
     a::d;
   }
 });
+
+foo = false;
