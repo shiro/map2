@@ -1,3 +1,7 @@
-if(false){
-  a::d;
-}
+on_window_change(||{
+  if(active_window_class() == "Alacritty"){
+    a::d;
+  }else{
+    a::a
+  }
+})

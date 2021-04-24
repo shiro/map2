@@ -313,6 +313,7 @@ dependencies = [
  "regex",
  "tap",
  "tokio",
+ "unicode-xid",
  "walkdir",
  "x11rb",
 ]

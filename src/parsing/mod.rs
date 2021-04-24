@@ -1,4 +1,6 @@
 mod custom_combinators;
+mod identifier;
+mod lambda;
 
 use anyhow::*;
 use futures::StreamExt;
@@ -17,21 +19,13 @@ use crate::*;
 use crate::block_ext::ExprVecExt;
 use evdev_rs::enums::EventType;
 use crate::parsing::custom_combinators::fold_many0_once;
+use crate::parsing::identifier::ident;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
 fn make_generic_nom_err<'a>() -> NomErr<VerboseError<&'a str>> { NomErr::Error(VerboseError { errors: vec![] }) }
 
 static STACK_SIZE: usize = 255;
-
-
-fn variable_name(input: &str) -> Res<&str, String> {
-    context(
-        "variable name",
-        tuple((alpha1, alphanumeric0)),
-    )(input)
-        .map(|(a, b)| (a, [b.0, b.1].join("")))
-}
 
 fn string(input: &str) -> Res<&str, Expr> {
     context(
@@ -60,7 +54,7 @@ fn variable_assignment(input: &str) -> Res<&str, Expr> {
         tuple((
             tag("let"),
             multispace0,
-            variable_name,
+            ident,
             multispace0,
             tag("="),
             multispace0,
@@ -251,13 +245,6 @@ fn if_stmt(input: &str) -> Res<&str, Stmt> {
 }
 
 
-fn function_name(input: &str) -> Res<&str, String> {
-    context(
-        "function_name",
-        variable_name, // same rules as for variable names
-    )(input)
-}
-
 fn function_arg(input: &str) -> Res<&str, Expr> {
     context("function_arg", expr)(input)
 }
@@ -266,7 +253,7 @@ fn function_call(input: &str) -> Res<&str, Expr> {
     context(
         "function_call",
         tuple((
-            function_name,
+            ident,
             tag("("),
             multispace0,
             opt(tuple((
@@ -383,9 +370,20 @@ mod tests {
             expr("true").unwrap().1,
             block(0)("{a::b;}").unwrap().1,
         ))));
-
         assert_eq!(stmt("if(true){ a::b; }"), Ok(("", Stmt::If(
             expr("true").unwrap().1,
+            block(0)("{a::b;}").unwrap().1,
+        ))));
+
+        assert_eq!(stmt("if(\"a\" == \"a\"){ a::b; }"), Ok(("", Stmt::If(
+            expr("\"a\" == \"a\"").unwrap().1,
+            block(0)("{a::b;}").unwrap().1,
+        ))));
+        assert_eq!(stmt("if(foo() == \"a\"){ a::b; }"), Ok(("", Stmt::If(
+            Expr::Eq(
+                Box::new(Expr::FunctionCall("foo".to_string(), vec![])),
+                Box::new(Expr::String("a".to_string())),
+            ),
             block(0)("{a::b;}").unwrap().1,
         ))));
     }
@@ -514,11 +512,11 @@ mod tests {
 
     #[test]
     fn test_assignment() {
-        assert_eq!(variable_name("hello2"), Ok(("", "hello2".to_string())));
+        assert_eq!(ident("hello2"), Ok(("", "hello2".to_string())));
         assert_eq!(variable_assignment("let foo = true"),
                    Ok(("", Expr::Assign("foo".to_string(), Box::new(boolean("true").unwrap().1))))
         );
 
-        assert!(matches!(variable_name("2hello"), Err(..)));
+        assert!(matches!(ident("2hello"), Err(..)));
     }
 }

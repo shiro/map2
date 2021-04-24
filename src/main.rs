@@ -145,20 +145,20 @@ async fn main() -> Result<()> {
     }
 
     fn handle_active_window_change(block: &mut Arc<tokio::sync::Mutex<Block>>, ev_writer_tx: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender, mappings: &mut CompiledKeyMappings, window_cycle_token: usize) {
-        *mappings = CompiledKeyMappings::new();
-
-        let mut message_tx = message_tx.clone();
-        let mut block = block.clone();
-        let ev_writer_tx = ev_writer_tx.clone();
-        task::spawn(async move {
-            eval_block(&mut *block.lock().await,
-                       &mut Ambient {
-                           ev_writer_tx,
-                           message_tx: Some(&mut message_tx),
-                           window_cycle_token,
-                       },
-            ).await;
-        });
+        // *mappings = CompiledKeyMappings::new();
+        //
+        // let mut message_tx = message_tx.clone();
+        // let mut block = block.clone();
+        // let ev_writer_tx = ev_writer_tx.clone();
+        // task::spawn(async move {
+        //     eval_block(&mut *block.lock().await,
+        //                &mut Ambient {
+        //                    ev_writer_tx,
+        //                    message_tx: Some(&mut message_tx),
+        //                    window_cycle_token,
+        //                },
+        //     ).await;
+        // });
     }
 
     async fn handle_execution_message(current_token: usize, msg: ExecutionMessage, state: &mut State, mappings: &mut CompiledKeyMappings) {

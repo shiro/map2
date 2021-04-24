@@ -9,6 +9,7 @@ pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<Stri
 pub(crate) enum ValueType {
     Bool(bool),
     String(String),
+    Lambda(Block),
 }
 
 #[derive(Debug)]
@@ -60,10 +61,10 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     match (left.borrow(), right.borrow()) {
                         (Bool(left), Bool(right)) => ExprRet::Value(Bool(left == right)),
                         (String(left), String(right)) => ExprRet::Value(Bool(left == right)),
-                        _ => panic!("incompatible types")
+                        _ => ExprRet::Value(Bool(false)),
                     }
                 }
-                (_, _) => panic!("unexpected value")
+                (_, _) => ExprRet::Value(Bool(false)),
             }
         }
         Expr::Assign(var_name, value) => {
@@ -136,12 +137,15 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         Expr::FunctionCall(name, args) => {
             match &**name {
                 "active_window_class" => {
-                    let (tx, mut rx) = tokio::sync::mpsc::channel(0);
+                    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
                     amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await.unwrap();
-
                     if let Some(active_window) = rx.recv().await.unwrap() {
                         return ExprRet::Value(ValueType::String(active_window.class));
                     }
+                    ExprRet::Void
+                }
+                "on_window_change" => {
+                    // register to main
                     ExprRet::Void
                 }
                 _ => ExprRet::Void
@@ -162,7 +166,6 @@ pub(crate) struct Ambient<'a> {
 pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
     // let var_map = block.var_map.clone();
     for stmt in &block.statements {
-        log_msg(&format!("{:?}", stmt));
         match stmt {
             Stmt::Expr(expr) => { eval_expr(expr, &block.var_map, amb).await; }
             Stmt::Block(nested_block) => {
@@ -173,11 +176,10 @@ pub(crate) async fn eval_block<'a>(block: &Block, amb: &mut Ambient<'a>) {
                 eval_conditional_block(condition, nested_block, amb).await;
             }
             Stmt::If(expr, block) => {
-                log_msg("wo");
                 if eval_expr(expr, &block.var_map, amb).await == ExprRet::Value(ValueType::Bool(true)) {
-                    log_msg("wo2");
                     eval_block(block, amb).await;
                 }
+                aa
             }
         }
     }

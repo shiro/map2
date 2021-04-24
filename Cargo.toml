@@ -21,6 +21,7 @@ nom = "6.1.2"
 evdev-rs = "0.5.0"
 walkdir = "2.3.2"
 regex = "1.4.5"
+unicode-xid = "0.2.1"
 
 [[bin]]
 name = "key-mods-rs"
