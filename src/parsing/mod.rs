@@ -27,6 +27,7 @@ mod identifier;
 mod key_mapping;
 mod lambda;
 mod variable;
+mod key_action;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 

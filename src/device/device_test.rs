@@ -1,4 +1,4 @@
-use std::{io};
+use std::{io, time};
 use std::collections::HashMap;
 use std::fs::File;
 
@@ -6,10 +6,13 @@ use anyhow::{anyhow, bail, Result};
 use evdev_rs::*;
 use evdev_rs::enums::*;
 use regex::Regex;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, broadcast};
 use tokio::task;
 use walkdir::{DirEntry, WalkDir};
 use crate::device::device_util;
+use notify::{Watcher, DebouncedEvent};
+use futures::{SinkExt, TryFutureExt};
+use itertools::enumerate;
 
 fn usage() {
     println!("Usage: evtest /path/to/device");
@@ -137,10 +140,21 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<String> {
 }
 
 
-async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>) {
+async fn read_from_fd_runner(mut device: Device, reader_rx: mpsc::Sender<InputEvent>,
+                             mut return_broadcast_rx: broadcast::Receiver<()>,
+) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
     loop {
-        a = device.next_event(ReadFlag::NORMAL | ReadFlag::BLOCKING);
+        println!("spin");
+        if return_broadcast_rx.try_recv().is_ok() {
+            println!("exiting");
+            device.grab(GrabMode::Ungrab).unwrap();
+            drop(device);
+            return;
+        }
+
+        a = device.next_event(ReadFlag::NORMAL);
+        println!("wow");
         if a.is_ok() {
             // let mut result = a.ok().unwrap();
             let mut result = a.ok().unwrap();
@@ -162,7 +176,11 @@ async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>
         } else {
             let err = a.err().unwrap();
             match err.raw_os_error() {
-                Some(libc::EAGAIN) => continue,
+                Some(libc::EAGAIN) => {
+                    println!("yielded");
+                    task::yield_now().await;
+                    continue;
+                }
                 _ => {
                     println!("{}", err);
                     break;
@@ -173,90 +191,149 @@ async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>
 }
 
 
-async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer: mpsc::Sender<InputEvent>) {
-    // make empty map
-    let mut fd_map = HashMap::new();
+async fn runner_it(fd_pattens: &Vec<Regex>, mut reader_rx: mpsc::Receiver<InputEvent>, mut writer: &mpsc::Sender<InputEvent>,
+                   mut return_rx: oneshot::Receiver<oneshot::Sender<mpsc::Receiver<InputEvent>>>,
+                   mut return_broadcast_rx: broadcast::Sender<()>,
+)
+                   -> Result<()> {
+    let mut first_iteration_box = Some((reader_rx, return_rx));
 
-    // let mut writer_box = writer;
-    let mut reader_init_box = Some(reader_init);
-    let (reader_tx, reader_rx) = mpsc::channel(128);
-    let mut reader_rx_box = Some(reader_rx);
+    let input_fd_path_list = get_fd_list(&fd_pattens);
+    if input_fd_path_list.len() < 1 {
+        return Err(anyhow!("no devices found"));
+    }
 
-    // TODO on change
-    let mut ran = false;
-    while ran == false {
-        let input_fd_path_list = get_fd_list(&fd_pattens);
-        if input_fd_path_list.len() < 1 {
-            // out_ev_tx.send(Err(anyhow!("no matching fd found"))).await;
-            break;
+    // println!("{:?}", input_fd_path_list);
+
+
+    let mut devices = vec![];
+    for fd_path in input_fd_path_list {
+        // if fd_map.get(&fd_path).is_some() { continue; }
+        // fd_map.insert(fd_path.clone(), true);
+
+        // grab fd_path as fd
+        let fd_file = File::open(fd_path)?;
+        let mut device = Device::new_from_file(fd_file)?;
+        device.grab(GrabMode::Grab).unwrap();
+        devices.push(device);
+    }
+
+    {
+        let mut it = devices.iter_mut();
+        let main_dev = it.next().ok_or(anyhow!("failed to open main device"))?;
+
+        for device in it {
+            device_util::clone_device(device, main_dev)?;
         }
+    }
 
-        // println!("{:?}", input_fd_path_list);
+    for device in devices {
+        // spawn virtual device and write to it
+        if let Some((mut reader_rx, mut return_tx)) = first_iteration_box {
+            let input_device = UInputDevice::create_from_device(&device)?;
 
-
-        let mut devices = vec![];
-        for fd_path in input_fd_path_list {
-            if fd_map.get(&fd_path).is_some() { continue; }
-            fd_map.insert(fd_path.clone(), true);
-
-            // grab fd_path as fd
-            let fd_file = File::open(fd_path).unwrap();
-            let mut device = Device::new_from_file(fd_file).unwrap();
-            device.grab(GrabMode::Grab).unwrap();
-            devices.push(device);
-        }
-
-        {
-            let mut it = devices.iter_mut();
-            let main_dev = it.next().unwrap();
-
-            for device in it {
-                device_util::clone_device(device, main_dev);
-            }
-        }
-
-
-        for device in devices {
-            // spawn virtual device and write to it
-            if let Some(mut reader_rx) = reader_rx_box {
-                let reader_init = reader_init_box.unwrap();
-
-                // make uinput device on fd as fd_uinput
-                let input_device = UInputDevice::create_from_device(&device).unwrap();
-
-                // spawn writing task with fd_uinput, move rx
-                // let reader = reader_rx.clone();
-                task::spawn(async move {
-                    loop {
+            task::spawn(async move {
+                loop {
+                    if let Ok(return_tx) = return_tx.try_recv() {
+                        return_tx.send(reader_rx);
+                        return Ok(());
+                    } else {
                         let msg: InputEvent = match reader_rx.recv().await {
                             Some(v) => v,
-                            None => break,
+                            None => return Err(anyhow!("message channel closed unexpectedly")),
                         };
-                        // print_event_debug(&msg);
-                        // log_msg(&format!("{}, {}", &msg.event_code, &msg.value));
                         input_device.write_event(&msg);
                     }
-                });
+                }
+                Ok(())
+            });
+        }
+        first_iteration_box = None;
 
-                // send the reader to the client
-                reader_init.send(reader_tx.clone());
+        // spawn tasks for reading devices
+        {
+            let writer = writer.clone();
+            let return_broadcast_rx = return_broadcast_rx.subscribe();
+            task::spawn(async move {
+                read_from_fd_runner(device, writer, return_broadcast_rx).await;
+            });
+        }
+    }
+
+    Ok(())
+}
+
+async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer: mpsc::Sender<InputEvent>)
+                -> Result<()> {
+    task::spawn(async move {
+        let (fs_event_tx, mut fs_event_rx) = mpsc::channel(128);
+        task::spawn_blocking(move || {
+            let (watch_tx, watch_rx) = std::sync::mpsc::channel();
+            let mut watcher: notify::RecommendedWatcher = notify::Watcher::new(watch_tx, time::Duration::from_secs(2))?;
+            watcher.watch("/dev/input", notify::RecursiveMode::Recursive)?;
+
+            loop {
+                match watch_rx.recv() {
+                    Ok(event) => {
+                        match event {
+                            DebouncedEvent::Create(_) => {}
+                            DebouncedEvent::Remove(_) => {}
+                            _ => { continue; }
+                        }
+
+                        println!("ev: {:?}", event);
+                        futures::executor::block_on(
+                            fs_event_tx.send(())
+                            // .map_err(|_| Err(anyhow!("fs message channel sync error")))
+                        );
+                    }
+                    Err(e) => return Err(anyhow!("watch error: {:?}", e)),
+                }
             }
-            // unset moved values
-            reader_init_box = None;
+            Ok(())
+        });
+
+
+        let (reader_tx, mut reader_rx) = mpsc::channel(128);
+        // send the reader to the client
+        reader_init.send(reader_tx.clone());
+
+        // put it in an option to avoid moved var errors
+        let mut reader_rx_box = Some(reader_rx);
+
+        // no return channel for the first iteration
+        let mut return_tx_box: Option<oneshot::Sender<oneshot::Sender<mpsc::Receiver<InputEvent>>>> = None;
+
+        let (mut broadcast, _) = broadcast::channel(64);
+
+        loop {
+            match return_tx_box {
+                Some(mut return_tx) => {
+                    println!("sending broadcast");
+                    broadcast.send(())?;
+                    std::thread::sleep(time::Duration::from_secs(1));
+
+                    println!("sending chan");
+                    let (tx, rx) = oneshot::channel();
+                    return_tx.send(tx).unwrap();
+                    reader_rx_box = Some(rx.await.unwrap());
+                    println!("cleanup done");
+                }
+                None => {} // first iteration, nothing to retreive
+            }
+            let (return_tx, return_rx) = oneshot::channel();
+            return_tx_box = Some(return_tx);
+
+            println!("new it");
+            runner_it(&fd_pattens, reader_rx_box.unwrap(), &writer, return_rx, broadcast.clone()).await;
             reader_rx_box = None;
 
-            // spawn tasks for reading devices
-            {
-                let writer = writer.clone();
-                task::spawn(async move {
-                    read_from_fd_runner(device, writer).await;
-                });
-            }
+            fs_event_rx.recv().await;
         }
+        Ok::<(), anyhow::Error>(())
+    });
 
-        // tokio::time::sleep(time::Duration::from_millis(5000)).await;
-        ran = true;
-    }
+    Ok(())
 }
 
 

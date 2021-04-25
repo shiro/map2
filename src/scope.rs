@@ -114,7 +114,6 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         Expr::KeyMapping(mappings) => {
             for mapping in mappings {
                 let mut mapping = mapping.clone();
-                // mapping.to.var_map = var_map.clone();
 
                 amb.message_tx.borrow_mut().as_ref().unwrap()
                     .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to, var_map.clone())).await

@@ -32,7 +32,7 @@ fn print_abs_bits(dev: &Device, axis: &EV_ABS) {
     }
 }
 
-fn clone_code_bits(src: &Device, dst: &mut Device, ev_code: &EventCode, max: &EventCode) {
+fn clone_code_bits(src: &Device, dst: &mut Device, ev_code: &EventCode, max: &EventCode) -> Result<()>{
     for code in ev_code.iter() {
         if code == *max {
             break;
@@ -41,16 +41,17 @@ fn clone_code_bits(src: &Device, dst: &mut Device, ev_code: &EventCode, max: &Ev
             continue;
         }
 
-        dst.enable(&code);
+        dst.enable(&code)?;
         // println!("    Event code: {}", code);
         // match code {
         //     EventCode::EV_ABS(k) => print_abs_bits(src, &k),
         //     // _ => (),
         // }
     }
+    Ok(())
 }
 
-fn clone_bits(src: &Device, dst: &mut Device) {
+fn clone_bits(src: &Device, dst: &mut Device) -> Result<()>{
     // println!("Supported events:");
     for ev_type in EventType::EV_SYN.iter() {
         match ev_type {
@@ -59,28 +60,29 @@ fn clone_bits(src: &Device, dst: &mut Device) {
                 dst,
                 &EventCode::EV_KEY(EV_KEY::KEY_RESERVED),
                 &EventCode::EV_KEY(EV_KEY::KEY_MAX),
-            ),
+            )?,
             EventType::EV_REL => clone_code_bits(
                 src,
                 dst,
                 &EventCode::EV_REL(EV_REL::REL_X),
                 &EventCode::EV_REL(EV_REL::REL_MAX),
-            ),
+            )?,
             EventType::EV_ABS => clone_code_bits(
                 src,
                 dst,
                 &EventCode::EV_ABS(EV_ABS::ABS_X),
                 &EventCode::EV_ABS(EV_ABS::ABS_MAX),
-            ),
+            )?,
             EventType::EV_LED => clone_code_bits(
                 src,
                 dst,
                 &EventCode::EV_LED(EV_LED::LED_NUML),
                 &EventCode::EV_LED(EV_LED::LED_MAX),
-            ),
+            )?,
             _ => (),
         }
     }
+    Ok(())
 }
 
 fn clone_props(src: &Device, dst: &mut Device) -> Result<()> {
@@ -92,7 +94,8 @@ fn clone_props(src: &Device, dst: &mut Device) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn clone_device(src: &Device, dst: &mut Device) {
-    clone_props(src, dst);
-    clone_bits(src, dst);
+pub(crate) fn clone_device(src: &Device, dst: &mut Device) -> Result<()>{
+    clone_props(src, dst)?;
+    clone_bits(src, dst)?;
+    Ok(())
 }
