@@ -1,4 +1,4 @@
-use std::{io, time};
+use std::{io, time, path, thread};
 use std::collections::HashMap;
 use std::fs::File;
 
@@ -14,8 +14,11 @@ use tokio::task;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::device::{device_util, virt_device};
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-fn get_fd_list(patterns: &Vec<Regex>) -> Vec<String> {
+
+fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     let mut list = vec![];
     for entry in WalkDir::new("/dev/input")
         .into_iter()
@@ -25,28 +28,21 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<String> {
         let name: String = String::from(entry.path().to_string_lossy());
 
         if !patterns.iter().any(|p| p.is_match(&name)) { continue; }
-        list.push(name);
+        list.push(PathBuf::from_str(&name).unwrap());
     }
     list
 }
 
 
 async fn read_from_fd_runner(mut device: Device, reader_rx: mpsc::Sender<InputEvent>,
-                             mut return_broadcast_rx: broadcast::Receiver<()>,
+                             mut abort_rx: oneshot::Receiver<()>,
 ) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
     loop {
-        // println!("spin");
-        if return_broadcast_rx.try_recv().is_ok() {
-            // device.grab(GrabMode::Ungrab).unwrap();
-            // drop(device);
-            return;
-        }
+        if abort_rx.try_recv().is_ok() { return; }
 
         a = device.next_event(ReadFlag::NORMAL);
-        // println!("wow");
         if a.is_ok() {
-            // let mut result = a.ok().unwrap();
             let mut result = a.ok().unwrap();
             match result.0 {
                 ReadStatus::Sync => { // dropped, need to sync
@@ -66,14 +62,19 @@ async fn read_from_fd_runner(mut device: Device, reader_rx: mpsc::Sender<InputEv
         } else {
             let err = a.err().unwrap();
             match err.raw_os_error() {
+                Some(libc::ENODEV) => { return; }
+                Some(libc::EWOULDBLOCK) => {
+                    task::yield_now().await;
+                    continue;
+                }
                 Some(libc::EAGAIN) => {
-                    // println!("yielded");
                     task::yield_now().await;
                     continue;
                 }
                 _ => {
-                    println!("{}", err);
-                    break;
+                    println!("{:?}", err);
+                    println!("reader loop err: {}", err);
+                    return;
                 }
             }
         }
@@ -109,44 +110,24 @@ async fn init_virtual_output_device(
     Ok(())
 }
 
-async fn runner_it(fd_pattens: &Vec<Regex>,
-                   mut writer: &mpsc::Sender<InputEvent>,
-                   mut return_broadcast_rx: broadcast::Sender<()>)
-                   -> Result<()> {
-    let input_fd_path_list = get_fd_list(&fd_pattens);
-    if input_fd_path_list.len() < 1 {
-        return Err(anyhow!("no devices found"));
-    }
+async fn runner_it(fd_path: &Path,
+                   mut writer: mpsc::Sender<InputEvent>)
+                   -> Result<oneshot::Sender<()>> {
+    let fd_file = tokio::fs::File::open(fd_path).await?;
+    let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
+    let mut device = Device::new_from_file(fd_file_nb)?;
+    device.grab(GrabMode::Grab).unwrap();
 
-    // println!("{:?}", input_fd_path_list);
+    // spawn tasks for reading devices
+    let (abort_tx, abort_rx) = oneshot::channel();
+    task::spawn(async move {
+        read_from_fd_runner(device, writer, abort_rx).await;
+    });
 
-
-    let mut devices = vec![];
-    for fd_path in input_fd_path_list {
-        // if fd_map.get(&fd_path).is_some() { continue; }
-        // fd_map.insert(fd_path.clone(), true);
-
-        // grab fd_path as fd
-        let fd_file = tokio::fs::File::open(fd_path).await?;
-        let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
-        let mut device = Device::new_from_file(fd_file_nb)?;
-        device.grab(GrabMode::Grab).unwrap();
-        devices.push(device);
-    }
-
-    for device in devices {
-        // spawn tasks for reading devices
-        let writer = writer.clone();
-        let return_broadcast_rx = return_broadcast_rx.subscribe();
-        task::spawn(async move {
-            read_from_fd_runner(device, writer, return_broadcast_rx).await;
-        });
-    }
-
-    Ok(())
+    Ok(abort_tx)
 }
 
-async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer: mpsc::Sender<InputEvent>)
+async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer: mpsc::Sender<InputEvent>)
                 -> Result<()> {
     task::spawn(async move {
         let (reader_tx, mut reader_rx) = mpsc::channel(128);
@@ -156,9 +137,14 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
 
         init_virtual_output_device(reader_rx).await?;
 
+        #[derive(Debug)]
+        enum FsWatchEvent {
+            ADD(PathBuf),
+            REMOVE(PathBuf),
+        }
 
         let (fs_event_tx, mut fs_event_rx) = mpsc::channel(128);
-        task::spawn_blocking(move || {
+        thread::spawn(move || {
             let (watch_tx, watch_rx) = std::sync::mpsc::channel();
             let mut watcher: notify::RecommendedWatcher = notify::Watcher::new(watch_tx, time::Duration::from_secs(2))?;
             watcher.watch("/dev/input", notify::RecursiveMode::Recursive)?;
@@ -166,16 +152,15 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
             loop {
                 match watch_rx.recv() {
                     Ok(event) => {
-                        match event {
-                            DebouncedEvent::Create(_) => {}
-                            DebouncedEvent::Remove(_) => {}
+                        use FsWatchEvent::*;
+                        let fs_event = match event {
+                            DebouncedEvent::Create(path_buf) => { ADD(path_buf) }
+                            DebouncedEvent::Remove(path_buf) => { REMOVE(path_buf) }
                             _ => { continue; }
-                        }
+                        };
 
-                        println!("ev: {:?}", event);
                         futures::executor::block_on(
-                            fs_event_tx.send(())
-                            // .map_err(|_| Err(anyhow!("fs message channel sync error")))
+                            fs_event_tx.send(fs_event)
                         );
                     }
                     Err(e) => return Err(anyhow!("watch error: {:?}", e)),
@@ -184,16 +169,30 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
             Ok(())
         });
 
-        let (mut broadcast, _) = broadcast::channel(64);
+        let mut device_map = HashMap::new();
 
+        for device_fd_path in get_fd_list(&device_fd_path_pattens) {
+            let abort_tx = runner_it(&device_fd_path, writer.clone()).await?;
+            device_map.insert(device_fd_path, abort_tx);
+        }
 
         loop {
-            // ignore error since there might be no subscribers yet
-            let _ = broadcast.send(());
+            let fs_event = fs_event_rx.recv().await.unwrap();
+            match fs_event {
+                FsWatchEvent::ADD(path) => {
+                    if !device_fd_path_pattens.iter().any(|regex| regex.is_match(path.to_str().unwrap())) {
+                        continue;
+                    }
 
-            runner_it(&fd_pattens, &writer, broadcast.clone()).await?;
-
-            fs_event_rx.recv().await;
+                    let abort_tx = runner_it(&path, writer.clone()).await?;
+                    device_map.insert(path, abort_tx);
+                }
+                FsWatchEvent::REMOVE(path) => {
+                    if let Some(abort_tx) = device_map.remove(&path) {
+                        let _ = abort_tx.send(());
+                    }
+                }
+            }
         }
         Ok::<(), anyhow::Error>(())
     });
@@ -208,7 +207,8 @@ pub(crate) async fn bind_udev_inputs(fd_patterns: Vec<&str>, reader_init_tx: one
     let fd_patterns_regex = fd_patterns.into_iter().map(|v| Regex::new(v).unwrap()).collect();
 
     task::spawn(async move {
-        runner(fd_patterns_regex, reader_init_tx, writer_tx).await;
+        runner(fd_patterns_regex, reader_init_tx, writer_tx).await?;
+        Ok::<(), anyhow::Error>(())
     });
 
     Ok(())
