@@ -49,7 +49,11 @@
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/nom-f53f86967e2f6af3/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/radium-1bcd19ad552590a8/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/evdev-sys-b2e844ecfc8dce50/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/crossbeam-utils-b3b5952ca991846d/out" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/target/debug/build/evdev-sys-47b506ee92bf1574/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/maybe-uninit-afdaae165a1b6ea9/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/parking_lot-006ef8fd69b091d9/out" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/target/debug/build/parking_lot_core-4fda2467fe57e9ed/out" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

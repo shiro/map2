@@ -1,6 +1,7 @@
 let foo = true;
 print(foo);
 
+d::m;
 a::{
   print(foo);
 };

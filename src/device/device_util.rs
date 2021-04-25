@@ -95,7 +95,18 @@ fn clone_props(src: &Device, dst: &mut Device) -> Result<()> {
 }
 
 pub(crate) fn clone_device(src: &Device, dst: &mut Device) -> Result<()>{
-    clone_props(src, dst)?;
+    // clone_props(src, dst)?;
     clone_bits(src, dst)?;
+
+    let name = src.name().unwrap_or("");
+    let phys = src.phys().unwrap_or("");
+    let uniq = src.uniq().unwrap_or("");
+
+    dst.set_name("NAsus Keyboard");
+    // dst.set_name(name);
+    // dst.set_phys(phys);
+    // dst.set_uniq(uniq);
+
+
     Ok(())
 }
