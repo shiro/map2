@@ -81,45 +81,38 @@ async fn read_from_fd_runner(mut device: Device, reader_rx: mpsc::Sender<InputEv
 }
 
 
-async fn runner_it(fd_pattens: &Vec<Regex>, mut reader_rx: mpsc::Receiver<InputEvent>, mut writer: &mpsc::Sender<InputEvent>,
-                   mut return_rx: oneshot::Receiver<oneshot::Sender<mpsc::Receiver<InputEvent>>>,
-                   mut return_broadcast_rx: broadcast::Sender<()>,
-)
-                   -> Result<()> {
-    // let mut first_iteration_box = Some((reader_rx, return_rx));
-    // if let Some((mut reader_rx, mut return_tx)) = first_iteration_box {
-    let file = tokio::fs::File::open("/tmp/dummy").await.unwrap();
+async fn init_virtual_output_device(
+    mut reader_rx: mpsc::Receiver<InputEvent>,
+) -> Result<()> {
+    // TODO remove dummy
+    let file = tokio::fs::File::open("/tmp/dummy").await?;
+    let file_nb = tokio_file_unix::File::new_nb(file)?;
 
-    let file_nb = tokio_file_unix::File::new_nb(file).unwrap();
-
-    let mut new_device = UninitDevice::new().unwrap().unstable_force_init(file_nb);
-    // device_util::clone_device(&device, &mut new_device)?;
+    let mut new_device = UninitDevice::new()
+        .ok_or(anyhow!("failed to instantiate udev device"))?
+        .unstable_force_init(file_nb);
     virt_device::setup_virt_device(&mut new_device);
 
-    let input_device = UInputDevice::create_from_device(&new_device).unwrap();
+    let input_device = UInputDevice::create_from_device(&new_device)?;
 
-
-    // let input_device = UInputDevice::create_from_device(&device)?;
     task::spawn(async move {
         loop {
-            tokio::select! {
-                return_tx = &mut return_rx => {
-                    return_tx.unwrap().send(reader_rx);
-                    return Ok(());
-                }
-                msg = reader_rx.recv() => {
-                    let ev: InputEvent = match msg {
-                        Some(v) => v,
-                        None => return Err(anyhow!("message channel closed unexpectedly")),
-                    };
-                    input_device.write_event(&ev);
-                }
-            }
+            let msg = reader_rx.recv().await;
+            let ev: InputEvent = match msg {
+                Some(v) => v,
+                None => return Err(anyhow!("message channel closed unexpectedly")),
+            };
+            input_device.write_event(&ev);
         }
         Ok(())
     });
+    Ok(())
+}
 
-
+async fn runner_it(fd_pattens: &Vec<Regex>,
+                   mut writer: &mpsc::Sender<InputEvent>,
+                   mut return_broadcast_rx: broadcast::Sender<()>)
+                   -> Result<()> {
     let input_fd_path_list = get_fd_list(&fd_pattens);
     if input_fd_path_list.len() < 1 {
         return Err(anyhow!("no devices found"));
@@ -156,6 +149,14 @@ async fn runner_it(fd_pattens: &Vec<Regex>, mut reader_rx: mpsc::Receiver<InputE
 async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer: mpsc::Sender<InputEvent>)
                 -> Result<()> {
     task::spawn(async move {
+        let (reader_tx, mut reader_rx) = mpsc::channel(128);
+
+        // send the reader to the client
+        reader_init.send(reader_tx.clone());
+
+        init_virtual_output_device(reader_rx).await?;
+
+
         let (fs_event_tx, mut fs_event_rx) = mpsc::channel(128);
         task::spawn_blocking(move || {
             let (watch_tx, watch_rx) = std::sync::mpsc::channel();
@@ -183,36 +184,14 @@ async fn runner(fd_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sende
             Ok(())
         });
 
-
-        let (reader_tx, mut reader_rx) = mpsc::channel(128);
-        // send the reader to the client
-        reader_init.send(reader_tx.clone());
-
-        // put it in an option to avoid moved var errors
-        let mut reader_rx_box = Some(reader_rx);
-
-        // no return channel for the first iteration
-        let mut return_tx_box: Option<oneshot::Sender<oneshot::Sender<mpsc::Receiver<InputEvent>>>> = None;
-
         let (mut broadcast, _) = broadcast::channel(64);
 
+
         loop {
-            match return_tx_box {
-                Some(mut return_tx) => {
-                    broadcast.send(())?;
+            // ignore error since there might be no subscribers yet
+            let _ = broadcast.send(());
 
-                    let (tx, rx) = oneshot::channel();
-                    return_tx.send(tx).unwrap();
-                    reader_rx_box = Some(rx.await.unwrap());
-                }
-                None => {} // first iteration, nothing to retreive
-            }
-            let (return_tx, return_rx) = oneshot::channel();
-            return_tx_box = Some(return_tx);
-
-            println!("new it");
-            runner_it(&fd_pattens, reader_rx_box.unwrap(), &writer, return_rx, broadcast.clone()).await;
-            reader_rx_box = None;
+            runner_it(&fd_pattens, &writer, broadcast.clone()).await?;
 
             fs_event_rx.recv().await;
         }
