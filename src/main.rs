@@ -9,7 +9,8 @@ extern crate lazy_static;
 extern crate regex;
 
 use std::{io, time};
-use std::io::{Write};
+use std::io::Write;
+use std::ops::DerefMut;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -22,6 +23,8 @@ use tokio::prelude::*;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 
+use device::device_logging::print_event_debug;
+
 use crate::device::device_test::bind_udev_inputs;
 use crate::key_defs::*;
 use crate::key_primitives::*;
@@ -29,7 +32,6 @@ use crate::scope::*;
 use crate::state::*;
 use crate::x11::{x11_initialize, x11_test};
 use crate::x11::ActiveWindowInfo;
-use std::ops::DerefMut;
 
 mod tab_mod;
 mod caps_mod;
@@ -286,7 +288,6 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         let block = block.clone();
         let mut message_tx = message_tx.clone();
         let ev_writer = ev_writer.clone();
-        // let mut var_map = var_map.clone();
         task::spawn(async move {
             let mut guard = block.lock().await;
             let mut foo = guard.deref_mut();
@@ -299,11 +300,3 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
 
     Ok(())
 }
-
-// input ev thread
-// tokio::spawn(async move {
-//     loop {
-//         listen_to_key_events(&mut read_ev, &mut stdin).await;
-//         input_ev_tx.send(read_ev).await.unwrap();
-//     }
-// });

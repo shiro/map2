@@ -16,6 +16,7 @@ use variable::*;
 use identifier::*;
 use lambda::*;
 use key_mapping::*;
+use key::*;
 
 use crate::*;
 use crate::block_ext::ExprVecExt;
@@ -28,6 +29,7 @@ mod key_mapping;
 mod lambda;
 mod variable;
 mod key_action;
+mod key;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -56,46 +58,7 @@ fn boolean(input: &str) -> Res<&str, Expr> {
     )
 }
 
-fn key_flags(input: &str) -> Res<&str, KeyModifierFlags> {
-    context("key_flags", many0(one_of("^!+#")))(input).and_then(|(next, val)| {
-        let mut flags = KeyModifierFlags::new();
-        for v in val {
-            match v {
-                '!' => { if !flags.alt { flags.alt(); } else { return Err(make_generic_nom_err()); } }
-                '^' => { if !flags.ctrl { flags.ctrl(); } else { return Err(make_generic_nom_err()); } }
-                '+' => { if !flags.shift { flags.shift(); } else { return Err(make_generic_nom_err()); } }
-                '#' => { if !flags.meta { flags.meta(); } else { return Err(make_generic_nom_err()); } }
-                _ => unreachable!()
-            }
-        };
-        Ok((next, flags))
-    })
-}
 
-#[derive(Eq, PartialEq, Debug, Clone)]
-enum ParsedSingleKey {
-    Key(Key),
-    CapitalKey(Key),
-}
-
-fn key(input: &str) -> Res<&str, ParsedSingleKey> {
-    context("key", alphanumeric1)(input)
-        .and_then(|(next, val)| {
-            let key_name = "KEY_".to_string()
-                .tap_mut(|s| s.push_str(&val.to_uppercase()));
-
-            let key = Key::from_str(&EventType::EV_KEY, key_name.as_str())
-                .map_err(|_| make_generic_nom_err())?;
-
-            // only 1 char and it's uppercase
-            let mut it = val.chars();
-            if it.next().unwrap().is_uppercase() && it.next().is_none() {
-                return Ok((next, ParsedSingleKey::CapitalKey(key.clone())));
-            }
-
-            Ok((next, ParsedSingleKey::Key(key.clone())))
-        })
-}
 
 #[derive(PartialEq, Debug, Clone)]
 enum ParsedKeyAction {
@@ -291,10 +254,23 @@ fn block(input: &str) -> Res<&str, Block> {
     )(input).map(|(next, v)| (next, v.2))
 }
 
+fn global_block(input: &str) -> Res<&str, Block> {
+    context(
+        "block",
+        tuple((multispace0, block_body, multispace0)),
+    )(input).map(|(next, v)| (next, v.1))
+}
+
 
 pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
-    match block_body(raw_script) {
-        Ok(v) => Ok(v.1),
+    match global_block(raw_script) {
+        Ok(v) => {
+            if v.0.is_empty() {
+                Ok(v.1)
+            } else {
+                Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v.0))
+            }
+        }
         Err(_) => Err(anyhow!("parsing failed"))
     }
 }

@@ -38,3 +38,14 @@ pub fn word(mut input: &str) -> Res<&str, String> {
 
     Ok(("", input.into()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_weird_names() {
+        assert_eq!(ident("_foobar"), Ok(("", "_foobar".to_string())));
+        assert_eq!(ident("btn_forward"), Ok(("", "btn_forward".to_string())));
+    }
+}
