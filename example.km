@@ -3,7 +3,7 @@ print(foo);
 
 d::m;
 
-btn_forward::m;
+{btn_forward down}::"hello";
 
 a::{
   print(foo);

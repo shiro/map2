@@ -46,9 +46,42 @@ pub(super) fn key(input: &str) -> Res<&str, ParsedSingleKey> {
         })
 }
 
+fn key_state(input: &str) -> Res<&str, i32> {
+    context("key_state", alt((
+        tag("down"), tag("up"),
+    )))(input).map(|(next, v)| (next, match v.to_uppercase().as_str() {
+        "UP" => 0,
+        "DOWN" => 1,
+        _ => unreachable!()
+    }))
+}
+
+pub(super) fn key_with_state(input: &str) -> Res<&str, (ParsedSingleKey, i32)> {
+    context(
+        "special_key", tuple((
+            tag("{"),
+            multispace0,
+            key,
+            multispace0,
+            key_state,
+            multispace0,
+            tag("}"),
+        )))(input)
+        .map(|(next, val)| (next, (val.2, val.4)))
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_special_key() {
+        assert_eq!(key_with_state("{a down}"), Ok(("", (
+            ParsedSingleKey::Key(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap()),
+            1,
+        ))));
+    }
 
     #[test]
     fn test_key() {
@@ -59,5 +92,17 @@ mod tests {
         assert_eq!(key("btn_forward"), Ok(("", ParsedSingleKey::Key(
             Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap())
         )));
+    }
+
+    #[test]
+    fn test_key_flags() {
+        assert_eq!(key_flags("!"), Ok(("", *KeyModifierFlags::new().alt())));
+        assert_eq!(key_flags("^"), Ok(("", *KeyModifierFlags::new().ctrl())));
+        assert_eq!(key_flags("+"), Ok(("", *KeyModifierFlags::new().shift())));
+        assert_eq!(key_flags("#"), Ok(("", *KeyModifierFlags::new().meta())));
+
+        assert_eq!(key_flags("!#"), Ok(("", *KeyModifierFlags::new().alt().meta())));
+        assert_eq!(key_flags("#!"), Ok(("", *KeyModifierFlags::new().alt().meta())));
+        assert_eq!(key_flags("#a!"), Ok(("a!", *KeyModifierFlags::new().meta())));
     }
 }

@@ -6,9 +6,9 @@ pub struct Key { pub(crate) event_code: EventCode }
 
 impl Key {
     pub(crate) fn from_str(ev_type: &EventType, s: &str) -> Result<Self> {
-        match EventCode::from_str(ev_type, s){
-            Some(event_code) => {Ok(Key{event_code})}
-            None => {Err(anyhow!("key not found: '{}'", s))}
+        match EventCode::from_str(ev_type, s) {
+            Some(event_code) => { Ok(Key { event_code }) }
+            None => { Err(anyhow!("key not found: '{}'", s)) }
         }
     }
 }
@@ -58,14 +58,18 @@ impl KeyModifierFlags {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub(crate) struct KeyAction { pub(crate) key: Key, pub(crate) value: i32 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) struct KeyActionWithMods { pub(crate) key: Key, pub(crate) value: i32, pub(crate) modifiers: KeyModifierFlags }
-
 impl KeyAction {
     pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value } }
     pub fn to_input_ev(&self) -> InputEvent {
         InputEvent { event_code: self.key.event_code, value: self.value, time: INPUT_EV_DUMMY_TIME }
     }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub(crate) struct KeyActionWithMods { pub(crate) key: Key, pub(crate) value: i32, pub(crate) modifiers: KeyModifierFlags }
+
+impl KeyActionWithMods {
+    pub fn new(key: Key, value: i32, modifiers: KeyModifierFlags) -> Self { KeyActionWithMods { key, value, modifiers } }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]

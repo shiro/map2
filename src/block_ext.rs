@@ -29,6 +29,10 @@ impl Block {
 }
 
 impl Expr {
+    pub(crate) fn map_key_block(from: KeyActionWithMods, to: Block) -> Self {
+        Expr::KeyMapping(vec![KeyMapping { from, to }])
+    }
+
     pub(crate) fn map_key_click(from: KeyClickActionWithMods, to: KeyClickActionWithMods) -> Self {
         let mut mappings = vec![];
         {
@@ -82,7 +86,7 @@ impl Expr {
         Expr::KeyMapping(mappings)
     }
 
-    pub(crate) fn map_key_block(from: KeyClickActionWithMods, to: Block) -> Self {
+    pub(crate) fn map_key_click_block(from: KeyClickActionWithMods, to: Block) -> Self {
         let mut mappings = vec![];
         mappings.push(KeyMapping {
             from: KeyActionWithMods {

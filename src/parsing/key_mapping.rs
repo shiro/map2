@@ -15,7 +15,17 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
         let (from, to) = (v.0, v.2);
 
         Ok((next, match from {
-            ParsedKeyAction::KeyAction(_) => { unimplemented!() }
+            ParsedKeyAction::KeyAction(from) => {
+                match to {
+                    ParsedKeyAction::KeyAction(_) => { unimplemented!() }
+                    ParsedKeyAction::KeyClickAction(_) => { unimplemented!() }
+                    ParsedKeyAction::KeySequence(to) => {
+                        Expr::map_key_block(from, Block::new()
+                            .tap_mut(|b| b.statements = to.into_iter().map(Stmt::Expr).collect()),
+                        )
+                    }
+                }
+            }
             ParsedKeyAction::KeyClickAction(from) => {
                 match to {
                     ParsedKeyAction::KeyAction(_) => { unimplemented!() }
@@ -23,7 +33,7 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
                         Expr::map_key_click(from, to)
                     }
                     ParsedKeyAction::KeySequence(expr) => {
-                        Expr::map_key_block(from, Block::new()
+                        Expr::map_key_click_block(from, Block::new()
                             .tap_mut(|b| b.statements = expr.into_iter().map(Stmt::Expr).collect()),
                         )
                     }
@@ -47,7 +57,7 @@ pub(super) fn key_mapping(input: &str) -> Res<&str, Expr> {
         let (from, to) = (v.0, v.3);
 
         let expr = match from {
-            ParsedKeyAction::KeyClickAction(from) => { Expr::map_key_block(from, to) }
+            ParsedKeyAction::KeyClickAction(from) => { Expr::map_key_click_block(from, to) }
             ParsedKeyAction::KeyAction(from) => unimplemented!(),
             ParsedKeyAction::KeySequence(from) => return Err(make_generic_nom_err()),
         };
@@ -75,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_key_mapping() {
-        assert_eq!(key_mapping("a::{}"), Ok(("", Expr::map_key_block(
+        assert_eq!(key_mapping("a::{}"), Ok(("", Expr::map_key_click_block(
             KeyClickActionWithMods::new(*KEY_A),
             Block::new(),
         ))));

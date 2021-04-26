@@ -17,6 +17,7 @@ use identifier::*;
 use lambda::*;
 use key_mapping::*;
 use key::*;
+use key_action::*;
 
 use crate::*;
 use crate::block_ext::ExprVecExt;
@@ -57,39 +58,6 @@ fn boolean(input: &str) -> Res<&str, Expr> {
         })
     )
 }
-
-
-
-#[derive(PartialEq, Debug, Clone)]
-enum ParsedKeyAction {
-    KeyAction(KeyAction),
-    KeyClickAction(KeyClickActionWithMods),
-    KeySequence(Vec<Expr>),
-}
-
-fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
-    context(
-        "key_action",
-        tuple((
-            key_flags,
-            key,
-        )),
-    )(input).and_then(|(next, parts)| {
-        let mut mods = parts.0;
-        let key;
-        match parts.1 {
-            ParsedSingleKey::Key(k) => { key = k; }
-            ParsedSingleKey::CapitalKey(k) => {
-                mods.shift();
-                key = k;
-            }
-        }
-
-        let action = KeyClickActionWithMods::new_with_mods(key, mods);
-        Ok((next, ParsedKeyAction::KeyClickAction(action)))
-    })
-}
-
 
 fn key_sequence(input: &str) -> Res<&str, Vec<Expr>> {
     context(
@@ -347,18 +315,6 @@ mod tests {
             Box::new(Expr::String("22hello".to_string())),
             Box::new(Expr::Boolean(true)),
         ))));
-    }
-
-    #[test]
-    fn test_key_flags() {
-        assert_eq!(key_flags("!"), Ok(("", *KeyModifierFlags::new().alt())));
-        assert_eq!(key_flags("^"), Ok(("", *KeyModifierFlags::new().ctrl())));
-        assert_eq!(key_flags("+"), Ok(("", *KeyModifierFlags::new().shift())));
-        assert_eq!(key_flags("#"), Ok(("", *KeyModifierFlags::new().meta())));
-
-        assert_eq!(key_flags("!#"), Ok(("", *KeyModifierFlags::new().alt().meta())));
-        assert_eq!(key_flags("#!"), Ok(("", *KeyModifierFlags::new().alt().meta())));
-        assert_eq!(key_flags("#a!"), Ok(("a!", *KeyModifierFlags::new().meta())));
     }
 
     #[test]
