@@ -108,6 +108,40 @@ impl Expr {
         Expr::KeyMapping(vec![KeyMapping { from, to: block }])
     }
 
+    // PROTO
+    pub(crate) fn map_key_click_action(from: KeyClickActionWithMods, to: KeyActionWithMods) -> Self {
+        let mut block = Block::new();
+
+        if from.modifiers.ctrl && !to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
+        if from.modifiers.alt && !to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+        if from.modifiers.shift && !to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
+        if from.modifiers.meta && !to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+
+        if !from.modifiers.ctrl && to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
+        if !from.modifiers.alt && to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+        if !from.modifiers.shift && to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
+        if !from.modifiers.meta && to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+
+        block.push_expr(Expr::KeyAction(KeyAction { key: to.key, value: to.value }));
+
+        // revert to original
+        if !from.modifiers.ctrl && to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
+        if !from.modifiers.alt && to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+        if !from.modifiers.shift && to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
+        if !from.modifiers.meta && to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+
+        if from.modifiers.ctrl && !to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
+        if from.modifiers.alt && !to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+        if from.modifiers.shift && !to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
+        if from.modifiers.meta && !to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+
+        Expr::KeyMapping(vec![
+            KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_DOWN, KeyModifierFlags::new()), to: block },
+            KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_REPEAT, KeyModifierFlags::new()), to: Block::new() },
+            KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_UP, KeyModifierFlags::new()), to: Block::new() },
+        ])
+    }
+
     pub(crate) fn map_key_action_click(from: KeyActionWithMods, to: KeyClickActionWithMods) -> Self {
         let mut block = Block::new();
 

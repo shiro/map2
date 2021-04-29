@@ -4,7 +4,7 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
     context(
         "key_mapping_inline",
         tuple((
-            key_action,
+            key_action_with_flags,
             tag("::"),
             alt((
                 key_sequence,
@@ -12,7 +12,7 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
             ))
         )),
     )(input).and_then(|(next, v)| {
-        let (from, to) = (v.0, v.2);
+        let (from, mut to) = (v.0, v.2);
 
         Ok((next, match from {
             // ParsedKeyAction::KeyAction(from) => {
@@ -24,33 +24,25 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
             //     )
             // }
             ParsedKeyAction::KeyClickAction(from) => {
-                //     match to {
-                //         ParsedKeyAction::KeyAction(_) => { unimplemented!() }
-                //         ParsedKeyAction::KeyClickAction(to) => {
-                //             Expr::map_key_click(from, to)
-                //         }
-                //     }
-
-                // click to click
                 if to.len() == 1 {
+                    // click to click
                     if let Some(ParsedKeyAction::KeyClickAction(to)) = to.get(0) {
                         return Ok((next, Expr::map_key_click(&from, to)));
                     }
+                    // click to action
+                    if let ParsedKeyAction::KeyAction(to) = to.remove(0) {
+                        return Ok((next, Expr::map_key_click_action(from, to)));
+                    }
                 }
 
-                // click to action
-
-
                 // click to seq
-                let expr = Expr::map_key_click_block(from, Block::new()
+                Expr::map_key_click_block(from, Block::new()
                     .tap_mut(|b| b.statements = to
                         .to_key_actions()
                         .into_iter()
                         .map(|v| Stmt::Expr(Expr::KeyAction(v)))
                         .collect()),
-                );
-
-                expr
+                )
             }
             _ => unimplemented!()
         }))
