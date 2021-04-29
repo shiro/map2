@@ -44,21 +44,10 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
                 // click to seq
                 let expr = Expr::map_key_click_block(from, Block::new()
                     .tap_mut(|b| b.statements = to
+                        .to_key_actions()
                         .into_iter()
-                        .fold(vec![], |mut acc, v| match v {
-                            ParsedKeyAction::KeyAction(action) => {
-                                if action.modifiers.shift { acc.push(Stmt::Expr(Expr::KeyAction(KeyAction::new(*KEY_LEFT_SHIFT, TYPE_DOWN)))); }
-                                acc.push(Stmt::Expr(Expr::KeyAction(KeyAction::new(action.key, action.value))));
-                                acc
-                            }
-                            ParsedKeyAction::KeyClickAction(action) => {
-                                if action.modifiers.shift { acc.push(Stmt::Expr(Expr::KeyAction(KeyAction::new(*KEY_LEFT_SHIFT, TYPE_DOWN)))); }
-                                acc.push(Stmt::Expr(Expr::KeyAction(KeyAction::new(action.key, TYPE_DOWN))));
-                                acc.push(Stmt::Expr(Expr::KeyAction(KeyAction::new(action.key, TYPE_UP))));
-                                acc
-                            }
-                        })
-                    ),
+                        .map(|v| Stmt::Expr(Expr::KeyAction(v)))
+                        .collect()),
                 );
 
                 expr

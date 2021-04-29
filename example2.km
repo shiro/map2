@@ -1,6 +1,7 @@
 print("wow");
 a::b;
+let foo = "hello world";
 b::{
-  print("wow");
+  send("hello world");
 };
 

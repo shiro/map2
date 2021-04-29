@@ -3,10 +3,12 @@ use std::fmt;
 
 use crate::*;
 use std::fmt::Formatter;
-// use crate::parsing::parser::parse_key_sequence;
+use crate::parsing::parser::parse_key_sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
+pub(crate) struct KeyActionCondition {
+    pub(crate) window_class_name: Option<String>,
+}
 
 #[derive(Clone, Debug)]
 pub(crate) enum ValueType {
@@ -184,18 +186,14 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         _ => panic!("invalid parameter passed to function 'send'"),
                     };
 
-                    // let parsed = parse_key_sequence(&*val).unwrap();
+                    let actions = parse_key_sequence(&*val).unwrap();
 
-                    //
-                    // let action = parsing::key_action::key_action(&*val).unwrap().1;
-                    //
-                    // match action {
-                    //     ParsedKeyAction::KeyAction(action) => {
-                    //         Expr::KeyAction(action)
-                    //     }
-                    //     ParsedKeyAction::KeyClickAction(_) => { unimplemented!() }
-                    //     ParsedKeyAction::KeySequence(expr) => { unimplemented!() }
-                    // }
+                    for action in actions {
+                        amb.ev_writer_tx.send(action.to_input_ev()).await;
+                        amb.ev_writer_tx.send(SYN_REPORT.clone()).await;
+                    }
+
+                    // amb.ev_writer_tx.send()
 
                     ExprRet::Void
                 }

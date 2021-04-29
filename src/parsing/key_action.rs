@@ -6,6 +6,29 @@ pub(super) enum ParsedKeyAction {
     KeyClickAction(KeyClickActionWithMods),
 }
 
+pub(super) trait ParsedKeyActionVecExt {
+    fn to_key_actions(self) -> Vec<KeyAction>;
+}
+
+impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
+    fn to_key_actions(self) -> Vec<KeyAction> {
+        self.into_iter()
+            .fold(vec![], |mut acc, v| match v {
+                ParsedKeyAction::KeyAction(action) => {
+                    if action.modifiers.shift { acc.push(KeyAction::new(*KEY_LEFT_SHIFT, TYPE_DOWN)); }
+                    acc.push(KeyAction::new(action.key, action.value));
+                    acc
+                }
+                ParsedKeyAction::KeyClickAction(action) => {
+                    if action.modifiers.shift { acc.push(KeyAction::new(*KEY_LEFT_SHIFT, TYPE_DOWN)); }
+                    acc.push(KeyAction::new(action.key, TYPE_DOWN));
+                    acc.push(KeyAction::new(action.key, TYPE_UP));
+                    acc
+                }
+            })
+    }
+}
+
 pub(super) fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
     context(
         "key_action",
@@ -14,7 +37,7 @@ pub(super) fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
             map(
                 alt((
                     key,
-                    map(tuple((tag("{"), key, tag("}"))), |v|v.1),
+                    map(tuple((tag("{"), key, tag("}"))), |v| v.1),
                 )),
                 |v| (v, None),
             ),

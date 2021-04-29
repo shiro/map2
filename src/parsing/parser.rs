@@ -13,18 +13,20 @@ pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
     }
 }
 
-// pub(crate) fn parse_key_sequence<>(raw: &str) -> Result<Vec<KeyActionWithMods>> {
-//     match key_sequence(raw) {
-//         Ok(v) => {
-//             if v.0.is_empty() {
-//                 Ok(v.1)
-//             } else {
-//                 Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v.0))
-//             }
-//         }
-//         Err(err) => Err(anyhow!("parsing failed: {}", err))
-//     }
-// }
+pub(crate) fn parse_key_sequence(raw: &str) -> Result<Vec<KeyAction>> {
+    // TODO remove this workaround (allow seq to be parsed without quotes)
+    let raw = format!("\"{}\"", raw);
+    match key_sequence(&raw) {
+        Ok(v) => {
+            if v.0.is_empty() {
+                Ok(v.1.to_key_actions())
+            } else {
+                Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v.0))
+            }
+        }
+        Err(err) => Err(anyhow!("parsing failed: {}", err))
+    }
+}
 
 
 #[cfg(test)]
