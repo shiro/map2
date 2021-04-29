@@ -3,6 +3,7 @@ use std::fmt;
 
 use crate::*;
 use std::fmt::Formatter;
+// use crate::parsing::parser::parse_key_sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition { pub(crate) window_class_name: Option<String> }
@@ -176,6 +177,29 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         }
         Expr::FunctionCall(name, args) => {
             match &**name {
+                "send" => {
+                    let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
+                    let val = match val {
+                        ExprRet::Value(ValueType::String(val)) => val,
+                        _ => panic!("invalid parameter passed to function 'send'"),
+                    };
+
+                    // let parsed = parse_key_sequence(&*val).unwrap();
+
+                    //
+                    // let action = parsing::key_action::key_action(&*val).unwrap().1;
+                    //
+                    // match action {
+                    //     ParsedKeyAction::KeyAction(action) => {
+                    //         Expr::KeyAction(action)
+                    //     }
+                    //     ParsedKeyAction::KeyClickAction(_) => { unimplemented!() }
+                    //     ParsedKeyAction::KeySequence(expr) => { unimplemented!() }
+                    // }
+
+                    ExprRet::Void
+                }
+
                 "active_window_class" => {
                     let (tx, mut rx) = mpsc::channel(1);
                     amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await.unwrap();

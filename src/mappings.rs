@@ -1,4 +1,5 @@
 use crate::*;
+use crate::parsing::parser::parse_script;
 
 
 pub(crate) fn bind_mappings() -> Block {
@@ -23,7 +24,7 @@ pub(crate) fn bind_mappings() -> Block {
     let script = std::fs::read_to_string(script_filename).expect("failed to read file");
 
     // let script = "a::b;  b::c;".to_string();
-    let mut global = parsing::parse_script(script.as_str()).unwrap();
+    let mut global = parse_script(script.as_str()).unwrap();
 
 
     // global.replace_key_block(

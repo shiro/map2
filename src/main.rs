@@ -3,6 +3,7 @@
 #![feature(unboxed_closures)]
 #![feature(trait_alias)]
 #![feature(label_break_value)]
+#![feature(destructuring_assignment)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -14,6 +15,7 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use tap::Tap;
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use evdev_rs::enums::EventCode;

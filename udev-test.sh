@@ -5,11 +5,11 @@ sleep 1
 sudo systemctl stop udevmon.service
 
 
-target/debug/key-mods-rs example.km  &
+target/debug/key-mods-rs $1  &
 
 proc_pid=$!
 
-sleep $1
+sleep $2
 
 sudo kill $proc_pid
 

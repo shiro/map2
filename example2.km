@@ -1,0 +1,4 @@
+print("wow");
+a::b;
+b::"hello world";
+

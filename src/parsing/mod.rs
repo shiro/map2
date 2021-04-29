@@ -18,59 +18,30 @@ use lambda::*;
 use key_mapping::*;
 use key::*;
 use key_action::*;
+use primitives::*;
+use function::*;
+use key_sequence::*;
 
 use crate::*;
 use crate::block_ext::ExprVecExt;
 use crate::parsing::custom_combinators::fold_many0_once;
 use crate::parsing::identifier::ident;
 
+pub mod parser;
+mod key_sequence;
 mod custom_combinators;
+mod function;
 mod identifier;
+mod key;
+mod key_action;
 mod key_mapping;
 mod lambda;
+mod primitives;
 mod variable;
-mod key_action;
-mod key;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
 fn make_generic_nom_err<'a>() -> NomErr<VerboseError<&'a str>> { NomErr::Error(VerboseError { errors: vec![] }) }
-
-static STACK_SIZE: usize = 255;
-
-fn string(input: &str) -> Res<&str, Expr> {
-    context(
-        "string",
-        tuple((tag("\""), take_until("\""), tag("\""))),
-    )(input)
-        .map(|(next, v)| (next, Expr::String(v.1.to_string())))
-}
-
-fn boolean(input: &str) -> Res<&str, Expr> {
-    context(
-        "value",
-        alt((tag("true"), tag("false"))),
-    )(input).map(|(next, v)|
-        (next, match v {
-            "true" => Expr::Boolean(true),
-            "false" => Expr::Boolean(false),
-            _ => unreachable!(),
-        })
-    )
-}
-
-fn key_sequence(input: &str) -> Res<&str, Vec<Expr>> {
-    context(
-        "key_sequence",
-        tuple((
-            tag("\""),
-            take_until("\""),
-            tag("\""),
-        )),
-    )(input).and_then(|(next, v)| {
-        Ok((next, vec![].append_string_sequence(v.1)))
-    })
-}
 
 
 fn expr_simple(input: &str) -> Res<&str, Expr> {
@@ -137,41 +108,6 @@ fn if_stmt(input: &str) -> Res<&str, Stmt> {
 }
 
 
-fn function_arg(input: &str) -> Res<&str, Expr> {
-    context("function_arg", expr)(input)
-}
-
-fn function_call(input: &str) -> Res<&str, Expr> {
-    context(
-        "function_call",
-        tuple((
-            ident,
-            tag("("),
-            multispace0,
-            opt(tuple((
-                function_arg,
-                multispace0,
-                many0(tuple((
-                    tag(","),
-                    multispace0,
-                    function_arg,
-                    multispace0,
-                ))),
-            ))),
-            tag(")"),
-        )),
-    )(input).map(|(next, v)| {
-        match v.3 {
-            Some(arg_v) => {
-                let mut args: Vec<Expr> = arg_v.2.into_iter().map(|x| x.2).collect();
-                args.insert(0, arg_v.0);
-                (next, Expr::FunctionCall(v.0, args))
-            }
-            _ => (next, Expr::FunctionCall(v.0, vec![]))
-        }
-    })
-}
-
 fn stmt(input: &str) -> Res<&str, Stmt> {
     context(
         "stmt",
@@ -230,19 +166,6 @@ fn global_block(input: &str) -> Res<&str, Block> {
 }
 
 
-pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
-    match global_block(raw_script) {
-        Ok(v) => {
-            if v.0.is_empty() {
-                Ok(v.1)
-            } else {
-                Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v.0))
-            }
-        }
-        Err(_) => Err(anyhow!("parsing failed"))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use nom::error::{ErrorKind, VerboseErrorKind};
@@ -251,22 +174,6 @@ mod tests {
     use crate::block_ext::ExprVecExt;
 
     use super::*;
-
-    #[test]
-    fn test_function_call() {
-        assert_eq!(function_call("foobar()"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![]))));
-        assert_eq!(function_call("foobar(\"hello\", true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
-            Expr::String("hello".to_string()),
-            Expr::Boolean(true),
-        ]))));
-        assert_eq!(function_call("foobar(true == true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
-            expr("true == true").unwrap().1
-        ]))));
-
-        assert_eq!(function_call("print(variable)"), Ok(("", Expr::FunctionCall("print".to_string(), vec![
-            variable("variable").unwrap().1
-        ]))));
-    }
 
     #[test]
     fn test_if_stmt() {
@@ -290,15 +197,6 @@ mod tests {
             ),
             block("{a::b;}").unwrap().1,
         ))));
-    }
-
-    #[test]
-    fn test_value() {
-        assert!(matches!(boolean("true"), Ok(("", Expr::Boolean(true)))));
-        assert!(matches!(boolean("false"), Ok(("", Expr::Boolean(false)))));
-        assert!(matches!(boolean("foo"), Err(..)));
-
-        assert_eq!(string("\"hello world\""), Ok(("", Expr::String("hello world".to_string()))));
     }
 
     #[test]
@@ -327,41 +225,34 @@ mod tests {
     }
 
     #[test]
-    fn test_key_sequence() {
-        assert_eq!(key_sequence("\"hello world\""), Ok(("", vec![]
-            .append_string_sequence("hello world")
-        )));
-    }
-
-    #[test]
     fn test_key_action() {
-        assert_eq!(key_action("!a"), Ok(("", ParsedKeyAction::KeyClickAction(
+        assert_eq!(key_action_with_flags("!a"), Ok(("", ParsedKeyAction::KeyClickAction(
             KeyClickActionWithMods::new_with_mods(
                 *KEY_A,
-                *KeyModifierFlags::new().alt(),
+                KeyModifierFlags::new().tap_mut(|v|v.alt()),
             )))));
 
-        assert_eq!(key_action("!#^a"), Ok(("", ParsedKeyAction::KeyClickAction(
-            KeyClickActionWithMods::new_with_mods(
-                *KEY_A,
-                *KeyModifierFlags::new().ctrl().alt().meta(),
-            )))));
-
-        assert_eq!(key_action("A"), Ok(("", ParsedKeyAction::KeyClickAction(
-            KeyClickActionWithMods::new_with_mods(
-                *KEY_A,
-                *KeyModifierFlags::new().shift(),
-            )))));
-
-        assert_eq!(key_action("+A"), Ok(("", ParsedKeyAction::KeyClickAction(
-            KeyClickActionWithMods::new_with_mods(
-                *KEY_A,
-                *KeyModifierFlags::new().shift(),
-            )))));
-
-        assert!(matches!(key_action("+al"), Err(..)));
-
-        assert!(matches!(key_action("++a"), Err(..)));
+        // assert_eq!(key_action("!#^a"), Ok(("", ParsedKeyAction::KeyClickAction(
+        //     KeyClickActionWithMods::new_with_mods(
+        //         *KEY_A,
+        //         *KeyModifierFlags::new().ctrl().alt().meta(),
+        //     )))));
+        //
+        // assert_eq!(key_action("A"), Ok(("", ParsedKeyAction::KeyClickAction(
+        //     KeyClickActionWithMods::new_with_mods(
+        //         *KEY_A,
+        //         *KeyModifierFlags::new().shift(),
+        //     )))));
+        //
+        // assert_eq!(key_action("+A"), Ok(("", ParsedKeyAction::KeyClickAction(
+        //     KeyClickActionWithMods::new_with_mods(
+        //         *KEY_A,
+        //         *KeyModifierFlags::new().shift(),
+        //     )))));
+        //
+        // assert!(matches!(key_action("+al"), Err(..)));
+        //
+        // assert!(matches!(key_action("++a"), Err(..)));
     }
 
     #[test]

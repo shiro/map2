@@ -95,6 +95,18 @@ impl InputEvGroup {
         make_key(self.up.event_code)
     }
 }
+
+
+lazy_static! {
+    pub(crate) static ref KEY_ALIAS_TABLE: HashMap<&'static str, Key> = {
+        let mut m = HashMap::new();
+        m.insert(".", Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap());
+        m.insert(" ", Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap());
+        m
+    };
+}
+
+
 // region key codes
 // pub const INPUT_EV_TAB: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_TAB);
 // pub const INPUT_EV_LEFTMETA: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTMETA);
@@ -135,6 +147,8 @@ impl InputEvGroup {
 // impl KeycodeExt for KEYCODE {
 //     fn to_key(&self) -> Key { Key { key_type: EV_KEY, code: *self } }
 // }
+
+
 
 lazy_static! {
     pub(crate) static ref KEY_LOOKUP: HashMap<&'static str, Key> = {
@@ -233,3 +247,4 @@ lazy_static! {
         m
     };
 }
+

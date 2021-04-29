@@ -4,25 +4,20 @@ use super::*;
 pub(super) enum ParsedKeyAction {
     KeyAction(KeyActionWithMods),
     KeyClickAction(KeyClickActionWithMods),
-    KeySequence(Vec<Expr>),
 }
 
 pub(super) fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
     context(
         "key_action",
-        tuple((
-            key_flags,
-            alt((
-                map(key, |v| (v, None)),
-                map(key_with_state, |v| (v.0, Some(v.1)))
-            )),
+        alt((
+            map(tuple((tag("{"), key_with_state, tag("}"))), |(_, v, _)| (v.0, Some(v.1))),
+            map(tuple((opt(tag("{")), key, opt(tag("}")))), |(_, v, _)| (v, None)),
         )),
-    )(input).and_then(|(next, parts)| {
-        let mut mods = parts.0;
+    )(input).and_then(|(next, (parsed_key, state))| {
+        let mut mods = KeyModifierFlags::new();
         let key;
-        let state = parts.1.1;
 
-        match parts.1.0 {
+        match parsed_key {
             ParsedSingleKey::Key(k) => { key = k; }
             ParsedSingleKey::CapitalKey(k) => {
                 mods.shift();
@@ -38,6 +33,26 @@ pub(super) fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
                 ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods))
             }
         };
+
+        Ok((next, action))
+    })
+}
+
+pub(super) fn key_action_with_flags(input: &str) -> Res<&str, ParsedKeyAction> {
+    context(
+        "key_action_with_flags",
+        tuple((
+            key_flags,
+            key_action,
+        )),
+    )(input).and_then(|(next, parts)| {
+        let mut flags = parts.0;
+        let mut action = parts.1;
+
+        match &mut action {
+            ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags) }
+            ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags) }
+        }
 
         Ok((next, action))
     })

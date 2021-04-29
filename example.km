@@ -3,11 +3,10 @@ print(foo);
 
 d::m;
 
+
 {btn_forward down}::"hello";
 
-a::{
-  print(foo);
-};
+a::{ print(foo); };
 
 
 on_window_change(||{
