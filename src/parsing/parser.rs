@@ -9,7 +9,7 @@ pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
                 Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v.0))
             }
         }
-        Err(_) => Err(anyhow!("parsing failed"))
+        Err(err) => Err(anyhow!("parsing failed: {}", err))
     }
 }
 

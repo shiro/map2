@@ -11,7 +11,13 @@ pub(super) fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
         "key_action",
         alt((
             map(tuple((tag("{"), key_with_state, tag("}"))), |(_, v, _)| (v.0, Some(v.1))),
-            map(tuple((opt(tag("{")), key, opt(tag("}")))), |(_, v, _)| (v, None)),
+            map(
+                alt((
+                    key,
+                    map(tuple((tag("{"), key, tag("}"))), |v|v.1),
+                )),
+                |v| (v, None),
+            ),
         )),
     )(input).and_then(|(next, (parsed_key, state))| {
         let mut mods = KeyModifierFlags::new();
