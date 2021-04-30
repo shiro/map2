@@ -1,9 +1,4 @@
-print("wow");
-a::b;
-let foo = "hello world";
-b::{
-  send("hello world");
-};
+print("start");
 
-+c::{a down};
++{c down}::a;
 

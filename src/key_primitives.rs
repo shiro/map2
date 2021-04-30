@@ -114,6 +114,7 @@ pub(crate) struct KeyClickActionWithMods {
 impl KeyClickActionWithMods {
     pub fn new(key: Key) -> Self { KeyClickActionWithMods { key, modifiers: KeyModifierFlags::new() } }
     pub fn new_with_mods(key: Key, modifiers: KeyModifierFlags) -> Self { KeyClickActionWithMods { key, modifiers } }
+    pub fn to_key_action(self, value: i32) -> KeyActionWithMods { KeyActionWithMods::new(self.key, value, self.modifiers) }
 }
 
 #[derive(Debug, Clone, PartialEq)]

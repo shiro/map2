@@ -15,14 +15,28 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
         let (from, mut to) = (v.0, v.2);
 
         Ok((next, match from {
-            // ParsedKeyAction::KeyAction(from) => {
-            //     Expr::map_key_block(from, Block::new()
-            //         .tap_mut(|b| b.statements = to.into_iter().map(|v| {
-            //             // TODO handle modifiers (just shift) by checking if it's already down
-            //             Stmt::Expr(Expr::KeyAction(KeyAction::new(v.key, v.value)))
-            //         }).collect()),
-            //     )
-            // }
+            ParsedKeyAction::KeyAction(from) => {
+                if to.len() == 1 {
+                    let to = to.remove(0);
+                    // action to click
+                    if let ParsedKeyAction::KeyClickAction(to) = to {
+                        return Ok((next, Expr::map_key_action_click(from, to)));
+                    }
+                    // action to action
+                    if let ParsedKeyAction::KeyAction(to) = to {
+                        return Ok((next, Expr::map_key_action_action(from, to)));
+                    }
+                }
+
+                // action to seq
+                Expr::map_key_block(from, Block::new()
+                    .tap_mut(|b| b.statements = to
+                        .to_key_actions()
+                        .into_iter()
+                        .map(|v| Stmt::Expr(Expr::KeyAction(v)))
+                        .collect()),
+                )
+            }
             ParsedKeyAction::KeyClickAction(from) => {
                 if to.len() == 1 {
                     // click to click

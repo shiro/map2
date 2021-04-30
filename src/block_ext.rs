@@ -16,13 +16,6 @@ impl Block {
         self
     }
 
-    pub(crate) fn append_string_sequence(&mut self, sequence: &str) -> Result<()> {
-        let mut expr_vec = vec![];
-        expr_vec.append_string_sequence(sequence)?;
-        self.statements.extend(expr_vec.into_iter().map(|expr| Stmt::Expr(expr)));
-        Ok(())
-    }
-
     pub(crate) fn sleep_for(mut self, duration: time::Duration) -> Self {
         self.statements.push(Stmt::Expr(Expr::SleepAction(duration)));
         self
@@ -30,7 +23,7 @@ impl Block {
 }
 
 impl Expr {
-    pub(crate) fn map_key_click_block(from: KeyClickActionWithMods, mut to: Block) -> Self {
+    fn _map_block(from: &KeyActionWithMods, to: &mut Block) {
         // release modifiers from the trigger
         if from.modifiers.ctrl {
             to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })));
@@ -48,32 +41,19 @@ impl Expr {
             to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })));
             to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })));
         }
+    }
 
+    pub(crate) fn map_key_click_block(from: KeyClickActionWithMods, mut to: Block) -> Self {
+        Expr::_map_block(&from.clone().to_key_action(TYPE_DOWN), &mut to);
         Expr::KeyMapping(vec![
             KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_DOWN, from.modifiers), to },
             KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_REPEAT, from.modifiers), to: Block::new() }, // stub
-            KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_UP, from.modifiers), to: Block::new() }, // stuv
+            KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_UP, from.modifiers), to: Block::new() }, // stub
         ])
     }
 
     pub(crate) fn map_key_block(from: KeyActionWithMods, mut to: Block) -> Self {
-        // release modifiers from the trigger
-        if from.modifiers.ctrl {
-            to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })));
-            to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })));
-        }
-        if from.modifiers.alt {
-            to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })));
-            to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })));
-        }
-        if from.modifiers.shift {
-            to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })));
-            to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })));
-        }
-        if from.modifiers.meta {
-            to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })));
-            to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })));
-        }
+        Expr::_map_block(&from, &mut to);
 
         Expr::KeyMapping(vec![KeyMapping { from, to }])
     }
@@ -230,7 +210,6 @@ pub(crate) trait ExprVecExt {
     fn append_click(self, key: Key) -> Self;
     fn append_action(self, action: KeyAction) -> Self;
     fn sleep_for_millis(self, duration: u64) -> Self;
-    fn append_string_sequence(&mut self, sequence: &str) -> Result<()>;
 }
 
 impl ExprVecExt for Vec<Expr> {
@@ -247,26 +226,6 @@ impl ExprVecExt for Vec<Expr> {
 
     fn sleep_for_millis(self, duration: u64) -> Self {
         unimplemented!();
-    }
-
-    fn append_string_sequence(&mut self, sequence: &str) -> Result<()> {
-        let mut it = sequence.chars();
-
-        while let Some(ch) = it.next() {
-            // special
-            if ch == '{' {
-                let special_char = it.by_ref().take_while(|&ch| ch != '}').collect::<String>();
-                let seq = KEY_SEQ_LOOKUP.get(special_char.as_str())
-                    .ok_or(anyhow!("failed to lookup key '{}'", special_char))?;
-                self.extend(seq.iter().cloned());
-                continue;
-            }
-
-            let seq = KEY_SEQ_LOOKUP.get(ch.to_string().as_str())
-                .ok_or(anyhow!("failed to lookup key '{}'", ch))?;
-            self.extend(seq.iter().cloned());
-        }
-        Ok(())
     }
 }
 

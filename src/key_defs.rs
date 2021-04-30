@@ -23,10 +23,13 @@ pub static SYN_REPORT: InputEvent = InputEvent { event_code: EventCode::EV_SYN(E
 
 lazy_static! {
 pub static ref KEY_LEFT_META: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap();
+pub static ref KEY_RIGHT_META: Key = Key::from_str(&EventType::EV_KEY, "KEY_RIGHTMETA").unwrap();
 pub static ref KEY_LEFT_ALT: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap();
 pub static ref KEY_RIGHT_ALT: Key = Key::from_str(&EventType::EV_KEY, "KEY_RIGHTALT").unwrap();
 pub static ref KEY_LEFT_SHIFT: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap();
+pub static ref KEY_RIGHT_SHIFT: Key = Key::from_str(&EventType::EV_KEY, "KEY_RIGHTSHIFT").unwrap();
 pub static ref KEY_LEFT_CTRL: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTCTRL").unwrap();
+pub static ref KEY_RIGHT_CTRL: Key = Key::from_str(&EventType::EV_KEY, "KEY_RIGHTCTRL").unwrap();
 pub static ref KEY_ENTER: Key = Key::from_str(&EventType::EV_KEY, "KEY_ENTER").unwrap();
 pub static ref KEY_ESC: Key = Key::from_str(&EventType::EV_KEY, "KEY_ESC").unwrap();
 pub static ref KEY_TAB: Key = Key::from_str(&EventType::EV_KEY, "KEY_TAB").unwrap();
@@ -107,144 +110,4 @@ lazy_static! {
 }
 
 
-// region key codes
-// pub const INPUT_EV_TAB: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_TAB);
-// pub const INPUT_EV_LEFTMETA: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTMETA);
-// pub const INPUT_EV_RIGHTMETA: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_RIGHTMETA);
-// pub const INPUT_EV_SHIFT: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTSHIFT);
-// pub const INPUT_EV_LEFTALT: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTALT);
-// pub const INPUT_EV_RIGHTALT: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_RIGHTALT);
-// pub const INPUT_EV_CAPSLOCK: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_CAPSLOCK);
-// pub const INPUT_EV_LEFTCTRL: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFTCTRL);
-// pub const INPUT_EV_ESC: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_ESC);
-// pub const INPUT_EV_H: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_H);
-// pub const INPUT_EV_J: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_J);
-// pub const INPUT_EV_K: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_K);
-// pub const INPUT_EV_L: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_L);
-// pub const INPUT_EV_ARROW_LEFT: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_LEFT);
-// pub const INPUT_EV_ARROW_DOWN: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_DOWN);
-// pub const INPUT_EV_ARROW_RIGHT: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_RIGHT);
-// pub const INPUT_EV_ARROW_UP: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_UP);
-// pub const INPUT_EV_F8: InputEvGroup = InputEvGroup::new(input_linux_sys::KEY_F8);
-// pub const INPUT_EV_MOUSE5: InputEvGroup = InputEvGroup::new(277);
-// pub const INPUT_EV_MOUSE6: InputEvGroup = InputEvGroup::new(277);
-// pub const INPUT_EV_MOUSE7: InputEvGroup = InputEvGroup::new(279);
-// pub const INPUT_EV_MOUSE8: InputEvGroup = InputEvGroup::new(280);
-// pub const INPUT_EV_MOUSE9: InputEvGroup = InputEvGroup::new(281);
-// pub const INPUT_EV_MOUSE10: InputEvGroup = InputEvGroup::new(282);
-// pub const INPUT_EV_MOUSE11: InputEvGroup = InputEvGroup::new(283);
-// pub const INPUT_EV_MOUSE12: InputEvGroup = InputEvGroup::new(284);
-// const WHEEL: input_event = input_event { type_: EV_REL as u16, code: REL_WHEEL as u16, value: 0, time: DUMMY_TIME };
-// endregion
-
-
-// type KEYCODE = i32;
-
-// trait KeycodeExt {
-//     fn to_key(&self) -> Key;
-// }
-//
-// impl KeycodeExt for KEYCODE {
-//     fn to_key(&self) -> Key { Key { key_type: EV_KEY, code: *self } }
-// }
-
-
-
-lazy_static! {
-    pub(crate) static ref KEY_LOOKUP: HashMap<&'static str, Key> = {
-        let mut m = HashMap::new();
-        m.insert("a", Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap());
-
-        // m.insert("mouse5", KEY_MOUSE5);
-        // m.insert("mouse6", KEY_MOUSE6);
-        // m.insert("mouse7", KEY_MOUSE7);
-        // m.insert("mouse8", KEY_MOUSE8);
-        // m.insert("mouse9", KEY_MOUSE9);
-        // m.insert("mouse10", KEY_MOUSE10);
-        // m.insert("mouse11", KEY_MOUSE11);
-        // m.insert("mouse12", KEY_MOUSE12);
-        // m.insert("enter", KEY_ENTER);
-        // m.insert("esc", KEY_ESC);
-        // m.insert("ctrl", KEY_LEFT_CTRL);
-        // m.insert("shift", KEY_LEFT_SHIFT);
-        // m.insert(" ", KEY_SPACE);
-        // m.insert("-", KEY_MINUS);
-        // m.insert("/", KEY_SLASH);
-        // m.insert("a", KEY_A);
-        // m.insert("b", KEY_B);
-        // m.insert("c", KEY_C);
-        // m.insert("d", KEY_D);
-        // m.insert("e", KEY_E);
-        // m.insert("f", KEY_F);
-        // m.insert("g", KEY_G);
-        // m.insert("h", KEY_H);
-        // m.insert("i", KEY_I);
-        // m.insert("j", KEY_J);
-        // m.insert("k", KEY_K);
-        // m.insert("l", KEY_L);
-        // m.insert("m", KEY_M);
-        // m.insert("n", KEY_N);
-        // m.insert("o", KEY_O);
-        // m.insert("p", KEY_P);
-        // m.insert("q", KEY_Q);
-        // m.insert("r", KEY_R);
-        // m.insert("s", KEY_S);
-        // m.insert("t", KEY_T);
-        // m.insert("u", KEY_U);
-        // m.insert("v", KEY_V);
-        // m.insert("w", KEY_W);
-        // m.insert("x", KEY_X);
-        // m.insert("y", KEY_Y);
-        // m.insert("z", KEY_Z);
-        m
-    };
-}
-
-
-lazy_static! {
-    pub(crate) static ref KEY_SEQ_LOOKUP: HashMap<&'static str, Vec<Expr>> = {
-        let mut m = HashMap::new();
-        m.insert("enter", vec![].append_click(*KEY_ENTER));
-        m.insert("esc", vec![].append_click(*KEY_ESC));
-        m.insert("ctrl", vec![].append_click(*KEY_LEFT_CTRL));
-        m.insert("ctrl down", vec![] .append_action(KeyAction::new(*KEY_LEFT_CTRL, TYPE_DOWN)));
-        m.insert("ctrl up", vec![] .append_action(KeyAction::new(*KEY_LEFT_CTRL, TYPE_UP)));
-        m.insert("shift", vec![].append_click(*KEY_LEFT_SHIFT));
-        m.insert(" ", vec![].append_click(*KEY_SPACE));
-        m.insert("-", vec![].append_click(*KEY_MINUS));
-        m.insert("/", vec![].append_click(*KEY_SLASH));
-        m.insert("a", vec![].append_click(*KEY_A));
-        m.insert("b", vec![].append_click(*KEY_B));
-        m.insert("c", vec![].append_click(*KEY_C));
-        m.insert("d", vec![].append_click(*KEY_D));
-        m.insert("e", vec![].append_click(*KEY_E));
-        m.insert("f", vec![].append_click(*KEY_F));
-        m.insert("g", vec![].append_click(*KEY_G));
-        m.insert("h", vec![].append_click(*KEY_H));
-        m.insert("i", vec![].append_click(*KEY_I));
-        m.insert("j", vec![].append_click(*KEY_J));
-        m.insert("k", vec![].append_click(*KEY_K));
-        m.insert("l", vec![].append_click(*KEY_L));
-        m.insert("m", vec![].append_click(*KEY_M));
-        m.insert("n", vec![].append_click(*KEY_N));
-        m.insert("o", vec![].append_click(*KEY_O));
-        m.insert("p", vec![].append_click(*KEY_P));
-        m.insert("q", vec![].append_click(*KEY_Q));
-        m.insert("r", vec![].append_click(*KEY_R));
-        m.insert("s", vec![].append_click(*KEY_S));
-        m.insert("t", vec![].append_click(*KEY_T));
-        m.insert("u", vec![].append_click(*KEY_U));
-        m.insert("v", vec![].append_click(*KEY_V));
-        m.insert("w", vec![].append_click(*KEY_W));
-        m.insert("x", vec![].append_click(*KEY_X));
-        m.insert("y", vec![].append_click(*KEY_Y));
-        m.insert("z", vec![].append_click(*KEY_Z));
-        m.insert("V", vec![]
-            .append_action(KeyAction::new(*KEY_LEFT_SHIFT, TYPE_DOWN))
-            .append_click(*KEY_V)
-            .append_action(KeyAction::new(*KEY_LEFT_SHIFT, TYPE_UP))
-        );
-        m
-    };
-}
 

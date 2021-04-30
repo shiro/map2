@@ -102,4 +102,11 @@ mod tests {
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap(), 1, KeyModifierFlags::new())
         ))));
     }
+
+    #[test]
+    fn test_flags() {
+        assert_eq!(key_action_with_flags("+{a down}"), Ok(("", ParsedKeyAction::KeyAction(
+            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.shift()))
+        ))));
+    }
 }

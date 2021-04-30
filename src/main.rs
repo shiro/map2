@@ -218,26 +218,31 @@ async fn main() -> Result<()> {
 }
 
 
-// fn update_modifiers(state: &mut State, ev: &input_event) {
-//     vec![
-//         (INPUT_EV_LEFTMETA, state.meta_is_down),
-//         // (INPUT_EV_RIGHTMETA, ModifierName::RightMeta),
-//     ]
-//         .iter_mut()
-//         .for_each(|(a, b)| {
-//             if *ev == a.down {
-//                 // *state.get_modifier_state(b) = true;
-//                 *b = true;
-//             } else if *ev == a.up {
-//                 // *state.get_modifier_state(b) = false;
-//                 *b = false;
-//                 if state.ignore_list.is_ignored(&KeyAction::new(a.to_key(), TYPE_UP)) {
-//                     state.ignore_list.unignore(&KeyAction::new(a.to_key(), TYPE_UP));
-//                     return;
-//                 }
-//             }
-//         });
-// }
+fn update_modifiers(state: &mut State, ev: &InputEvent) {
+    let ignore_list = &mut state.ignore_list;
+    vec![
+        (*KEY_LEFT_CTRL, &mut state.leftcontrol_is_down),
+        // (*KEY_RIGHT_CTRL, &mut state.leftcontrol_is_down, &mut state.ignore_list),
+        (*KEY_LEFT_ALT, &mut state.leftalt_is_down),
+        // (*KEY_RIGHT_ALT, &mut state.leftalt_is_down, &mut state.ignore_list),
+        (*KEY_LEFT_SHIFT, &mut state.shift_is_down),
+        // (*KEY_RIGHT_SHIFT, &mut state.shift_is_down, &mut state.ignore_list),
+        (*KEY_LEFT_META, &mut state.meta_is_down),
+        // (*KEY_RIGHT_META, &mut state.meta_is_down, &mut state.ignore_list),
+    ]
+        .iter_mut()
+        .for_each(|(a, b)| {
+            if ev.value == TYPE_DOWN && ev.event_code == a.event_code {
+                **b = true;
+            } else if ev.value == TYPE_UP && ev.event_code == a.event_code {
+                **b = false;
+                if ignore_list.is_ignored(&KeyAction::new(*a, TYPE_UP)) {
+                    ignore_list.unignore(&KeyAction::new(*a, TYPE_UP));
+                    return;
+                }
+            }
+        });
+}
 
 async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
                          var_map: &mut GuardedVarMap,
@@ -256,7 +261,7 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
     //     return Ok(());
     // }
 
-    // update_modifiers(&mut state, &ev);
+    update_modifiers(&mut state, &ev);
 
     // if crate::tab_mod::tab_mod(&ev, &mut *state) {
     //     return Ok(());
