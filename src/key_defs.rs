@@ -104,6 +104,10 @@ lazy_static! {
         let mut m = HashMap::new();
         m.insert(".", Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap());
         m.insert(" ", Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap());
+        m.insert("SHIFT", Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap());
+        m.insert("ALT", Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap());
+        m.insert("META", Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap());
+        m.insert("CTRL", Key::from_str(&EventType::EV_KEY, "KEY_LEFTCTRL").unwrap());
         m
     };
 }

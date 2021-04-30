@@ -77,7 +77,7 @@ pub(super) fn key_mapping(input: &str) -> Res<&str, Expr> {
 
         let expr = match from {
             ParsedKeyAction::KeyClickAction(from) => { Expr::map_key_click_block(from, to) }
-            ParsedKeyAction::KeyAction(from) => unimplemented!(),
+            ParsedKeyAction::KeyAction(from) => { Expr::map_key_block(from, to) },
         };
         Ok((next, expr))
     })

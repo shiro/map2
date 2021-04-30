@@ -1,4 +1,7 @@
 print("start");
 
-+{c down}::a;
+{tab down}::{
+  send("{shift down}{meta down}{alt down}h{alt up}{meta up}{shift up}");
+};
+
 
