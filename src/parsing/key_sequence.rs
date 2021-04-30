@@ -1,9 +1,10 @@
-use super::*;
-use nom::combinator::{peek, recognize, map_res};
-use nom::multi::many1;
 use itertools::Itertools;
+use nom::combinator::{map_res, peek, recognize};
+use nom::multi::many1;
 
-pub(super) fn key_sequence(mut input: &str) -> Res<&str, Vec<ParsedKeyAction>> {
+use super::*;
+
+pub(super) fn key_sequence(input: &str) -> Res<&str, Vec<ParsedKeyAction>> {
     context(
         "key_sequence",
         tuple((

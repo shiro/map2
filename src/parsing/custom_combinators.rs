@@ -1,10 +1,10 @@
-use nom::character::complete::{char, digit1};
 use nom::branch::alt;
-use nom::sequence::{pair, tuple};
+use nom::character::complete::{char, digit1};
 use nom::combinator::{opt, recognize, value};
-use nom::IResult;
-use nom::error::{ErrorKind, ParseError};
 use nom::Err;
+use nom::error::{ErrorKind, ParseError};
+use nom::IResult;
+use nom::sequence::{pair, tuple};
 
 /// This is a custom implementation of nom::recognize_float that does not parse
 /// the optional sign before the number, so that expressions like `x+3` parse
@@ -60,18 +60,4 @@ pub fn fold_many0_once<I, O, E, F, G, R>(f: F, init: R, g: G) -> impl FnOnce(I) 
             }
         }
     }
-}
-
-/// A combinator that takes a parser `inner` and produces a parser that also consumes both leading
-/// and trailing whitespace, returning the output of `inner`.
-/// See `https://docs.rs/nom/6.0.1/nom/recipes/index.html` for details.
-pub fn ws<'a, F: 'a, O, E: ParseError<&'a str>>(inner: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
-    where
-        F: FnMut(&'a str) -> IResult<&'a str, O, E>,
-{
-    nom::sequence::delimited(
-        nom::character::complete::multispace0,
-        inner,
-        nom::character::complete::multispace0,
-    )
 }

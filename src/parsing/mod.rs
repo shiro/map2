@@ -12,15 +12,15 @@ use nom::multi::many0;
 use nom::sequence::*;
 use tap::Tap;
 
-use variable::*;
+use function::*;
 use identifier::*;
-use lambda::*;
-use key_mapping::*;
 use key::*;
 use key_action::*;
-use primitives::*;
-use function::*;
+use key_mapping::*;
 use key_sequence::*;
+use lambda::*;
+use primitives::*;
+use variable::*;
 
 use crate::*;
 use crate::block_ext::ExprVecExt;

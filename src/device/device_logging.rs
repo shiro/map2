@@ -1,5 +1,5 @@
-use evdev_rs::InputEvent;
 use evdev_rs::enums::EventCode;
+use evdev_rs::InputEvent;
 
 pub fn print_event_debug(ev: &InputEvent) {
     match ev.event_code {

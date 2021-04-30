@@ -1,13 +1,7 @@
-use std::collections::HashMap;
-
 use anyhow::{anyhow, bail, Result};
 use evdev_rs::*;
 use evdev_rs::Device;
 use evdev_rs::enums::*;
-use regex::Regex;
-use tokio::sync::{mpsc, oneshot};
-use tokio::task;
-use walkdir::{DirEntry, WalkDir};
 
 fn print_abs_bits(dev: &Device, axis: &EV_ABS) {
     let code = EventCode::EV_ABS(axis.clone());

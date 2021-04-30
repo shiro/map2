@@ -75,7 +75,7 @@ pub(super) fn key_action_with_flags(input: &str) -> Res<&str, ParsedKeyAction> {
             key_action,
         )),
     )(input).and_then(|(next, parts)| {
-        let mut flags = parts.0;
+        let flags = parts.0;
         let mut action = parts.1;
 
         match &mut action {

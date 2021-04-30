@@ -1,9 +1,8 @@
 use anyhow::Result;
-
-use x11rb::protocol::xproto::{GetPropertyReply, ConnectionExt, Atom, Window, intern_atom, AtomEnum, Screen, ChangeWindowAttributesAux, EventMask};
 use x11rb::connection::Connection;
-use x11rb::x11_utils::TryParse;
 use x11rb::protocol::Event::PropertyNotify;
+use x11rb::protocol::xproto::{Atom, AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply, intern_atom, Screen, Window};
+use x11rb::x11_utils::TryParse;
 
 #[derive(Debug, Clone)]
 pub(crate)  struct ActiveWindowInfo {

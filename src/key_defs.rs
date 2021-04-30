@@ -1,8 +1,7 @@
-use evdev_rs::enums::{EventType, EventCode, EV_SYN};
+use evdev_rs::enums::{EV_SYN, EventCode, EventType};
 use evdev_rs::TimeVal;
 
 use crate::*;
-use crate::block_ext::ExprVecExt;
 
 pub(crate) const fn make_key(event_code: EventCode) -> Key { Key { event_code } }
 

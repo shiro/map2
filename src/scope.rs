@@ -1,8 +1,8 @@
 use std::borrow::{Borrow, BorrowMut};
 use std::fmt;
+use std::fmt::Formatter;
 
 use crate::*;
-use std::fmt::Formatter;
 use crate::parsing::parser::parse_key_sequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -116,7 +116,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         }
         Expr::KeyMapping(mappings) => {
             for mapping in mappings {
-                let mut mapping = mapping.clone();
+                let mapping = mapping.clone();
 
                 amb.message_tx.borrow_mut().as_ref().unwrap()
                     .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to, var_map.clone())).await
@@ -161,8 +161,8 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             return ExprRet::Value(ValueType::Lambda(block.clone(), var_map.clone()));
         }
         Expr::KeyAction(action) => {
-            amb.ev_writer_tx.send(action.to_input_ev()).await;
-            amb.ev_writer_tx.send(SYN_REPORT.clone()).await;
+            amb.ev_writer_tx.send(action.to_input_ev()).await.unwrap();
+            amb.ev_writer_tx.send(SYN_REPORT.clone()).await.unwrap();
 
             return ExprRet::Void;
         }
@@ -189,8 +189,8 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     let actions = parse_key_sequence(&*val).unwrap();
 
                     for action in actions {
-                        amb.ev_writer_tx.send(action.to_input_ev()).await;
-                        amb.ev_writer_tx.send(SYN_REPORT.clone()).await;
+                        amb.ev_writer_tx.send(action.to_input_ev()).await.unwrap();
+                        amb.ev_writer_tx.send(SYN_REPORT.clone()).await.unwrap();
                     }
 
                     // amb.ev_writer_tx.send()

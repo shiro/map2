@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub(super) fn lambda(input: &str) -> Res<&str, Expr> {
     context(
         "lambda",

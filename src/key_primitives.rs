@@ -1,5 +1,6 @@
-use crate::*;
 use evdev_rs::enums::{EventCode, EventType};
+
+use crate::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct Key {

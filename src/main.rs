@@ -15,17 +15,15 @@ use std::ops::DerefMut;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use tap::Tap;
 use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use evdev_rs::enums::EventCode;
 use evdev_rs::InputEvent;
 use nom::lib::std::collections::HashMap;
+use tap::Tap;
 use tokio::prelude::*;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
-
-use device::device_logging::print_event_debug;
 
 use crate::device::device_test::bind_udev_inputs;
 use crate::key_defs::*;
@@ -133,7 +131,7 @@ async fn main() -> Result<()> {
     ];
 
     let (mut ev_reader_init_tx, mut ev_reader_init_rx) = oneshot::channel();
-    let (mut ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
+    let (ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
     // start coroutine
     bind_udev_inputs(patterns, ev_reader_init_tx, ev_writer_tx).await;
     let mut ev_reader_tx = ev_reader_init_rx.await.unwrap();
@@ -251,7 +249,7 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
     match ev.event_code {
         EventCode::EV_KEY(_) => {}
         _ => {
-            ev_writer.send(ev).await;
+            ev_writer.send(ev).await.unwrap();
             return Ok(());
         }
     }
@@ -297,13 +295,13 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         let ev_writer = ev_writer.clone();
         task::spawn(async move {
             let mut guard = block.lock().await;
-            let mut foo = guard.deref_mut();
+            let foo = guard.deref_mut();
             eval_block(&foo.0, &mut foo.1, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
         });
         return Ok(());
     }
 
-    ev_writer.send(ev).await;
+    ev_writer.send(ev).await.unwrap();
 
     Ok(())
 }

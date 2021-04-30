@@ -1,6 +1,7 @@
-use std::{io, time, path, thread};
+use std::{io, path, thread, time};
 use std::collections::HashMap;
-use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Result};
 use evdev_rs::*;
@@ -9,14 +10,11 @@ use futures::{SinkExt, TryFutureExt};
 use itertools::enumerate;
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::device::{device_util, virt_device};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-
 
 fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     let mut list = vec![];
@@ -34,7 +32,7 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 }
 
 
-async fn read_from_fd_runner(mut device: Device, reader_rx: mpsc::Sender<InputEvent>,
+async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>,
                              mut abort_rx: oneshot::Receiver<()>,
 ) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
@@ -92,7 +90,7 @@ async fn init_virtual_output_device(
     let mut new_device = UninitDevice::new()
         .ok_or(anyhow!("failed to instantiate udev device"))?
         .unstable_force_init(file_nb);
-    virt_device::setup_virt_device(&mut new_device);
+    virt_device::setup_virt_device(&mut new_device).unwrap();
 
     let input_device = UInputDevice::create_from_device(&new_device)?;
 
@@ -103,7 +101,7 @@ async fn init_virtual_output_device(
                 Some(v) => v,
                 None => return Err(anyhow!("message channel closed unexpectedly")),
             };
-            input_device.write_event(&ev);
+            input_device.write_event(&ev)?;
         }
         Ok(())
     });
@@ -111,7 +109,7 @@ async fn init_virtual_output_device(
 }
 
 async fn runner_it(fd_path: &Path,
-                   mut writer: mpsc::Sender<InputEvent>)
+                   writer: mpsc::Sender<InputEvent>)
                    -> Result<oneshot::Sender<()>> {
     let fd_file = tokio::fs::File::open(fd_path).await?;
     let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
@@ -127,10 +125,10 @@ async fn runner_it(fd_path: &Path,
     Ok(abort_tx)
 }
 
-async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer: mpsc::Sender<InputEvent>)
+async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, writer: mpsc::Sender<InputEvent>)
                 -> Result<()> {
     task::spawn(async move {
-        let (reader_tx, mut reader_rx) = mpsc::channel(128);
+        let (reader_tx, reader_rx) = mpsc::channel(128);
 
         // send the reader to the client
         reader_init.send(reader_tx.clone());
@@ -201,7 +199,7 @@ async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender
 }
 
 
-pub(crate) async fn bind_udev_inputs(fd_patterns: Vec<&str>, reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, mut writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
+pub(crate) async fn bind_udev_inputs(fd_patterns: Vec<&str>, reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
     if fd_patterns.len() < 1 { bail!(anyhow!("need at least 1 pattern")); }
 
     let fd_patterns_regex = fd_patterns.into_iter().map(|v| Regex::new(v).unwrap()).collect();

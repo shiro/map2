@@ -1,10 +1,7 @@
-use std::collections::HashMap;
-
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result};
 use evdev_rs::*;
 use evdev_rs::Device;
 use evdev_rs::enums::*;
-use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
 use walkdir::{DirEntry, WalkDir};

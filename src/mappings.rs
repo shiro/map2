@@ -1,7 +1,6 @@
 use crate::*;
 use crate::parsing::parser::parse_script;
 
-
 pub(crate) fn bind_mappings() -> Block {
 
     // global.replace_key(

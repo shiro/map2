@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub(super) fn key_flags(input: &str) -> Res<&str, KeyModifierFlags> {
     context("key_flags", many0(one_of("^!+#")))(input).and_then(|(next, val)| {
         let mut flags = KeyModifierFlags::new();
