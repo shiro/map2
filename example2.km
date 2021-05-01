@@ -1,7 +1,50 @@
 print("start");
 
 {tab down}::{
-  send("{shift down}{meta down}{alt down}h{alt up}{meta up}{shift up}");
+  send("{alt down}{meta down}{shift down}");
 };
 
+{tab up}::{
+  send("{alt up}{meta up}{shift up}");
+};
+
+let ralt = false;
+{rightalt down}::{ralt = true;};
+{rightalt up}::{ralt = false;};
+
+{j down}::{
+  if (ralt) {
+    send("{down down}");
+  }
+  if (ralt == false){
+    send("{j down}");
+  }
+};
+{j up}::{
+  if (ralt) {
+    send("{down up}");
+  }
+  if (ralt == false){
+    send("{j up}");
+  }
+};
+
+
+
+
+let esc_mod_disable_flag = false;
+{a down}::{ esc_mod_disable_flag = true; send("{a down}"); };
+{f down}::{ esc_mod_disable_flag = true; send("{f down}"); };
+
+{capslock down}::{
+  esc_mod_disable_flag = false;
+  send("{ctrl down}");
+};
+
+{capslock up}::{
+  send("{ctrl up}");
+  if (esc_mod_disable_flag == false){
+    send("{esc}");
+  }
+};
 

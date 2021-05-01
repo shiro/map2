@@ -127,13 +127,14 @@ async fn runner_it(fd_path: &Path,
 
 async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, writer: mpsc::Sender<InputEvent>)
                 -> Result<()> {
+
     task::spawn(async move {
         let (reader_tx, reader_rx) = mpsc::channel(128);
 
         // send the reader to the client
         reader_init.send(reader_tx.clone());
 
-        init_virtual_output_device(reader_rx).await?;
+        init_virtual_output_device(reader_rx).await.unwrap();
 
         #[derive(Debug)]
         enum FsWatchEvent {
@@ -205,7 +206,7 @@ pub(crate) async fn bind_udev_inputs(fd_patterns: Vec<&str>, reader_init_tx: one
     let fd_patterns_regex = fd_patterns.into_iter().map(|v| Regex::new(v).unwrap()).collect();
 
     task::spawn(async move {
-        runner(fd_patterns_regex, reader_init_tx, writer_tx).await?;
+        runner(fd_patterns_regex, reader_init_tx, writer_tx).await.unwrap();
         Ok::<(), anyhow::Error>(())
     });
 
