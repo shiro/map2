@@ -289,6 +289,24 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     let val = val as u8 as char;
                     ValueType::String(format!("{}", val))
                 }
+                "map_key" => {
+                    let val = (
+                        eval_expr(args.get(0).unwrap(), var_map, amb).await,
+                        eval_expr(args.get(1).unwrap(), var_map, amb).await,
+                    );
+                    let (from, to) = match val {
+                        (ValueType::String(from), ValueType::Lambda(to,var_map)) => (from, (to, var_map)),
+                        _ => panic!("invalid arguments passed to 'map_key'"),
+                    };
+
+                    // let from =
+
+
+
+
+
+                    ValueType::Void
+                }
                 _ => ValueType::Void
             }
         }

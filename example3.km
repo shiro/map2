@@ -1,3 +1,5 @@
 for(let i=97; i<97+26;i=i+1){
   print(number_to_char(i));
 }
+
+^a::{print("w");};
