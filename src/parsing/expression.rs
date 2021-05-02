@@ -27,12 +27,7 @@ pub(super) fn expr_1(i: &str) -> Res<&str, Expr> {
         |i: &str| {
             context(
                 "expr_1",
-                tuple((
-                    multispace0,
-                    alt((tag("+"), tag("-"))),
-                    multispace0,
-                    expr_simple,
-                )),
+                tuple((multispace0, alt((tag("+"), tag("-"))), multispace0, expr_simple)),
             )(i)
         },
         init,
@@ -52,12 +47,7 @@ pub(super) fn expr(i: &str) -> Res<&str, Expr> {
         |i: &str| {
             context(
                 "expr",
-                tuple((
-                    multispace0,
-                    alt((tag("=="), tag("!="))),
-                    multispace0,
-                    expr_1,
-                )),
+                tuple((multispace0, alt((tag("=="), tag("!="),tag("<"),tag(">"))), multispace0, expr_1)),
             )(i)
         },
         init,
@@ -65,6 +55,8 @@ pub(super) fn expr(i: &str) -> Res<&str, Expr> {
             match op {
                 "==" => Expr::Eq(Box::new(acc), Box::new(val)),
                 "!=" => Expr::Neq(Box::new(acc), Box::new(val)),
+                ">" => Expr::GT(Box::new(acc), Box::new(val)),
+                "<" => Expr::LT(Box::new(acc), Box::new(val)),
                 _ => unreachable!()
             }
         },

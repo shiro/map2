@@ -23,6 +23,7 @@ use key_sequence::*;
 use lambda::*;
 use primitives::*;
 use variable::*;
+use for_loop::*;
 
 use crate::*;
 use crate::parsing::custom_combinators::fold_many0_once;
@@ -41,6 +42,7 @@ mod key_sequence;
 mod lambda;
 mod primitives;
 mod variable;
+mod for_loop;
 
 type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -53,6 +55,7 @@ fn stmt(input: &str) -> Res<&str, Stmt> {
         tuple((
             alt((
                 if_stmt,
+                for_loop,
                 map(tuple((expr, tag(";"))), |v| Stmt::Expr(v.0)),
                 map(block, Stmt::Block),
             )),

@@ -4,6 +4,7 @@ use std::fmt::Formatter;
 
 use crate::*;
 use crate::parsing::parser::parse_key_sequence;
+use x11rb::protocol::xproto::lookup_color;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition {
@@ -89,7 +90,24 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 (Number(left), Number(right)) => Bool(left != right),
                 _ => Bool(true),
             }
-
+        }
+        Expr::LT(left, right) => {
+            use ValueType::*;
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Bool(left), Bool(right)) => Bool(left < right),
+                (String(left), String(right)) => Bool(left < right),
+                (Number(left), Number(right)) => Bool(left < right),
+                _ => Bool(false),
+            }
+        }
+        Expr::GT(left, right) => {
+            use ValueType::*;
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Bool(left), Bool(right)) => Bool(left > right),
+                (String(left), String(right)) => Bool(left > right),
+                (Number(left), Number(right)) => Bool(left > right),
+                _ => Bool(false),
+            }
         }
         Expr::Add(left, right) => {
             use ValueType::*;
@@ -281,6 +299,20 @@ pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, a
                     eval_block(block, &mut var_map, amb).await;
                 }
             }
+            Stmt::For(init_expr, termination_expr, advance_expr, block) => {
+                eval_expr(init_expr, &var_map, amb).await;
+
+                loop {
+                    let should_continue = match eval_expr(termination_expr, &var_map, amb).await {
+                        ValueType::Bool(v) => v,
+                        _ => panic!("termination condition in for loop needs to return a boolean"),
+                    };
+                    if !should_continue { break; }
+
+                    eval_block(block, &mut var_map, amb).await;
+                    eval_expr(advance_expr, &var_map, amb).await;
+                }
+            }
         }
     }
 }
@@ -311,8 +343,8 @@ impl Block {
 pub(crate) enum Expr {
     Eq(Box<Expr>, Box<Expr>),
     Neq(Box<Expr>, Box<Expr>),
-    // LT(Expr, Expr),
-    // GT(Expr, Expr),
+    LT(Box<Expr>, Box<Expr>),
+    GT(Box<Expr>, Box<Expr>),
     // INC(Expr),
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
@@ -336,7 +368,7 @@ pub(crate) enum Stmt {
     Expr(Expr),
     Block(Block),
     If(Vec<(Expr, Block)>, Option<Block>),
+    For(Expr, Expr, Expr, Block),
     // While
-    // For(Expr::Assign, Expr, Expr, Stmt::Block)
     // Return(Expr),
 }
