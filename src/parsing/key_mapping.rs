@@ -66,7 +66,7 @@ pub(super) fn key_mapping(input: &str) -> Res<&str, Expr> {
     context(
         "key_mapping",
         tuple((
-            key_action,
+            key_action_with_flags,
             tag("::"),
             multispace0,
             block,
