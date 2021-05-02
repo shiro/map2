@@ -2,8 +2,6 @@ use anyhow::{Result};
 use evdev_rs::*;
 use evdev_rs::Device;
 use evdev_rs::enums::*;
-use tokio::sync::{mpsc, oneshot};
-use tokio::task;
 use walkdir::{DirEntry, WalkDir};
 
 fn clone_code_bits(dev: &Device, ev_code: &EventCode, max: &EventCode) -> Result<()> {

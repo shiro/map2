@@ -1,4 +1,4 @@
-use std::{io, path, thread, time};
+use std::{io, thread, time};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -7,12 +7,11 @@ use anyhow::{anyhow, bail, Result};
 use evdev_rs::*;
 use evdev_rs::enums::*;
 use futures::{SinkExt, TryFutureExt};
-use itertools::enumerate;
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;
-use walkdir::{DirEntry, WalkDir};
+use walkdir::{WalkDir};
 
 use crate::device::{device_util, virt_device};
 

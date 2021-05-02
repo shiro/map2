@@ -23,7 +23,6 @@ use primitives::*;
 use variable::*;
 
 use crate::*;
-use crate::block_ext::ExprVecExt;
 use crate::parsing::custom_combinators::fold_many0_once;
 use crate::parsing::identifier::ident;
 

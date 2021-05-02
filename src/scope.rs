@@ -15,6 +15,7 @@ pub(crate) enum ValueType {
     Bool(bool),
     String(String),
     Lambda(Block, GuardedVarMap),
+    Void,
 }
 
 impl PartialEq for ValueType {
@@ -34,6 +35,7 @@ impl fmt::Display for ValueType {
             ValueType::Bool(v) => write!(f, "{}", v),
             ValueType::String(v) => write!(f, "{}", v),
             ValueType::Lambda(_, _) => write!(f, "Lambda"),
+            ValueType::Void => write!(f, "Void"),
         }
     }
 }
@@ -65,34 +67,34 @@ pub(crate) type GuardedVarMap = Arc<Mutex<VarMap>>;
 
 
 #[async_recursion]
-pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mut Ambient<'_>) -> ExprRet {
+pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mut Ambient<'_>) -> ValueType {
     match expr {
         Expr::Eq(left, right) => {
             use ValueType::*;
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
-                (ExprRet::Value(left), ExprRet::Value(right)) => {
+                (left, right) => {
                     match (left.borrow(), right.borrow()) {
-                        (Bool(left), Bool(right)) => ExprRet::Value(Bool(left == right)),
-                        (String(left), String(right)) => ExprRet::Value(Bool(left == right)),
-                        _ => ExprRet::Value(Bool(false)),
+                        (Bool(left), Bool(right)) => Bool(left == right),
+                        (String(left), String(right)) => Bool(left == right),
+                        _ => Bool(false),
                     }
                 }
-                (_, _) => ExprRet::Value(Bool(false)),
+                (_, _) => Bool(false),
             }
         }
         Expr::Init(var_name, value) => {
             let value = match eval_expr(value, var_map, amb).await {
-                ExprRet::Value(v) => v,
-                ExprRet::Void => panic!("unexpected value")
+                ValueType::Void => panic!("unexpected value"),
+                v => v,
             };
 
             var_map.lock().unwrap().scope_values.insert(var_name.clone(), value);
-            return ExprRet::Void;
+            return ValueType::Void;
         }
         Expr::Assign(var_name, value) => {
             let value = match eval_expr(value, var_map, amb).await {
-                ExprRet::Value(v) => v,
-                ExprRet::Void => panic!("unexpected value")
+                ValueType::Void => panic!("unexpected value"),
+                v => v,
             };
 
             let mut map = var_map.clone();
@@ -112,7 +114,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 drop(map_guard);
                 map = tmp;
             }
-            ExprRet::Void
+            ValueType::Void
         }
         Expr::KeyMapping(mappings) => {
             for mapping in mappings {
@@ -123,7 +125,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     .unwrap();
             }
 
-            return ExprRet::Void;
+            return ValueType::Void;
         }
         Expr::Name(var_name) => {
             let mut value = None;
@@ -147,42 +149,42 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             }
 
             match value {
-                Some(value) => ExprRet::Value(value),
-                None => ExprRet::Void,
+                Some(value) => value,
+                None => ValueType::Void,
             }
         }
         Expr::Boolean(value) => {
-            return ExprRet::Value(ValueType::Bool(*value));
+            return ValueType::Bool(*value);
         }
         Expr::String(value) => {
-            return ExprRet::Value(ValueType::String(value.clone()));
+            return ValueType::String(value.clone());
         }
         Expr::Lambda(block) => {
-            return ExprRet::Value(ValueType::Lambda(block.clone(), var_map.clone()));
+            return ValueType::Lambda(block.clone(), var_map.clone());
         }
         Expr::KeyAction(action) => {
             amb.ev_writer_tx.send(action.to_input_ev()).await.unwrap();
             amb.ev_writer_tx.send(SYN_REPORT.clone()).await.unwrap();
 
-            return ExprRet::Void;
+            return ValueType::Void;
         }
         Expr::EatKeyAction(action) => {
             match &amb.message_tx {
                 Some(tx) => { tx.send(ExecutionMessage::EatEv(action.clone())).await.unwrap(); }
                 None => panic!("need message tx"),
             }
-            return ExprRet::Void;
+            return ValueType::Void;
         }
         Expr::SleepAction(duration) => {
             tokio::time::sleep(*duration).await;
-            return ExprRet::Void;
+            return ValueType::Void;
         }
         Expr::FunctionCall(name, args) => {
             match &**name {
                 "send" => {
                     let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
                     let val = match val {
-                        ExprRet::Value(ValueType::String(val)) => val,
+                        ValueType::String(val) => val,
                         _ => panic!("invalid parameter passed to function 'send'"),
                     };
 
@@ -193,25 +195,23 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         amb.ev_writer_tx.send(SYN_REPORT.clone()).await.unwrap();
                     }
 
-                    // amb.ev_writer_tx.send()
-
-                    ExprRet::Void
+                    ValueType::Void
                 }
 
                 "active_window_class" => {
                     let (tx, mut rx) = mpsc::channel(1);
                     amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await.unwrap();
                     if let Some(active_window) = rx.recv().await.unwrap() {
-                        return ExprRet::Value(ValueType::String(active_window.class));
+                        return ValueType::String(active_window.class);
                     }
-                    ExprRet::Void
+                    ValueType::Void
                 }
                 "on_window_change" => {
                     if args.len() != 1 { panic!("function takes 1 argument") }
 
                     let inner_block;
                     let inner_var_map;
-                    if let ExprRet::Value(ValueType::Lambda(_block, _var_map)) = eval_expr(args.get(0).unwrap(), var_map, amb).await {
+                    if let ValueType::Lambda(_block, _var_map) = eval_expr(args.get(0).unwrap(), var_map, amb).await {
                         inner_block = _block;
                         inner_var_map = _var_map;
                     } else {
@@ -219,14 +219,14 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     }
 
                     amb.message_tx.as_ref().unwrap().send(ExecutionMessage::RegisterWindowChangeCallback(inner_block, inner_var_map)).await.unwrap();
-                    ExprRet::Void
+                    ValueType::Void
                 }
                 "print" => {
                     let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
                     println!("{}", val);
-                    ExprRet::Void
+                    ValueType::Void
                 }
-                _ => ExprRet::Void
+                _ => ValueType::Void
             }
         }
     }
@@ -251,7 +251,7 @@ pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, a
                 eval_block(nested_block, &mut var_map, amb).await;
             }
             Stmt::If(expr, block) => {
-                if eval_expr(expr, &mut var_map, amb).await == ExprRet::Value(ValueType::Bool(true)) {
+                if eval_expr(expr, &mut var_map, amb).await == ValueType::Bool(true) {
                     eval_block(block, &mut var_map, amb).await;
                 }
             }
@@ -280,21 +280,6 @@ impl Block {
     }
 }
 
-
-#[derive(PartialEq)]
-pub(crate) enum ExprRet {
-    Void,
-    Value(ValueType),
-}
-
-impl fmt::Display for ExprRet {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            ExprRet::Void => write!(f, "Void"),
-            ExprRet::Value(v) => write!(f, "{}", v),
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Expr {

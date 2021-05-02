@@ -92,11 +92,7 @@ pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMess
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut stdin = tokio::io::stdin();
-    // let mut read_ev: input_event = unsafe { mem::zeroed() };
-
     let (window_ev_tx, mut window_ev_rx) = tokio::sync::mpsc::channel(128);
-    // let (input_ev_tx, mut input_ev_rx) = tokio::sync::mpsc::channel(128);
     let (mut message_tx, mut message_rx) = tokio::sync::mpsc::channel(128);
 
     // x11 thread

@@ -79,26 +79,6 @@ pub static ref KEY_KPD7: Key = Key::from_str(&EventType::EV_KEY, "KEY_KP7").unwr
 }
 
 
-pub struct InputEvGroup {
-    pub up: InputEvent,
-    pub down: InputEvent,
-    pub repeat: InputEvent,
-}
-
-impl InputEvGroup {
-    pub const fn new(event_code: EventCode) -> Self {
-        InputEvGroup {
-            up: InputEvent { event_code, value: 0, time: INPUT_EV_DUMMY_TIME },
-            down: InputEvent { event_code, value: 1, time: INPUT_EV_DUMMY_TIME },
-            repeat: InputEvent { event_code, value: 2, time: INPUT_EV_DUMMY_TIME },
-        }
-    }
-    pub fn to_key(&self) -> Key {
-        make_key(self.up.event_code)
-    }
-}
-
-
 lazy_static! {
     pub(crate) static ref KEY_ALIAS_TABLE: HashMap<&'static str, Key> = {
         let mut m = HashMap::new();
