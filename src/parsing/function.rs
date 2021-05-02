@@ -43,8 +43,8 @@ mod tests {
     fn test_function_call() {
         assert_eq!(function_call("foobar()"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![]))));
         assert_eq!(function_call("foobar(\"hello\", true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
-            Expr::String("hello".to_string()),
-            Expr::Boolean(true),
+            Expr::Value(ValueType::String("hello".to_string())),
+            Expr::Value(ValueType::Bool(true)),
         ]))));
         assert_eq!(function_call("foobar(true == true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
             expr("true == true").unwrap().1

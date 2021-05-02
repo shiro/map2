@@ -20,7 +20,6 @@ use async_recursion::async_recursion;
 use evdev_rs::enums::EventCode;
 use evdev_rs::InputEvent;
 use nom::lib::std::collections::HashMap;
-use tap::Tap;
 use tokio::prelude::*;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task;

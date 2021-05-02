@@ -69,7 +69,7 @@ mod tests {
         assert_eq!(stmt("if(foo() == \"a\"){ a::b; }"), Ok(("", Stmt::If(vec![
             (Expr::Eq(
                 Box::new(Expr::FunctionCall("foo".to_string(), vec![])),
-                Box::new(Expr::String("a".to_string())),
+                Box::new(Expr::Value(ValueType::String("a".to_string()))),
             ),
              block("{a::b;}").unwrap().1),
         ], None,

@@ -1,4 +1,4 @@
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::{BorrowMut};
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -15,6 +15,7 @@ pub(crate) enum ValueType {
     Bool(bool),
     String(String),
     Lambda(Block, GuardedVarMap),
+    Number(f64),
     Void,
 }
 
@@ -34,6 +35,7 @@ impl fmt::Display for ValueType {
         match self {
             ValueType::Bool(v) => write!(f, "{}", v),
             ValueType::String(v) => write!(f, "{}", v),
+            ValueType::Number(v) => write!(f, "{}", v),
             ValueType::Lambda(_, _) => write!(f, "Lambda"),
             ValueType::Void => write!(f, "Void"),
         }
@@ -72,14 +74,10 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         Expr::Eq(left, right) => {
             use ValueType::*;
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
-                (left, right) => {
-                    match (left.borrow(), right.borrow()) {
-                        (Bool(left), Bool(right)) => Bool(left == right),
-                        (String(left), String(right)) => Bool(left == right),
-                        _ => Bool(false),
-                    }
-                }
-                (_, _) => Bool(false),
+                (Bool(left), Bool(right)) => Bool(left == right),
+                (String(left), String(right)) => Bool(left == right),
+                (Number(left), Number(right)) => Bool(left == right),
+                _ => Bool(false),
             }
         }
         Expr::Init(var_name, value) => {
@@ -153,11 +151,8 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 None => ValueType::Void,
             }
         }
-        Expr::Boolean(value) => {
-            return ValueType::Bool(*value);
-        }
-        Expr::String(value) => {
-            return ValueType::String(value.clone());
+        Expr::Value(value) => {
+            return value.clone();
         }
         Expr::Lambda(block) => {
             return ValueType::Lambda(block.clone(), var_map.clone());
@@ -251,13 +246,13 @@ pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, a
                 eval_block(nested_block, &mut var_map, amb).await;
             }
             Stmt::If(if_else_if_pairs, else_pair) => {
-                for (expr, block) in if_else_if_pairs{
+                for (expr, block) in if_else_if_pairs {
                     if eval_expr(expr, &mut var_map, amb).await == ValueType::Bool(true) {
                         eval_block(block, &mut var_map, amb).await;
                         continue 'outer;
                     }
                 }
-                if let Some((block)) = else_pair{
+                if let Some((block)) = else_pair {
                     eval_block(block, &mut var_map, amb).await;
                 }
             }
@@ -299,8 +294,9 @@ pub(crate) enum Expr {
     KeyMapping(Vec<KeyMapping>),
 
     Name(String),
-    Boolean(bool),
-    String(String),
+    // Boolean(bool),
+    // String(String),
+    Value(ValueType),
     Lambda(Block),
 
     FunctionCall(String, Vec<Expr>),

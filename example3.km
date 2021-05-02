@@ -1,7 +1,7 @@
-let foo = false;
+let foo = 3;
 
-if(foo){
+if(foo == 4){
     print("wow");
-  }else if(foo == false){
+  }else{
     print("now");
   }

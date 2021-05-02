@@ -52,6 +52,7 @@ fn expr_simple(input: &str) -> Res<&str, Expr> {
             alt((
                 boolean,
                 string,
+                number,
                 lambda,
                 variable_initialization,
                 variable_assignment,
@@ -162,16 +163,16 @@ mod tests {
     #[test]
     fn test_operator_equal() {
         assert_eq!(expr("true == true"), Ok(("", Expr::Eq(
-            Box::new(Expr::Boolean(true)),
-            Box::new(Expr::Boolean(true)),
+            Box::new(Expr::Value(ValueType::Bool(true))),
+            Box::new(Expr::Value(ValueType::Bool(true))),
         ))));
         assert_eq!(expr("\"hello world\" == \"hello world\""), Ok(("", Expr::Eq(
-            Box::new(Expr::String("hello world".to_string())),
-            Box::new(Expr::String("hello world".to_string())),
+            Box::new(Expr::Value(ValueType::String("hello world".to_string()))),
+            Box::new(Expr::Value(ValueType::String("hello world".to_string()))),
         ))));
         assert_eq!(expr("\"22hello\" == true"), Ok(("", Expr::Eq(
-            Box::new(Expr::String("22hello".to_string())),
-            Box::new(Expr::Boolean(true)),
+            Box::new(Expr::Value(ValueType::String("22hello".to_string()))),
+            Box::new(Expr::Value(ValueType::Bool(true))),
         ))));
     }
 
