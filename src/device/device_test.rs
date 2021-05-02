@@ -51,7 +51,7 @@ async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>
                     }
                 }
                 ReadStatus::Success => {
-                    reader_rx.send(result.1).await;
+                    reader_rx.send(result.1).await.unwrap();
                 }
             }
         } else {
@@ -149,7 +149,7 @@ async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender
 
                         futures::executor::block_on(
                             fs_event_tx.send(fs_event)
-                        );
+                        ).unwrap();
                     }
                     Err(e) => return Err(anyhow!("watch error: {:?}", e)),
                 }
