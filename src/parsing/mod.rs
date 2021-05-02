@@ -21,12 +21,14 @@ use key_sequence::*;
 use lambda::*;
 use primitives::*;
 use variable::*;
+use if_statement::*;
 
 use crate::*;
 use crate::parsing::custom_combinators::fold_many0_once;
 use crate::parsing::identifier::ident;
 
 pub mod parser;
+mod if_statement;
 mod key_sequence;
 mod custom_combinators;
 mod function;
@@ -87,23 +89,6 @@ fn expr(i: &str) -> Res<&str, Expr> {
             }
         },
     )(i)
-}
-
-fn if_stmt(input: &str) -> Res<&str, Stmt> {
-    context(
-        "if_stmt",
-        tuple((
-            tag("if"),
-            multispace0,
-            tag("("),
-            multispace0,
-            expr,
-            multispace0,
-            tag(")"),
-            multispace0,
-            block,
-        )),
-    )(input).map(|(next, v)| (next, Stmt::If(v.4, v.8)))
 }
 
 
@@ -175,30 +160,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_if_stmt() {
-        assert_eq!(if_stmt("if(true){ a::b; }"), Ok(("", Stmt::If(
-            expr("true").unwrap().1,
-            block("{a::b;}").unwrap().1,
-        ))));
-        assert_eq!(stmt("if(true){ a::b; }"), Ok(("", Stmt::If(
-            expr("true").unwrap().1,
-            block("{a::b;}").unwrap().1,
-        ))));
-
-        assert_eq!(stmt("if(\"a\" == \"a\"){ a::b; }"), Ok(("", Stmt::If(
-            expr("\"a\" == \"a\"").unwrap().1,
-            block("{a::b;}").unwrap().1,
-        ))));
-        assert_eq!(stmt("if(foo() == \"a\"){ a::b; }"), Ok(("", Stmt::If(
-            Expr::Eq(
-                Box::new(Expr::FunctionCall("foo".to_string(), vec![])),
-                Box::new(Expr::String("a".to_string())),
-            ),
-            block("{a::b;}").unwrap().1,
-        ))));
-    }
-
-    #[test]
     fn test_operator_equal() {
         assert_eq!(expr("true == true"), Ok(("", Expr::Eq(
             Box::new(Expr::Boolean(true)),
@@ -228,7 +189,7 @@ mod tests {
         assert_eq!(key_action_with_flags("!a"), Ok(("", ParsedKeyAction::KeyClickAction(
             KeyClickActionWithMods::new_with_mods(
                 *KEY_A,
-                KeyModifierFlags::new().tap_mut(|v|v.alt()),
+                KeyModifierFlags::new().tap_mut(|v| v.alt()),
             )))));
 
         // assert_eq!(key_action("!#^a"), Ok(("", ParsedKeyAction::KeyClickAction(

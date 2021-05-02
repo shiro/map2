@@ -244,14 +244,20 @@ pub(crate) struct Ambient<'a> {
 pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) {
     let mut var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
 
-    for stmt in &block.statements {
+    'outer: for stmt in &block.statements {
         match stmt {
             Stmt::Expr(expr) => { eval_expr(expr, &mut var_map, amb).await; }
             Stmt::Block(nested_block) => {
                 eval_block(nested_block, &mut var_map, amb).await;
             }
-            Stmt::If(expr, block) => {
-                if eval_expr(expr, &mut var_map, amb).await == ValueType::Bool(true) {
+            Stmt::If(if_else_if_pairs, else_pair) => {
+                for (expr, block) in if_else_if_pairs{
+                    if eval_expr(expr, &mut var_map, amb).await == ValueType::Bool(true) {
+                        eval_block(block, &mut var_map, amb).await;
+                        continue 'outer;
+                    }
+                }
+                if let Some((block)) = else_pair{
                     eval_block(block, &mut var_map, amb).await;
                 }
             }
@@ -308,7 +314,7 @@ pub(crate) enum Expr {
 pub(crate) enum Stmt {
     Expr(Expr),
     Block(Block),
-    If(Expr, Block),
+    If(Vec<(Expr, Block)>, Option<Block>),
     // While
     // For(Expr::Assign, Expr, Expr, Stmt::Block)
     // Return(Expr),

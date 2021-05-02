@@ -1,0 +1,7 @@
+let foo = false;
+
+if(foo){
+    print("wow");
+  }else if(foo == false){
+    print("now");
+  }
