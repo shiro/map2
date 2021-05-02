@@ -83,13 +83,9 @@ async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>
 async fn init_virtual_output_device(
     mut reader_rx: mpsc::Receiver<InputEvent>,
 ) -> Result<()> {
-    // TODO remove dummy
-    let file = tokio::fs::File::open("/tmp/dummy").await?;
-    let file_nb = tokio_file_unix::File::new_nb(file)?;
-
     let mut new_device = UninitDevice::new()
         .ok_or(anyhow!("failed to instantiate udev device"))?
-        .unstable_force_init(file_nb);
+        .unstable_force_init();
     virt_device::setup_virt_device(&mut new_device).unwrap();
 
     let input_device = UInputDevice::create_from_device(&new_device)?;
