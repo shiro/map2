@@ -267,18 +267,27 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     println!("{}", val);
                     ValueType::Void
                 }
-                "to_key" => {
+                "number_to_key" => {
                     let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
                     let val = match val {
                         ValueType::Number(val) => val,
                         _ => panic!("only numbers can be converted to keys"),
                     };
-                    // let val: u32 = val.try_into().expect("failed to convert variable to u32");
                     let val = val as u32;
 
                     let key = int_to_ev_key(val).expect(&*format!("key for scan code '{}' not found", val));
 
                     ValueType::String(format!("{{{}}}", EventCode::EV_KEY(key).to_string()))
+                }
+                "number_to_char" => {
+                    let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
+                    let val = match val {
+                        ValueType::Number(val) => val,
+                        _ => panic!("only numbers can be converted to chars"),
+                    };
+
+                    let val = val as u8 as char;
+                    ValueType::String(format!("{}", val))
                 }
                 _ => ValueType::Void
             }
