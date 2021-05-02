@@ -5,6 +5,8 @@ use std::fmt::Formatter;
 use crate::*;
 use crate::parsing::parser::parse_key_sequence;
 use x11rb::protocol::xproto::lookup_color;
+use evdev_rs::enums::int_to_ev_key;
+use std::convert::{TryInto, TryFrom};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition {
@@ -264,6 +266,19 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
                     println!("{}", val);
                     ValueType::Void
+                }
+                "to_key" => {
+                    let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
+                    let val = match val {
+                        ValueType::Number(val) => val,
+                        _ => panic!("only numbers can be converted to keys"),
+                    };
+                    // let val: u32 = val.try_into().expect("failed to convert variable to u32");
+                    let val = val as u32;
+
+                    let key = int_to_ev_key(val).expect(&*format!("key for scan code '{}' not found", val));
+
+                    ValueType::String(format!("{{{}}}", EventCode::EV_KEY(key).to_string()))
                 }
                 _ => ValueType::Void
             }
