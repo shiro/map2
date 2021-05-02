@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use nom::combinator::{map_res, peek, recognize};
+use nom::combinator::{map_res, recognize};
 use nom::multi::many1;
 
 use super::*;

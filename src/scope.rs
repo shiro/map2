@@ -25,6 +25,7 @@ impl PartialEq for ValueType {
         match (self, other) {
             (String(l), String(r)) => l == r,
             (Bool(l), Bool(r)) => l == r,
+            (Number(l), Number(r)) => l == r,
             (_, _) => false,
         }
     }
@@ -78,6 +79,30 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 (String(left), String(right)) => Bool(left == right),
                 (Number(left), Number(right)) => Bool(left == right),
                 _ => Bool(false),
+            }
+        }
+        Expr::Neq(left, right) => {
+            use ValueType::*;
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Bool(left), Bool(right)) => Bool(left != right),
+                (String(left), String(right)) => Bool(left != right),
+                (Number(left), Number(right)) => Bool(left != right),
+                _ => Bool(true),
+            }
+
+        }
+        Expr::Add(left, right) => {
+            use ValueType::*;
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Number(left), Number(right)) => Number(left + right),
+                _ => panic!("cannot add unsupported types"),
+            }
+        }
+        Expr::Sub(left, right) => {
+            use ValueType::*;
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Number(left), Number(right)) => Number(left - right),
+                _ => panic!("cannot subtract unsupported types"),
             }
         }
         Expr::Init(var_name, value) => {
@@ -252,7 +277,7 @@ pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, a
                         continue 'outer;
                     }
                 }
-                if let Some((block)) = else_pair {
+                if let Some(block) = else_pair {
                     eval_block(block, &mut var_map, amb).await;
                 }
             }
@@ -285,17 +310,17 @@ impl Block {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Expr {
     Eq(Box<Expr>, Box<Expr>),
+    Neq(Box<Expr>, Box<Expr>),
     // LT(Expr, Expr),
     // GT(Expr, Expr),
     // INC(Expr),
-    // Add(Expr, Expr),
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
     Init(String, Box<Expr>),
     Assign(String, Box<Expr>),
     KeyMapping(Vec<KeyMapping>),
 
     Name(String),
-    // Boolean(bool),
-    // String(String),
     Value(ValueType),
     Lambda(Block),
 

@@ -58,7 +58,6 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
                         .collect()),
                 )
             }
-            _ => unimplemented!()
         }))
     })
 }

@@ -5,8 +5,6 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Result};
 use evdev_rs::*;
-use evdev_rs::enums::*;
-use futures::{SinkExt, TryFutureExt};
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
@@ -61,10 +59,6 @@ async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>
             match err.raw_os_error() {
                 Some(libc::ENODEV) => { return; }
                 Some(libc::EWOULDBLOCK) => {
-                    task::yield_now().await;
-                    continue;
-                }
-                Some(libc::EAGAIN) => {
                     task::yield_now().await;
                     continue;
                 }

@@ -197,7 +197,7 @@ async fn main() -> Result<()> {
                     &mut message_tx, &mut mappings, window_cycle_token, &mut window_change_handlers);
             }
             Some(ev) = ev_writer_rx.recv() => {
-                handle_stdin_ev(&mut state, ev, &mut global_var_map, &mut mappings,
+                handle_stdin_ev(&mut state, ev, &mut mappings,
                     &mut ev_reader_tx, &mut message_tx, window_cycle_token).await.unwrap();
             }
             Some(msg) = message_rx.recv() => {
@@ -238,7 +238,6 @@ fn update_modifiers(state: &mut State, ev: &InputEvent) {
 }
 
 async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
-                         var_map: &mut GuardedVarMap,
                          mappings: &mut CompiledKeyMappings,
                          ev_writer: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender, window_cycle_token: usize) -> Result<()> {
     match ev.event_code {
@@ -290,8 +289,8 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         let ev_writer = ev_writer.clone();
         task::spawn(async move {
             let mut guard = block.lock().await;
-            let foo = guard.deref_mut();
-            eval_block(&foo.0, &mut foo.1, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
+            let var_map = guard.deref_mut();
+            eval_block(&var_map.0, &mut var_map.1, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
         });
         return Ok(());
     }
