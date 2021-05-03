@@ -329,8 +329,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         eval_expr(&Expr::Init(param.clone(), Box::new(Expr::Value(val))), &lambda_var_map, amb).await;
                     }
 
-                    eval_block(&lambda_block, &mut lambda_var_map, amb).await;
-                    ValueType::Void
+                    eval_block(&lambda_block, &mut lambda_var_map, amb).await
                 }
             }
         }
@@ -346,7 +345,7 @@ pub(crate) struct Ambient<'a> {
 }
 
 #[async_recursion]
-pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) {
+pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) -> ValueType {
     let mut var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
 
     'outer: for stmt in &block.statements {
@@ -380,8 +379,13 @@ pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, a
                     eval_expr(advance_expr, &var_map, amb).await;
                 }
             }
+            Stmt::Return(expr) => {
+                return eval_expr(expr, &var_map, amb).await;
+            }
         }
     }
+
+    ValueType::Void
 }
 
 fn mutexes_are_equal<T>(first: &Mutex<T>, second: &Mutex<T>) -> bool
@@ -437,5 +441,5 @@ pub(crate) enum Stmt {
     If(Vec<(Expr, Block)>, Option<Block>),
     For(Expr, Expr, Expr, Block),
     // While
-    // Return(Expr),
+    Return(Expr),
 }

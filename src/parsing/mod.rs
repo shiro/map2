@@ -24,12 +24,14 @@ use lambda::*;
 use primitives::*;
 use variable::*;
 use for_loop::*;
+use return_statement::*;
 
 use crate::*;
 use crate::parsing::custom_combinators::fold_many0_once;
 use crate::parsing::identifier::ident;
 
 pub mod parser;
+mod return_statement;
 mod custom_combinators;
 mod expression;
 mod function;
@@ -54,6 +56,7 @@ fn stmt(input: &str) -> Res<&str, Stmt> {
         "stmt",
         tuple((
             alt((
+                return_statement,
                 if_stmt,
                 for_loop,
                 map(tuple((expr, tag(";"))), |v| Stmt::Expr(v.0)),
