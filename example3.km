@@ -1,5 +1,32 @@
-for(let i=97; i<97+26;i=i+1){
-  print(number_to_char(i));
+print("start");
+
+let key_pressed = false;
+let tab_pressed = false;
+
+{tab down}::{
+  tab_pressed = true;
+  key_pressed = false;
+};
+
+
+{tab up}::{
+  tab_pressed = false;
+  if(key_pressed == false){
+    send("{tab}");
+  }
+};
+
+for(let i=97; i<97+26; i=i+1){
+  let key = number_to_char(i);
+  let d = "{"+key+" down}";
+
+  map_key(d, ||{
+    key_pressed = true;
+    if(tab_pressed){
+      send( "{alt down}{meta down}{shift down}" + d + "{alt up}{meta up}{shift up}");
+    }else{
+      send(d);
+    }
+  });
 }
 
-^a::{print("w");};

@@ -1,0 +1,3 @@
+let foo = ||{print("wow");};
+
+foo2();

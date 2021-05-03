@@ -3,7 +3,7 @@ use std::fmt;
 use std::fmt::Formatter;
 
 use crate::*;
-use crate::parsing::parser::parse_key_sequence;
+use crate::parsing::parser::{parse_key_sequence, parse_key_action_with_mods};
 use x11rb::protocol::xproto::lookup_color;
 use evdev_rs::enums::int_to_ev_key;
 use std::convert::{TryInto, TryFrom};
@@ -295,19 +295,35 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         eval_expr(args.get(1).unwrap(), var_map, amb).await,
                     );
                     let (from, to) = match val {
-                        (ValueType::String(from), ValueType::Lambda(to,var_map)) => (from, (to, var_map)),
+                        (ValueType::String(from), ValueType::Lambda(to, var_map)) => (from, (to, var_map)),
                         _ => panic!("invalid arguments passed to 'map_key'"),
                     };
 
-                    // let from =
+                    let mappings = match parse_key_action_with_mods(&*from, to.0).unwrap() {
+                        Expr::KeyMapping(v) => v,
+                        _ => unreachable!(),
+                    };
 
+                    for mapping in mappings {
+                        let mapping = mapping.clone();
 
-
-
+                        amb.message_tx.borrow_mut().as_ref().unwrap()
+                            .send(ExecutionMessage::AddMapping(amb.window_cycle_token, mapping.from, mapping.to, to.1.clone())).await
+                            .unwrap();
+                    }
 
                     ValueType::Void
                 }
-                _ => ValueType::Void
+                name => {
+                    let (lambda_block, mut lambda_var_map) = match eval_expr(&Expr::Name(name.to_string()), var_map, amb).await {
+                        ValueType::Lambda(block, var_map) => (block, var_map),
+                        ValueType::Void => panic!("function '{}' not found in this scope", name),
+                        _ => panic!("variable '{}' is not a lambda function", name),
+                    };
+
+                    eval_block(&lambda_block, &mut lambda_var_map, amb).await;
+                    ValueType::Void
+                }
             }
         }
     }
