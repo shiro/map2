@@ -17,7 +17,7 @@ pub(crate) struct KeyActionCondition {
 pub(crate) enum ValueType {
     Bool(bool),
     String(String),
-    Lambda(Block, GuardedVarMap),
+    Lambda(Vec<String>, Block, GuardedVarMap),
     Number(f64),
     Void,
 }
@@ -40,7 +40,7 @@ impl fmt::Display for ValueType {
             ValueType::Bool(v) => write!(f, "{}", v),
             ValueType::String(v) => write!(f, "{}", v),
             ValueType::Number(v) => write!(f, "{}", v),
-            ValueType::Lambda(_, _) => write!(f, "Lambda"),
+            ValueType::Lambda(_, _, _) => write!(f, "Lambda"),
             ValueType::Void => write!(f, "Void"),
         }
     }
@@ -200,8 +200,8 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         Expr::Value(value) => {
             return value.clone();
         }
-        Expr::Lambda(block) => {
-            return ValueType::Lambda(block.clone(), var_map.clone());
+        Expr::Lambda(params, block) => {
+            return ValueType::Lambda(params.clone(), block.clone(), var_map.clone());
         }
         Expr::KeyAction(action) => {
             amb.ev_writer_tx.send(action.to_input_ev()).await.unwrap();
@@ -252,7 +252,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
 
                     let inner_block;
                     let inner_var_map;
-                    if let ValueType::Lambda(_block, _var_map) = eval_expr(args.get(0).unwrap(), var_map, amb).await {
+                    if let ValueType::Lambda(_, _block, _var_map) = eval_expr(args.get(0).unwrap(), var_map, amb).await {
                         inner_block = _block;
                         inner_var_map = _var_map;
                     } else {
@@ -295,7 +295,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         eval_expr(args.get(1).unwrap(), var_map, amb).await,
                     );
                     let (from, to) = match val {
-                        (ValueType::String(from), ValueType::Lambda(to, var_map)) => (from, (to, var_map)),
+                        (ValueType::String(from), ValueType::Lambda(_, to, var_map)) => (from, (to, var_map)),
                         _ => panic!("invalid arguments passed to 'map_key'"),
                     };
 
@@ -315,11 +315,19 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     ValueType::Void
                 }
                 name => {
-                    let (lambda_block, mut lambda_var_map) = match eval_expr(&Expr::Name(name.to_string()), var_map, amb).await {
-                        ValueType::Lambda(block, var_map) => (block, var_map),
+                    let (lambda_params, lambda_block, mut lambda_var_map) = match eval_expr(&Expr::Name(name.to_string()), var_map, amb).await {
+                        ValueType::Lambda(params, block, var_map) => (params, block, var_map),
                         ValueType::Void => panic!("function '{}' not found in this scope", name),
                         _ => panic!("variable '{}' is not a lambda function", name),
                     };
+
+                    for (idx, param) in lambda_params.iter().enumerate() {
+                        let val = match args.get(idx) {
+                            Some(expr) => eval_expr(expr, var_map, amb).await,
+                            None => ValueType::Void,
+                        };
+                        eval_expr(&Expr::Init(param.clone(), Box::new(Expr::Value(val))), &lambda_var_map, amb).await;
+                    }
 
                     eval_block(&lambda_block, &mut lambda_var_map, amb).await;
                     ValueType::Void
@@ -413,7 +421,7 @@ pub(crate) enum Expr {
 
     Name(String),
     Value(ValueType),
-    Lambda(Block),
+    Lambda(Vec<String>, Block),
 
     FunctionCall(String, Vec<Expr>),
 
