@@ -39,17 +39,45 @@ let key_tab_mod = |key|{
 
 
 
+let lalt = false;
+{leftalt down}::{lalt = true; send("{leftalt down}");};
+{leftalt up}::{lalt = false; send("{leftalt up}");};
+
+let ralt = false;
+{rightalt down}::{ralt = true; send("{rightalt down}");};
+{rightalt up}::{ralt = false; send("{rightalt up}");};
+
+
 for(let i=97; i<97+26; i=i+1){
   let key = number_to_char(i);
-  let d = "{"+key+" down}";
+  let key_down = "{"+key+" down}";
+  let key_up = "{"+key+" up}";
 
-  map_key(d, ||{
+  if(key == "j"){
+    map_key(key_down, ||{
+      key_pressed = true;
+      print(ralt);
+
+      if (ralt){ send("{alt down}{meta down}j{alt up}{meta up}"); return 0; }
+
+      if (key_tab_mod(key_down)){ return 0; }
+      send(key_down);
+    });
+
+    map_key(key_up, ||{
+      if (lalt){ send("{down up}"); return 0; }
+      if (ralt){ return 0; }
+      send(key_up);
+    });
+
+    return 0;
+  }
+  if(key == "j") {print("bug");}
+
+  map_key(key_down, ||{
     key_pressed = true;
-
-    if (key_tab_mod(d)){ return 0; }
-
-    send(d);
+    if (key_tab_mod(key_down)){ return 0; }
+    send(key_down);
   });
 }
-
 

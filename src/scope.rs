@@ -329,7 +329,11 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         eval_expr(&Expr::Init(param.clone(), Box::new(Expr::Value(val))), &lambda_var_map, amb).await;
                     }
 
-                    eval_block(&lambda_block, &mut lambda_var_map, amb).await
+                    let ret = eval_block(&lambda_block, &mut lambda_var_map, amb).await;
+                    match ret {
+                        Some(ret) => ret,
+                        None => ValueType::Void,
+                    }
                 }
             }
         }
@@ -345,24 +349,27 @@ pub(crate) struct Ambient<'a> {
 }
 
 #[async_recursion]
-pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) -> ValueType {
+pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) -> Option<ValueType> {
     let mut var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
 
     'outer: for stmt in &block.statements {
         match stmt {
             Stmt::Expr(expr) => { eval_expr(expr, &mut var_map, amb).await; }
             Stmt::Block(nested_block) => {
-                eval_block(nested_block, &mut var_map, amb).await;
+                let ret = eval_block(nested_block, &mut var_map, amb).await;
+                if let Some(ret) = ret { return Some(ret); };
             }
             Stmt::If(if_else_if_pairs, else_pair) => {
                 for (expr, block) in if_else_if_pairs {
                     if eval_expr(expr, &mut var_map, amb).await == ValueType::Bool(true) {
-                        eval_block(block, &mut var_map, amb).await;
+                        let ret = eval_block(block, &mut var_map, amb).await;
+                        if let Some(ret) = ret { return Some(ret); };
                         continue 'outer;
                     }
                 }
                 if let Some(block) = else_pair {
-                    eval_block(block, &mut var_map, amb).await;
+                    let ret = eval_block(block, &mut var_map, amb).await;
+                    if let Some(ret) = ret { return Some(ret); };
                 }
             }
             Stmt::For(init_expr, termination_expr, advance_expr, block) => {
@@ -375,17 +382,19 @@ pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, a
                     };
                     if !should_continue { break; }
 
-                    eval_block(block, &mut var_map, amb).await;
+                    let ret = eval_block(block, &mut var_map, amb).await;
+                    if let Some(ret) = ret { return Some(ret); };
+
                     eval_expr(advance_expr, &var_map, amb).await;
                 }
             }
             Stmt::Return(expr) => {
-                return eval_expr(expr, &var_map, amb).await;
+                return Some(eval_expr(expr, &var_map, amb).await);
             }
         }
     }
 
-    ValueType::Void
+    None
 }
 
 fn mutexes_are_equal<T>(first: &Mutex<T>, second: &Mutex<T>) -> bool
