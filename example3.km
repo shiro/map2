@@ -16,17 +16,40 @@ let tab_pressed = false;
   }
 };
 
+
+let key_tab_mod = |key|{
+  if(tab_pressed){
+    send( "{alt down}{meta down}{shift down}" + key + "{alt up}{meta up}{shift up}");
+  }
+};
+
+
+
+{capslock down}::{
+  key_pressed = false;
+  send("{ctrl down}");
+};
+
+{capslock up}::{
+  send("{ctrl up}");
+  if (key_pressed == false){
+    send("{esc}");
+  }
+};
+
+
+
 for(let i=97; i<97+26; i=i+1){
   let key = number_to_char(i);
   let d = "{"+key+" down}";
 
   map_key(d, ||{
     key_pressed = true;
-    if(tab_pressed){
-      send( "{alt down}{meta down}{shift down}" + d + "{alt up}{meta up}{shift up}");
-    }else{
-      send(d);
-    }
+
+    if (key_tab_mod(d)){ return 0; }
+
+    send(d);
   });
 }
+
 
