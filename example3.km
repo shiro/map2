@@ -93,3 +93,44 @@ for(let i=97; i<97+26; i=i+1){
   });
 }
 
+let setup_mouse = ||{
+  f13::kp1;
+  f14::kp2;
+  f15::kp3;
+  f16::kp4;
+  f17::kp5;
+  f18::kp6;
+  f19::kp7;
+  f20::kp8;
+  f21::kp9;
+};
+
+setup_mouse();
+
+
+let map_figma_shortcut = |key, command|{
+  map_key(key, ||{
+    send("{ctrl down}/{ctrl up}");
+    sleep(200);
+    send(command+"{enter}");
+  });
+};
+
+on_window_change(||{
+  setup_mouse();
+
+  if(active_window_class() == "firefox"){
+    f13::^tab;
+    +f13::+^tab;
+    f14::^t;
+    f16::f5;
+    f21::^w;
+  }else if(active_window_class() == "figma-linux"){
+    map_figma_shortcut("f13", "palette-pick");
+    map_figma_shortcut("f14", "atom-sync");
+    map_figma_shortcut("f15", "batch styler");
+    map_figma_shortcut("f16", "chroma colors");
+    map_figma_shortcut("f17", "scripter");
+    map_figma_shortcut("f20", "theme-flip");
+  }
+});

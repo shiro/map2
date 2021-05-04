@@ -263,6 +263,15 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     amb.message_tx.as_ref().unwrap().send(ExecutionMessage::RegisterWindowChangeCallback(inner_block, inner_var_map)).await.unwrap();
                     ValueType::Void
                 }
+                "sleep" => {
+                    let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
+                    match val{
+                        ValueType::Number(millis) => tokio::time::sleep(time::Duration::from_millis(millis as u64)).await,
+                        _ => panic!("sleep expects a number argument"),
+                    }
+
+                    ValueType::Void
+                }
                 "print" => {
                     let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
                     println!("{}", val);

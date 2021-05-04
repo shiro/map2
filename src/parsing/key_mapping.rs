@@ -8,7 +8,7 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
             tag("::"),
             alt((
                 key_sequence,
-                map(key_action, |v| vec![v]),
+                map(key_action_with_flags, |v| vec![v]),
             ))
         )),
     )(input).and_then(|(next, v)| {

@@ -87,6 +87,7 @@ lazy_static! {
         m.insert(",", Key::from_str(&EventType::EV_KEY, "KEY_COMMA").unwrap());
         m.insert("-", Key::from_str(&EventType::EV_KEY, "KEY_MINUS").unwrap());
         m.insert(".", Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap());
+        m.insert("/", Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap());
         m.insert(";", Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap());
         m.insert("=", Key::from_str(&EventType::EV_KEY, "KEY_EQUAL").unwrap());
         m.insert("SHIFT", Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap());
