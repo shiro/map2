@@ -52,22 +52,17 @@ let ralt = false;
 
 
 let directional_mod = |key, direction|{
-  print("yes");
-
   let key_down = "{"+key+" down}";
   let key_up = "{"+key+" up}";
 
   map_key(key_down, ||{
     key_pressed = true;
 
-    print(direction);
-
     if (caps_down){
       send("{alt down}{meta down}{shift down}{ctrl down}"+key+"{alt up}{meta up}{shift up}{ctrl up}");
       return 0;
     }
-    if (lalt){ 
-      send("{"+direction+" down}"); return 0; }
+    if (lalt){ send("{"+direction+" down}"); return 0; }
     if (ralt){ send("{alt down}{meta down}"+key+"{alt up}{meta up}"); return 0; }
 
     if (key_tab_mod(key_down)){ return 0; }

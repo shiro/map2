@@ -201,7 +201,8 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             return value.clone();
         }
         Expr::Lambda(params, block) => {
-            return ValueType::Lambda(params.clone(), block.clone(), var_map.clone());
+            let mut lambda_var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
+            return ValueType::Lambda(params.clone(), block.clone(), lambda_var_map);
         }
         Expr::KeyAction(action) => {
             amb.ev_writer_tx.send(action.to_input_ev()).await.unwrap();
@@ -321,6 +322,11 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         _ => panic!("variable '{}' is not a lambda function", name),
                     };
 
+                    // we need to clone the lambda's var_map since each lambda execution needs to not affect the next one
+                    // TODO make GuardedVarMap a proper struct and implement a proper deep clone method
+                    let mut lambda_var_map = GuardedVarMap::new(Mutex::new(VarMap::new(
+                        lambda_var_map.lock().unwrap().parent.clone()
+                    )));
 
                     for (idx, param) in lambda_params.iter().enumerate() {
                         let val = match args.get(idx) {
@@ -329,7 +335,6 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         };
 
                         eval_expr(&Expr::Init(param.clone(), Box::new(Expr::Value(val))), &lambda_var_map, amb).await;
-                        println!("val is {:?}", lambda_var_map);
                     }
 
                     let ret = eval_block(&lambda_block, &mut lambda_var_map, amb).await;
