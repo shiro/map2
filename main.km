@@ -63,8 +63,6 @@ let directional_mod = |key, direction|{
         return 0;
       }
       if (lalt){ send("{"+direction+" down}"); return 0; }
-      print(ralt);
-      print(key);
       if (ralt){ send("{rightalt up}{alt down}{meta down}"+key+"{alt up}{meta up}{rightalt down}"); return 0; }
 
       if (key_tab_mod(key_down)){ return 0; }
