@@ -1,3 +1,0 @@
-sleep(4000);
-print("hi");
-send("{f21}");

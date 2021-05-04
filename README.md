@@ -1,6 +1,7 @@
 # Key mods RS
 
-A scripting language that allows complex key remapping on Linux.
+A scripting language that allows complex key remapping on Linux, written in
+Rust.
 
 For details check the [documentation](#documentation).
 
@@ -200,6 +201,13 @@ Converts a number to the corresponding character.
 let char = num_to_char(97);
 print(char); // output: 'a'
 ```
+
+# Feature roadmap
+
+- [ ] all basic expressions (i.e. multiplication, division, string and number
+      concatenation, etc.)
+- [ ] proper error reporting
+- [ ] pretty command line interface (CLI)
 
 # Authors
 
