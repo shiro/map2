@@ -42,9 +42,10 @@ mod tests {
 
     #[test]
     fn test_lambda() {
-        assert_eq!(lambda("||{}"), Ok(("", Expr::Lambda(Block::new()))));
-        assert_eq!(lambda("||{ a::b; }"), Ok(("", Expr::Lambda(
-            block_body("a::b;").unwrap().1
+        assert_eq!(lambda("||{}"), Ok(("", Expr::Lambda(vec![], Block::new()))));
+        assert_eq!(lambda("|a|{ a::b; }"), Ok(("", Expr::Lambda(
+            vec!["a".to_string()],
+            block_body("a::b;").unwrap().1,
         ))));
     }
 }

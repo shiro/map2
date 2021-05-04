@@ -108,5 +108,9 @@ mod tests {
         assert_eq!(key_action_with_flags("+{a down}"), Ok(("", ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.shift()))
         ))));
+
+        assert_eq!(key_action_with_flags("!{j down}"), Ok(("", ParsedKeyAction::KeyAction(
+            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_J").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.alt()))
+        ))));
     }
 }

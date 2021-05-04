@@ -26,6 +26,8 @@ let key_tab_mod = |key|{
 
 let caps_down = false;
 
+^capslock::capslock;
+
 {capslock down}::{
   caps_down = true;
   key_pressed = false;
@@ -44,36 +46,43 @@ let caps_down = false;
 
 let lalt = false;
 {leftalt down}::{lalt = true; send("{leftalt down}");};
-{leftalt up}::{lalt = false; send("{leftalt up}");};
+!{leftalt up}::{lalt = false; send("{leftalt up}");};
 
 let ralt = false;
-{rightalt down}::{ralt = true;};
-{rightalt up}::{ralt = false;};
+{rightalt down}::{ralt = true; send("{rightalt down}");};
+{rightalt up}::{ralt = false; send("{rightalt up}");};
 
 
 let directional_mod = |key, direction|{
+  let map = |key_down, key_down_str, key_up, key_up_str|{
+    map_key(key_down, ||{
+      key_pressed = true;
+
+      if (caps_down){
+        send("{alt down}{meta down}{shift down}{ctrl down}"+key+"{alt up}{meta up}{shift up}{ctrl up}");
+        return 0;
+      }
+      if (lalt){ send("{"+direction+" down}"); return 0; }
+      print(ralt);
+      print(key);
+      if (ralt){ send("{rightalt up}{alt down}{meta down}"+key+"{alt up}{meta up}{rightalt down}"); return 0; }
+
+      if (key_tab_mod(key_down)){ return 0; }
+      send(key_down_str);
+    });
+
+    map_key(key_up, ||{
+      if (lalt){ send("{"+direction+" up}"); return 0; }
+      if (ralt){ return 0; }
+      send(key_up_str);
+    });
+  };
+
   let key_down = "{"+key+" down}";
   let key_up = "{"+key+" up}";
 
-  map_key(key_down, ||{
-    key_pressed = true;
-
-    if (caps_down){
-      send("{alt down}{meta down}{shift down}{ctrl down}"+key+"{alt up}{meta up}{shift up}{ctrl up}");
-      return 0;
-    }
-    if (lalt){ send("{"+direction+" down}"); return 0; }
-    if (ralt){ send("{alt down}{meta down}"+key+"{alt up}{meta up}"); return 0; }
-
-    if (key_tab_mod(key_down)){ return 0; }
-    send(key_down);
-  });
-
-  map_key(key_up, ||{
-    if (lalt){ send("{"+direction+" up}"); return 0; }
-    if (ralt){ return 0; }
-    send(key_up);
-  });
+  map(key_down, key_down ,key_up, key_up);
+  map("!"+key_down, "{alt down}"+key_down+"{alt up}", "!"+key_up, "{alt down}"+key_up+"{alt up}");
 };
 
 for(let i=97; i<97+26; i=i+1){

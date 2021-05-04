@@ -24,49 +24,12 @@ pub(super) fn key_sequence(input: &str) -> Res<&str, Vec<ParsedKeyAction>> {
         .map(|v| {
             if !v.0.is_empty() { return Err(make_generic_nom_err()); }
             Ok(v.1)
-            // Ok(33)
-            // v.1
         })
         .fold_ok(vec![], |mut acc, v| {
             acc.push(v);
             acc
         })?
-
-                                        //.collect()
     )))
-    //
-    //
-    // let mut actions = vec![];
-    // (input, _) = tag("\"")(input)?;
-    //
-    // loop {
-    //     let mut ch = "";
-    //     (input, ch) = take(1usize)(input)?;
-    //
-    //     match peek(take(1usize))(input) {
-    //         Ok((_, '{')) => {
-    //             let (rest, action) = key_action(key_name)?;
-    //             if !rest.is_empty() { return Err(make_generic_nom_err()); }
-    //         }
-    //         Ok(_) => {}
-    //         _ => {}
-    //     }
-    //
-    //     if ch == "\"" { break; }
-    //
-    //     let mut key_name = ch;
-    //
-    //     if ch == "{" {
-    //         (input, key_name) = take_until("}")(input)?;
-    //         (input, _) = take(1usize)(input)?;
-    //     }
-    //
-    //     let (rest, action) = key_action(key_name)?;
-    //     if !rest.is_empty() { return Err(make_generic_nom_err()); }
-    //
-    //     actions.push(action);
-    // }
-    // Ok((input, actions))
 }
 
 #[cfg(test)]

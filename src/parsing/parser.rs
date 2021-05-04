@@ -30,12 +30,12 @@ pub(crate) fn parse_key_sequence(raw: &str) -> Result<Vec<KeyAction>> {
 
 pub(crate) fn parse_key_action_with_mods(from: &str, to: Block) -> Result<Expr> {
     let from = key_action_with_flags(from).expect("failed to parse mapping trigger");
-    if !from.0.is_empty(){ return Err(anyhow!("failed to parse mapping trigger"))}
+    if !from.0.is_empty() { return Err(anyhow!("failed to parse mapping trigger")); }
     let from = from.1;
 
     let expr = match from {
         ParsedKeyAction::KeyClickAction(from) => { Expr::map_key_click_block(from, to) }
-        ParsedKeyAction::KeyAction(from) => { Expr::map_key_block(from, to) },
+        ParsedKeyAction::KeyAction(from) => { Expr::map_key_block(from, to) }
     };
 
     Ok(expr)
@@ -48,7 +48,8 @@ mod tests {
 
     #[test]
     fn test_key_sequence() {
-        // assert_eq!(parse_key_sequence("hello{enter}world").unwrap(),
-        //            vec![].tap_mut(|v| v.append_string_sequence("hello{enter}world").unwrap()));
+        assert_eq!(parse_key_sequence("hello{enter}world").unwrap(),
+                   key_sequence("\"hello{enter}world\"").unwrap().1.to_key_actions(),
+        );
     }
 }

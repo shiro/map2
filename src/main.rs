@@ -31,6 +31,7 @@ use crate::scope::*;
 use crate::state::*;
 use crate::x11::{x11_initialize, x11_test};
 use crate::x11::ActiveWindowInfo;
+use crate::device::device_logging::print_event_debug;
 
 mod tab_mod;
 mod caps_mod;
@@ -217,7 +218,7 @@ fn update_modifiers(state: &mut State, ev: &InputEvent) {
         (*KEY_LEFT_CTRL, &mut state.leftcontrol_is_down),
         // (*KEY_RIGHT_CTRL, &mut state.leftcontrol_is_down, &mut state.ignore_list),
         (*KEY_LEFT_ALT, &mut state.leftalt_is_down),
-        // (*KEY_RIGHT_ALT, &mut state.leftalt_is_down, &mut state.ignore_list),
+        // (*KEY_RIGHT_ALT, &mut state.leftalt_is_down),
         (*KEY_LEFT_SHIFT, &mut state.shift_is_down),
         // (*KEY_RIGHT_SHIFT, &mut state.shift_is_down, &mut state.ignore_list),
         (*KEY_LEFT_META, &mut state.meta_is_down),
@@ -248,29 +249,6 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         }
     }
 
-    // if ev.type_ != input_linux_sys::EV_KEY as u16 {
-    //     // print_event(&ev);
-    //     return Ok(());
-    // }
-
-    update_modifiers(&mut state, &ev);
-
-    // if crate::tab_mod::tab_mod(&ev, &mut *state) {
-    //     return Ok(());
-    // }
-    //
-    // if !state.leftcontrol_is_down {
-    //     if crate::caps_mod::caps_mod(&ev, &mut *state) {
-    //         return Ok(());
-    //     }
-    // }
-    //
-    // if !state.disable_alt_mod {
-    //     if crate::rightalt_mod::rightalt_mod(&ev, &mut *state) {
-    //         return Ok(());
-    //     }
-    // }
-
     let mut from_modifiers = KeyModifierFlags::new();
     from_modifiers.ctrl = state.leftcontrol_is_down.clone();
     from_modifiers.alt = state.leftalt_is_down.clone();
@@ -282,6 +260,8 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         value: ev.value,
         modifiers: from_modifiers,
     };
+
+    update_modifiers(&mut state, &ev);
 
     if let Some(block) = mappings.0.get(&from_key_action) {
         let block = block.clone();
