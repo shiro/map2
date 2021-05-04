@@ -24,7 +24,7 @@ pub(super) fn lambda(input: &str) -> Res<&str, Expr> {
         let params = match val.2 {
             Some(v) => {
                 let first = v.0;
-                let mut params: Vec<String> = v.2.into_iter().map(|v| v.0.to_string()).collect();
+                let mut params: Vec<String> = v.2.into_iter().map(|v| v.2.to_string()).collect();
                 params.insert(0, first);
                 params
             }

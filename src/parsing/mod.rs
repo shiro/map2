@@ -25,6 +25,7 @@ use primitives::*;
 use variable::*;
 use for_loop::*;
 use return_statement::*;
+use continue_statement::*;
 
 use crate::*;
 use crate::parsing::custom_combinators::fold_many0_once;
@@ -32,6 +33,7 @@ use crate::parsing::identifier::ident;
 
 pub mod parser;
 mod return_statement;
+mod continue_statement;
 mod custom_combinators;
 mod expression;
 mod function;
@@ -57,6 +59,7 @@ fn stmt(input: &str) -> Res<&str, Stmt> {
         tuple((
             alt((
                 return_statement,
+                continue_statement,
                 if_stmt,
                 for_loop,
                 map(tuple((expr, tag(";"))), |v| Stmt::Expr(v.0)),

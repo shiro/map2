@@ -24,13 +24,16 @@ let key_tab_mod = |key|{
 };
 
 
+let caps_down = false;
 
 {capslock down}::{
+  caps_down = true;
   key_pressed = false;
   send("{ctrl down}");
 };
 
 {capslock up}::{
+  caps_down = false;
   send("{ctrl up}");
   if (key_pressed == false){
     send("{esc}");
@@ -44,35 +47,49 @@ let lalt = false;
 {leftalt up}::{lalt = false; send("{leftalt up}");};
 
 let ralt = false;
-{rightalt down}::{ralt = true; send("{rightalt down}");};
-{rightalt up}::{ralt = false; send("{rightalt up}");};
+{rightalt down}::{ralt = true;};
+{rightalt up}::{ralt = false;};
 
+
+let directional_mod = |key, direction|{
+  print("yes");
+
+  let key_down = "{"+key+" down}";
+  let key_up = "{"+key+" up}";
+
+  map_key(key_down, ||{
+    key_pressed = true;
+
+    print(direction);
+
+    if (caps_down){
+      send("{alt down}{meta down}{shift down}{ctrl down}"+key+"{alt up}{meta up}{shift up}{ctrl up}");
+      return 0;
+    }
+    if (lalt){ 
+      send("{"+direction+" down}"); return 0; }
+    if (ralt){ send("{alt down}{meta down}"+key+"{alt up}{meta up}"); return 0; }
+
+    if (key_tab_mod(key_down)){ return 0; }
+    send(key_down);
+  });
+
+  map_key(key_up, ||{
+    if (lalt){ send("{"+direction+" up}"); return 0; }
+    if (ralt){ return 0; }
+    send(key_up);
+  });
+};
 
 for(let i=97; i<97+26; i=i+1){
   let key = number_to_char(i);
   let key_down = "{"+key+" down}";
   let key_up = "{"+key+" up}";
 
-  if(key == "j"){
-    map_key(key_down, ||{
-      key_pressed = true;
-      print(ralt);
-
-      if (ralt){ send("{alt down}{meta down}j{alt up}{meta up}"); return 0; }
-
-      if (key_tab_mod(key_down)){ return 0; }
-      send(key_down);
-    });
-
-    map_key(key_up, ||{
-      if (lalt){ send("{down up}"); return 0; }
-      if (ralt){ return 0; }
-      send(key_up);
-    });
-
-    return 0;
-  }
-  if(key == "j") {print("bug");}
+  if(key == "h"){ directional_mod(key, "left"); continue; }
+  if(key == "j"){ directional_mod(key, "down"); continue; }
+  if(key == "k"){ directional_mod(key, "up"); continue; }
+  if(key == "l"){ directional_mod(key, "right"); continue; }
 
   map_key(key_down, ||{
     key_pressed = true;

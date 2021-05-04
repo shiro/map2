@@ -321,18 +321,22 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         _ => panic!("variable '{}' is not a lambda function", name),
                     };
 
+
                     for (idx, param) in lambda_params.iter().enumerate() {
                         let val = match args.get(idx) {
                             Some(expr) => eval_expr(expr, var_map, amb).await,
                             None => ValueType::Void,
                         };
+
                         eval_expr(&Expr::Init(param.clone(), Box::new(Expr::Value(val))), &lambda_var_map, amb).await;
+                        println!("val is {:?}", lambda_var_map);
                     }
 
                     let ret = eval_block(&lambda_block, &mut lambda_var_map, amb).await;
                     match ret {
-                        Some(ret) => ret,
-                        None => ValueType::Void,
+                        BlockRet::None => ValueType::Void,
+                        BlockRet::Return(ret) => ret,
+                        BlockRet::Continue => panic!("function cannot return a continue statement"),
                     }
                 }
             }
@@ -348,8 +352,14 @@ pub(crate) struct Ambient<'a> {
     pub(crate) window_cycle_token: usize,
 }
 
+pub(crate) enum BlockRet {
+    None,
+    Continue,
+    Return(ValueType),
+}
+
 #[async_recursion]
-pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) -> Option<ValueType> {
+pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) -> BlockRet {
     let mut var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
 
     'outer: for stmt in &block.statements {
@@ -357,19 +367,28 @@ pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, a
             Stmt::Expr(expr) => { eval_expr(expr, &mut var_map, amb).await; }
             Stmt::Block(nested_block) => {
                 let ret = eval_block(nested_block, &mut var_map, amb).await;
-                if let Some(ret) = ret { return Some(ret); };
+                match ret {
+                    BlockRet::None => {}
+                    _ => return ret,
+                };
             }
             Stmt::If(if_else_if_pairs, else_pair) => {
                 for (expr, block) in if_else_if_pairs {
                     if eval_expr(expr, &mut var_map, amb).await == ValueType::Bool(true) {
                         let ret = eval_block(block, &mut var_map, amb).await;
-                        if let Some(ret) = ret { return Some(ret); };
+                        match ret {
+                            BlockRet::None => {}
+                            _ => return ret,
+                        };
                         continue 'outer;
                     }
                 }
                 if let Some(block) = else_pair {
                     let ret = eval_block(block, &mut var_map, amb).await;
-                    if let Some(ret) = ret { return Some(ret); };
+                    match ret {
+                        BlockRet::None => {}
+                        _ => return ret,
+                    };
                 }
             }
             Stmt::For(init_expr, termination_expr, advance_expr, block) => {
@@ -383,18 +402,24 @@ pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, a
                     if !should_continue { break; }
 
                     let ret = eval_block(block, &mut var_map, amb).await;
-                    if let Some(ret) = ret { return Some(ret); };
+                    match ret {
+                        BlockRet::Return(_) => return ret,
+                        _ => {}
+                    };
 
                     eval_expr(advance_expr, &var_map, amb).await;
                 }
             }
             Stmt::Return(expr) => {
-                return Some(eval_expr(expr, &var_map, amb).await);
+                return BlockRet::Return(eval_expr(expr, &var_map, amb).await);
+            }
+            Stmt::Continue => {
+                return BlockRet::Continue;
             }
         }
     }
 
-    None
+    BlockRet::None
 }
 
 fn mutexes_are_equal<T>(first: &Mutex<T>, second: &Mutex<T>) -> bool
@@ -451,4 +476,5 @@ pub(crate) enum Stmt {
     For(Expr, Expr, Expr, Block),
     // While
     Return(Expr),
+    Continue,
 }
