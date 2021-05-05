@@ -1,9 +1,9 @@
-use std::{io, thread, time};
+use std::{io, thread, time, fs};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Result, Error};
 use evdev_rs::*;
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
@@ -12,6 +12,7 @@ use tokio::task;
 use walkdir::{WalkDir};
 
 use crate::device::{device_util, virt_device};
+use tokio::sync::oneshot::Sender;
 
 fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     let mut list = vec![];
@@ -34,7 +35,6 @@ fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>,
 ) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
     loop {
-        // TODO figure out how to stop the thread nicely without making fan go brrr
         if abort_rx.try_recv().is_ok() { return; }
 
         a = device.next_event(ReadFlag::NORMAL);
@@ -104,10 +104,11 @@ async fn init_virtual_output_device(
 async fn runner_it(fd_path: &Path,
                    writer: mpsc::Sender<InputEvent>)
                    -> Result<oneshot::Sender<()>> {
-    let fd_file = tokio::fs::File::open(fd_path).await?;
+    let fd_file = fs::File::open(&fd_path).expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
     let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
-    let mut device = Device::new_from_file(fd_file_nb)?;
-    device.grab(GrabMode::Grab).unwrap();
+    let mut device = Device::new_from_file(fd_file_nb).expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
+    device.grab(GrabMode::Grab)
+        .map_err(|err| anyhow!("failed to grab device '{}': {}", fd_path.to_str().unwrap_or("..."), err))?;
 
     // spawn tasks for reading devices
     let (abort_tx, abort_rx) = oneshot::channel();
@@ -163,7 +164,15 @@ async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender
         let mut device_map = HashMap::new();
 
         for device_fd_path in get_fd_list(&device_fd_path_pattens) {
-            let abort_tx = runner_it(&device_fd_path, writer.clone()).await?;
+            let res = runner_it(&device_fd_path, writer.clone()).await;
+            let abort_tx= match res{
+                Ok(v) => v,
+                Err(err) => {
+                    eprintln!("{}", err);
+                    continue;
+                }
+            };
+
             device_map.insert(device_fd_path, abort_tx);
         }
 
