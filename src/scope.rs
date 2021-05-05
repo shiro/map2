@@ -265,7 +265,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 }
                 "sleep" => {
                     let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
-                    match val{
+                    match val {
                         ValueType::Number(millis) => tokio::time::sleep(time::Duration::from_millis(millis as u64)).await,
                         _ => panic!("sleep expects a number argument"),
                     }
@@ -298,6 +298,18 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
 
                     let val = val as u8 as char;
                     ValueType::String(format!("{}", val))
+                }
+                "char_to_number" => {
+                    let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
+                    let val = match val {
+                        ValueType::String(val) => val,
+                        _ => panic!("only chars can be converted to chars"),
+                    };
+                    if val.len() != 1 { panic!("string needs to contain exactly 1 character") }
+
+                    let first_ch = val.chars().next().unwrap();
+                    let val = first_ch as u8 as f64;
+                    ValueType::Number(val)
                 }
                 "map_key" => {
                     let val = (

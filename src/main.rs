@@ -4,6 +4,7 @@
 #![feature(trait_alias)]
 #![feature(label_break_value)]
 #![feature(destructuring_assignment)]
+#![feature(seek_convenience)]
 
 #[macro_use]
 extern crate lazy_static;
@@ -32,6 +33,7 @@ use crate::state::*;
 use crate::x11::{x11_initialize, x11_test};
 use crate::x11::ActiveWindowInfo;
 use crate::device::device_logging::print_event_debug;
+use crate::cli::parse_cli;
 
 mod tab_mod;
 mod caps_mod;
@@ -45,7 +47,7 @@ mod block_ext;
 mod key_primitives;
 mod parsing;
 mod device;
-mod udevmon;
+mod cli;
 
 
 struct IgnoreList(Vec<KeyAction>);
@@ -92,6 +94,8 @@ pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMess
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let mut configuration = parse_cli()?;
+
     let (window_ev_tx, mut window_ev_rx) = tokio::sync::mpsc::channel(128);
     let (mut message_tx, mut message_rx) = tokio::sync::mpsc::channel(128);
 
@@ -113,7 +117,7 @@ async fn main() -> Result<()> {
 
 
     let mut state = State::new();
-    let mut global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings()));
+    let mut global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings(&mut configuration.script_file)));
     let mut window_cycle_token: usize = 0;
     let mut mappings = CompiledKeyMappings::new();
 
@@ -123,18 +127,17 @@ async fn main() -> Result<()> {
     // experimental udev stuff
     let patterns = vec![
         "/dev/input/by-id/.*-event-mouse",
-        "/dev/input/by-id/usb-Logitech_G700s.*-event.*",
+        "/dev/input/by-id/usb-Logitech_G700s.*-event-kbd",
         "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
     ];
 
     let (mut ev_reader_init_tx, mut ev_reader_init_rx) = oneshot::channel();
     let (ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
     // start coroutine
-    bind_udev_inputs(patterns, ev_reader_init_tx, ev_writer_tx).await;
-    let mut ev_reader_tx = ev_reader_init_rx.await.unwrap();
+    bind_udev_inputs(patterns, ev_reader_init_tx, ev_writer_tx).await?;
+    let mut ev_reader_tx = ev_reader_init_rx.await?;
 
     let mut window_change_handlers = vec![];
-
 
     {
         let mut message_tx = message_tx.clone();
@@ -150,7 +153,7 @@ async fn main() -> Result<()> {
         });
     }
 
-    fn handle_active_window_change(ev_writer_tx: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender, mappings: &mut CompiledKeyMappings,
+    fn handle_active_window_change(ev_writer_tx: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender,
                                    window_cycle_token: usize, window_change_handlers: &mut Vec<(Block, GuardedVarMap)>) {
         for (handler, var_map) in window_change_handlers {
             let mut message_tx = message_tx.clone();
@@ -196,7 +199,7 @@ async fn main() -> Result<()> {
                 state.active_window = Some(window);
                 window_cycle_token = window_cycle_token + 1;
                 handle_active_window_change(&mut ev_reader_tx,
-                    &mut message_tx, &mut mappings, window_cycle_token, &mut window_change_handlers);
+                    &mut message_tx, window_cycle_token, &mut window_change_handlers);
             }
             Some(ev) = ev_writer_rx.recv() => {
                 handle_stdin_ev(&mut state, ev, &mut mappings,

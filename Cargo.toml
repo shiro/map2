@@ -19,7 +19,7 @@ lazy_static = "1.4.0"
 async-recursion = "0.3.2"
 nom = "6.1.2"
 tokio-file-unix = "0.5.1"
-#evdev-rs = "0.5.0"
+clap = "2.33.3"
 evdev-rs = { path = "evdev-rs" }
 walkdir = "2.3.2"
 regex = "1.4.5"

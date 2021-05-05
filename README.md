@@ -207,7 +207,7 @@ print(char); // output: 'a'
 - [ ] all basic expressions (i.e. multiplication, division, string and number
       concatenation, etc.)
 - [ ] proper error reporting
-- [ ] pretty command line interface (CLI)
+- [ ] more command line options
 
 # Authors
 

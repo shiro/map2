@@ -29,11 +29,12 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 }
 
 
-async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>,
-                             mut abort_rx: oneshot::Receiver<()>,
+fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>,
+                       mut abort_rx: oneshot::Receiver<()>,
 ) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
     loop {
+        // TODO figure out how to stop the thread nicely without making fan go brrr
         if abort_rx.try_recv().is_ok() { return; }
 
         a = device.next_event(ReadFlag::NORMAL);
@@ -51,7 +52,9 @@ async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>
                     }
                 }
                 ReadStatus::Success => {
-                    reader_rx.send(result.1).await.unwrap();
+                    futures::executor::block_on(
+                        reader_rx.send(result.1)
+                    ).unwrap();
                 }
             }
         } else {
@@ -59,7 +62,8 @@ async fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>
             match err.raw_os_error() {
                 Some(libc::ENODEV) => { return; }
                 Some(libc::EWOULDBLOCK) => {
-                    task::yield_now().await;
+                    // thread::yield_now();
+                    thread::sleep(time::Duration::from_millis(2));
                     continue;
                 }
                 _ => {
@@ -107,8 +111,8 @@ async fn runner_it(fd_path: &Path,
 
     // spawn tasks for reading devices
     let (abort_tx, abort_rx) = oneshot::channel();
-    task::spawn(async move {
-        read_from_fd_runner(device, writer, abort_rx).await;
+    thread::spawn(move || {
+        read_from_fd_runner(device, writer, abort_rx);
     });
 
     Ok(abort_tx)
@@ -116,7 +120,6 @@ async fn runner_it(fd_path: &Path,
 
 async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, writer: mpsc::Sender<InputEvent>)
                 -> Result<()> {
-
     task::spawn(async move {
         let (reader_tx, reader_rx) = mpsc::channel(128);
 
