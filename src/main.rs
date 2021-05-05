@@ -123,6 +123,7 @@ async fn main() -> Result<()> {
     // experimental udev stuff
     let patterns = vec![
         "/dev/input/by-id/.*-event-mouse",
+        "/dev/input/by-id/usb-Logitech_G700s.*-event.*",
         "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
     ];
 
