@@ -193,13 +193,22 @@ if(active_window_class() == "firefox"){
 }
 ```
 
-#### number_to_char(number)
+#### number_to_char(number: Number)
 
 Converts a number to the corresponding character.
 
 ```.rust
 let char = num_to_char(97);
 print(char); // output: 'a'
+```
+
+#### char_to_number(char: String)
+
+Converts a character to the corresponding number.
+
+```.rust
+let number = char_to_number("a");
+print(number); // output: '97'
 ```
 
 # Feature roadmap
