@@ -102,6 +102,7 @@ let handle_key = |key|{
 for(let i=97; i<97+26; i=i+1){ handle_key(number_to_char(i)); }
 for(let i=char_to_number("0"); i<char_to_number("9"); i=i+1){ handle_key(number_to_char(i)); }
 handle_key("space");
+handle_key("/");
 
 
 let setup_mouse = ||{
