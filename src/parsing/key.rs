@@ -24,8 +24,8 @@ pub(super) enum ParsedSingleKey {
 
 pub(super) fn key(input: &str) -> Res<&str, ParsedSingleKey> {
     context("key", alt(( // multiple asci chars or 1 arbitrary char
-        ident,
-        map(take(1usize), |v: &str| v.to_string())
+                         ident,
+                         map(take(1usize), |v: &str| v.to_string())
     )))(input)
         .and_then(|(next, val)| {
             let mut key_name = val.to_uppercase();

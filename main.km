@@ -83,8 +83,7 @@ let directional_mod = |key, direction|{
   map("!"+key_down, "{alt down}"+key_down+"{alt up}", "!"+key_up, "{alt down}"+key_up+"{alt up}");
 };
 
-let handle_key = |i|{
-  let key = number_to_char(i);
+let handle_key = |key|{
   let key_down = "{"+key+" down}";
   let key_up = "{"+key+" up}";
 
@@ -100,9 +99,9 @@ let handle_key = |i|{
   });
 };
 
-for(let i=97; i<97+26; i=i+1){ handle_key(i); }
-for(let i=char_to_number("0"); i<char_to_number("9"); i=i+1){ handle_key(i); }
-handle_key(char_to_number(" "));
+for(let i=97; i<97+26; i=i+1){ handle_key(number_to_char(i)); }
+for(let i=char_to_number("0"); i<char_to_number("9"); i=i+1){ handle_key(number_to_char(i)); }
+handle_key("space");
 
 
 let setup_mouse = ||{
