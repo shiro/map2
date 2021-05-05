@@ -211,6 +211,16 @@ let number = char_to_number("a");
 print(number); // output: '97'
 ```
 
+#### exit(exit_code?: Number)
+
+Terminates the application with the specified exit code. If no exit code is
+provided it defaults to '0'.
+
+```.rust
+exit(); // exits the application and indicates success
+exit(1); // exits the application and indicates an error
+```
+
 # Feature roadmap
 
 - [ ] all basic expressions (i.e. multiplication, division, string and number
