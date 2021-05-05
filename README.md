@@ -215,8 +215,11 @@ print(number); // output: '97'
 
 - [ ] all basic expressions (i.e. multiplication, division, string and number
       concatenation, etc.)
-- [ ] proper error reporting
+- [ ] proper error tracing
 - [ ] more command line options
+- [ ] more built-ins
+- [ ] comment support
+- [ ] lots of example scripts
 
 # Authors
 

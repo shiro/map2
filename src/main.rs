@@ -88,6 +88,7 @@ pub(crate) enum ExecutionMessage {
     AddMapping(usize, KeyActionWithMods, Block, GuardedVarMap),
     GetFocusedWindowInfo(mpsc::Sender<Option<ActiveWindowInfo>>),
     RegisterWindowChangeCallback(Block, GuardedVarMap),
+    Exit(i32),
 }
 
 pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMessage>;
@@ -173,8 +174,13 @@ async fn main() -> Result<()> {
         }
     }
 
+    enum ExecutionHandlerRet{
+        Normal,
+        Exit(i32),
+    }
+
     async fn handle_execution_message(current_token: usize, msg: ExecutionMessage, state: &mut State, mappings: &mut CompiledKeyMappings,
-                                      window_change_handlers: &mut Vec<(Block, GuardedVarMap)>) {
+                                      window_change_handlers: &mut Vec<(Block, GuardedVarMap)>) -> ExecutionHandlerRet {
         match msg {
             ExecutionMessage::EatEv(action) => {
                 state.ignore_list.ignore(&action);
@@ -190,7 +196,11 @@ async fn main() -> Result<()> {
             ExecutionMessage::RegisterWindowChangeCallback(block, var_map) => {
                 window_change_handlers.push((block, var_map));
             }
+            ExecutionMessage::Exit(exit_code) => {
+                return ExecutionHandlerRet::Exit(exit_code);
+            }
         }
+        ExecutionHandlerRet::Normal
     }
 
     loop {
@@ -206,7 +216,11 @@ async fn main() -> Result<()> {
                     &mut ev_reader_tx, &mut message_tx, window_cycle_token).await.unwrap();
             }
             Some(msg) = message_rx.recv() => {
-                handle_execution_message(window_cycle_token, msg, &mut state, &mut mappings, &mut window_change_handlers).await;
+                let ret = handle_execution_message(window_cycle_token, msg, &mut state, &mut mappings, &mut window_change_handlers).await;
+                match ret{
+                    ExecutionHandlerRet::Exit(exit_code) => {std::process::exit(exit_code)}
+                    _ => {}
+                }
             }
             else => { break }
         }

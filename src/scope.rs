@@ -223,6 +223,21 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         }
         Expr::FunctionCall(name, args) => {
             match &**name {
+                "exit" => {
+                    let arg = args.get(0);
+                    let val = match arg {
+                        Some(arg) => eval_expr(arg, var_map, amb).await,
+                        _ => ValueType::Number(0.0),
+                    };
+
+                    let exit_code = match val {
+                        ValueType::Number(exit_code) => exit_code as i32,
+                        _ => panic!("the first parameter to 'exit' must be a number"),
+                    };
+
+                    amb.message_tx.as_ref().unwrap().send(ExecutionMessage::Exit(exit_code)).await.unwrap();
+                    ValueType::Void
+                }
                 "send" => {
                     let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
                     let val = match val {
