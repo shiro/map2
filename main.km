@@ -58,11 +58,11 @@ let directional_mod = |key, direction|{
     map_key(key_down, ||{
       key_pressed = true;
 
+      if (lalt){ send("{"+direction+" down}"); return 0; }
       if (caps_down){
         send("{alt down}{meta down}{shift down}{ctrl down}"+key+"{alt up}{meta up}{shift up}{ctrl up}");
         return 0;
       }
-      if (lalt){ send("{"+direction+" down}"); return 0; }
       if (ralt){ send("{rightalt up}{alt down}{meta down}"+key+"{alt up}{meta up}{rightalt down}"); return 0; }
 
       if (key_tab_mod(key_down)){ return 0; }
