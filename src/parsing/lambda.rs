@@ -5,19 +5,19 @@ pub(super) fn lambda(input: &str) -> Res<&str, Expr> {
         "lambda",
         tuple((
             tag("|"),
-            multispace0,
+            ws0,
             opt((tuple((
                 ident,
-                multispace0,
+                ws0,
                 many0(tuple((
                     tag(","),
-                    multispace0,
+                    ws0,
                     ident,
-                    multispace0,
+                    ws0,
                 ))),
             )))),
             tag("|"),
-            multispace0,
+            ws0,
             block,
         )),
     )(input).map(|(next, val)| {

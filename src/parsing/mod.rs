@@ -26,9 +26,9 @@ use variable::*;
 use for_loop::*;
 use return_statement::*;
 use continue_statement::*;
+use custom_combinators::*;
 
 use crate::*;
-use crate::parsing::custom_combinators::fold_many0_once;
 use crate::parsing::identifier::ident;
 
 pub mod parser;
@@ -75,7 +75,7 @@ fn block_body(input: &str) -> Res<&str, Block> {
         opt(tuple((
             stmt,
             many0(tuple((
-                multispace0,
+                ws0,
                 stmt,
             ))),
         ))),
@@ -98,9 +98,9 @@ fn block(input: &str) -> Res<&str, Block> {
         "block",
         tuple((
             tag("{"),
-            multispace0,
+            ws0,
             block_body,
-            multispace0,
+            ws0,
             tag("}")
         )),
     )(input).map(|(next, v)| (next, v.2))
@@ -109,7 +109,7 @@ fn block(input: &str) -> Res<&str, Block> {
 fn global_block(input: &str) -> Res<&str, Block> {
     context(
         "block",
-        tuple((multispace0, block_body, multispace0)),
+        tuple((ws0, block_body, ws0)),
     )(input).map(|(next, v)| (next, v.1))
 }
 

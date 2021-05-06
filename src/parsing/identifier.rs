@@ -1,4 +1,4 @@
-use nom::character::complete::multispace0;
+use super::*;
 use unicode_xid::UnicodeXID;
 
 use crate::parsing::{make_generic_nom_err, Res};
@@ -23,7 +23,7 @@ pub fn ident(input: &str) -> Res<&str, String> {
 }
 
 pub fn word(input: &str) -> Res<&str, String> {
-    let (input, _) = multispace0(input)?;
+    let (input, _) = ws0(input)?;
 
     let mut chars = input.char_indices();
     match chars.next() {

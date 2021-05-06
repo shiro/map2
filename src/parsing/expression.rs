@@ -17,7 +17,7 @@ pub(super) fn expr_4(input: &str) -> Res<&str, Expr> {
                 key_mapping,
                 variable,
             )),
-            multispace0,
+            ws0,
         )),
     )(input).map(|(next, v)| (next, v.0))
 }
@@ -36,7 +36,7 @@ pub(super) fn expr_2(i: &str) -> Res<&str, Expr> {
         |i: &str| {
             context(
                 "expr_2",
-                tuple((multispace0, alt((tag("*"), tag("/"))), multispace0, expr_3)),
+                tuple((ws0, alt((tag("*"), tag("/"))), ws0, expr_3)),
             )(i)
         },
         init,
@@ -56,7 +56,7 @@ pub(super) fn expr_1(i: &str) -> Res<&str, Expr> {
         |i: &str| {
             context(
                 "expr_1",
-                tuple((multispace0, alt((tag("+"), tag("-"))), multispace0, expr_2)),
+                tuple((ws0, alt((tag("+"), tag("-"))), ws0, expr_2)),
             )(i)
         },
         init,
@@ -76,7 +76,7 @@ pub(super) fn expr(i: &str) -> Res<&str, Expr> {
         |i: &str| {
             context(
                 "expr",
-                tuple((multispace0, alt((tag("=="), tag("!="), tag("&&"), tag("||"), tag("<"), tag(">"))), multispace0, expr_1)),
+                tuple((ws0, alt((tag("=="), tag("!="), tag("&&"), tag("||"), tag("<"), tag(">"))), ws0, expr_1)),
             )(i)
         },
         init,

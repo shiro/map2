@@ -10,15 +10,15 @@ pub(super) fn function_call(input: &str) -> Res<&str, Expr> {
         tuple((
             ident,
             tag("("),
-            multispace0,
+            ws0,
             opt(tuple((
                 function_arg,
-                multispace0,
+                ws0,
                 many0(tuple((
                     tag(","),
-                    multispace0,
+                    ws0,
                     function_arg,
-                    multispace0,
+                    ws0,
                 ))),
             ))),
             tag(")"),

@@ -68,7 +68,7 @@ pub(super) fn key_mapping(input: &str) -> Res<&str, Expr> {
         tuple((
             key_action_with_flags,
             tag("::"),
-            multispace0,
+            ws0,
             block,
         )),
     )(input).and_then(|(next, v)| {

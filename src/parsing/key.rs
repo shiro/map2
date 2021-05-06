@@ -67,7 +67,7 @@ pub(super) fn key_with_state(input: &str) -> Res<&str, (ParsedSingleKey, i32)> {
     context(
         "special_key", tuple((
             key,
-            multispace0,
+            ws0,
             key_state,
         )))(input)
         .map(|(next, val)| (next, (val.0, val.2)))

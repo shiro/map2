@@ -1,9 +1,11 @@
+use nom::{Compare, Err, InputIter, InputLength, InputTake};
 use nom::branch::alt;
-use nom::character::complete::{char, digit1};
+use nom::bytes::complete::{is_not, tag, take_until};
+use nom::character::complete::{char, digit1, multispace0, multispace1};
 use nom::combinator::{opt, recognize, value};
-use nom::Err;
 use nom::error::{ErrorKind, ParseError};
 use nom::IResult;
+use nom::multi::many0;
 use nom::sequence::{pair, tuple};
 
 /// This is a custom implementation of nom::recognize_float that does not parse
@@ -60,4 +62,49 @@ pub fn fold_many0_once<I, O, E, F, G, R>(f: F, init: R, g: G) -> impl FnOnce(I) 
             }
         }
     }
+}
+
+fn line_comment<'a, E>(input: &'a str) -> IResult<&str, (), E>
+    where E: ParseError<&'a str>,
+{
+    value((), tuple((
+        tag("//"),
+        is_not("\r\n")
+    )))(input)
+}
+
+fn inline_comment<'a, E>(input: &'a str) -> IResult<&str, (), E> where E: ParseError<&'a str> {
+    value((), tuple((
+        tag("/*"),
+        take_until("*/"),
+        tag("*/"),
+    )))(input)
+}
+
+pub fn ws0<'a, E>(input: &'a str) -> IResult<&str, (), E> where E: ParseError<&'a str> {
+    value((), tuple((
+        multispace0,
+        many0(
+            tuple((
+                alt((
+                    line_comment,
+                    inline_comment,
+                )),
+                multispace0,
+            ))
+        )
+    )))(input)
+}
+
+pub fn ws1<'a, E>(input: &'a str) -> IResult<&str, (), E> where E: ParseError<&'a str> {
+    value((), tuple((
+        multispace1,
+        many0(tuple((
+            alt((
+                line_comment,
+                inline_comment,
+            )),
+            multispace0,
+        )))
+    )))(input)
 }

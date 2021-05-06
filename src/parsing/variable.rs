@@ -5,11 +5,11 @@ pub(super) fn variable_initialization(input: &str) -> Res<&str, Expr> {
         "variable_declaration",
         tuple((
             tag("let"),
-            multispace0,
+            ws0,
             ident,
-            multispace0,
+            ws0,
             tag("="),
-            multispace0,
+            ws0,
             expr,
         )),
     )(input).map(|(next, parts)|
@@ -22,9 +22,9 @@ pub(super) fn variable_assignment(input: &str) -> Res<&str, Expr> {
         "variable_assignment",
         tuple((
             ident,
-            multispace0,
+            ws0,
             tag("="),
-            multispace0,
+            ws0,
             expr,
         )),
     )(input).map(|(next, parts)|

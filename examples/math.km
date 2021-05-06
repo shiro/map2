@@ -1,5 +1,6 @@
-let res = false && true == false;
+let res = !(3 + 4 * 22 / (4 + 1) == 5) && true || true;
 
+// print val
 print(res);
 
 exit();
