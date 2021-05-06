@@ -19,13 +19,13 @@ Just run:
 
 Basic mappings simply map one key to a different one.
 
-```.rust
+```
 a::b; // when 'a' is pressed, 'b' will be pressed instead
 ```
 
 Under the hood the above expression is a shorthand for the following code:
 
-```.rust
+```
 {a down}::{b down};
 {a repeat}::{b repeat};
 {a up}::{b up};
@@ -34,7 +34,7 @@ Under the hood the above expression is a shorthand for the following code:
 Keys can also be remapped to key sequences, meaning that pressing the key will
 result in the key sequence being typed.
 
-```.rust
+```
 a::"hello world"; // maps a to "hello world"
 ```
 
@@ -43,7 +43,7 @@ Also see [Key sequences](#key-sequences).
 Complex mappings can be used by putting a code block on the right side of the
 mapping expression.
 
-```.rust
+```
 a::{
   sleep(200);
   print("hi");
@@ -64,7 +64,7 @@ The following modifier flags can be used:
 
 Flags can be used on both sides of a mapping expression:
 
-```.rust
+```
 !a::b; // maps 'alt+a' to 'b'
 a::+b; // maps 'a' to 'shift+b'
 #!^a::+b; // maps 'meta+alt+ctrl+a' to 'shift+b'
@@ -75,13 +75,13 @@ a::+b; // maps 'a' to 'shift+b'
 Variables can be initialized using the `let` keyword. Assigning a value to a
 non-existent variable produces an error.
 
-```.rust
+```
 let foo = 33;
 ```
 
 Variables are dynamically typed, meaning the their type can change at runtime.
 
-```.rust
+```
 let foo = 33;
 foo = "hello";
 ```
@@ -95,7 +95,7 @@ The flow of execution can be controlled using control statements.
 If statements can check whether a certain condition is satisfied and execute
 code conditionally.
 
-```.rust
+```
 let a = 3;
 
 if (a == 1){
@@ -111,7 +111,7 @@ if (a == 1){
 
 For loops are useful when a code block should be run several times.
 
-```.rust
+```
 for(let i=0; i<10; i = i+1){
   print(i);
 }
@@ -123,13 +123,13 @@ Key sequences represent multiple keys with a specific ordering. They can be
 used on the right side of a mapping expression in order to type the sequence
 when a key is pressed.
 
-```.rust
+```
 a::"hello world";
 ```
 
 Complex keys are also permitted.
 
-```.rust
+```
 a::"hello{enter}world{shift down}1{shift up}";
 ```
 
@@ -144,7 +144,7 @@ user defined functions.
 
 Print the value to the standard output.
 
-```.rust
+```
 print(33);
 
 print("hello");
@@ -158,7 +158,7 @@ Maps a key to a callback at runtime, meaning expressions can be used as
 parameters. This is useful when the trigger key or callback need to be
 dynamically evaluated.
 
-```.rust
+```
 map_key("a", ||{
   send("b");
 });
@@ -169,7 +169,7 @@ map_key("a", ||{
 Pauses the execution for a certain duration. This does not block other mappings
 and tasks.
 
-```.rust
+```
 sleep(1000); // sleep for 1 second
 ```
 
@@ -177,7 +177,7 @@ sleep(1000); // sleep for 1 second
 
 Registers a callback that is called whenever the active window changes.
 
-```.rust
+```
 on_window_change(||{
   print("hello");
 });
@@ -187,7 +187,7 @@ on_window_change(||{
 
 Gets the class name of the currently active window or `Void`.
 
-```.rust
+```
 if(active_window_class() == "firefox"){
   print("firefox!");
 }
@@ -197,7 +197,7 @@ if(active_window_class() == "firefox"){
 
 Converts a number to the corresponding character.
 
-```.rust
+```
 let char = num_to_char(97);
 print(char); // output: 'a'
 ```
@@ -206,7 +206,7 @@ print(char); // output: 'a'
 
 Converts a character to the corresponding number.
 
-```.rust
+```
 let number = char_to_number("a");
 print(number); // output: '97'
 ```
@@ -216,9 +216,19 @@ print(number); // output: '97'
 Terminates the application with the specified exit code. If no exit code is
 provided it defaults to '0'.
 
-```.rust
+```
 exit(); // exits the application and indicates success
 exit(1); // exits the application and indicates an error
+```
+
+## Comments
+
+Code inside of comments is not evaluated and will be ignored. There exist two
+types of comments: line comments and in-line comments.
+
+```
+// this is a line comment
+print(/* this is an in-line comment */ "hello");
 ```
 
 # Feature roadmap
