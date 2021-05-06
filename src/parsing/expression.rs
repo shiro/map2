@@ -1,10 +1,11 @@
 use super::*;
 
-pub(super) fn expr_simple(input: &str) -> Res<&str, Expr> {
+pub(super) fn expr_4(input: &str) -> Res<&str, Expr> {
     context(
-        "expr_simple",
+        "expr_4",
         tuple((
             alt((
+                map(tuple((tag("("), expr, tag(")"))), |(_, v, _)| v),
                 boolean,
                 string,
                 number,
@@ -21,13 +22,41 @@ pub(super) fn expr_simple(input: &str) -> Res<&str, Expr> {
     )(input).map(|(next, v)| (next, v.0))
 }
 
+pub(super) fn expr_3(input: &str) -> Res<&str, Expr> {
+    context("expr_3",
+            alt((
+                map(tuple((tag("!"), expr_4)), |(_, v)| Expr::Neg(Box::new(v))),
+                expr_4,
+            )))(input)
+}
+
+pub(super) fn expr_2(i: &str) -> Res<&str, Expr> {
+    let (i, init) = expr_3(i)?;
+    fold_many0_once(
+        |i: &str| {
+            context(
+                "expr_2",
+                tuple((multispace0, alt((tag("*"), tag("/"))), multispace0, expr_3)),
+            )(i)
+        },
+        init,
+        |acc, (_, op, _, val)| {
+            match op {
+                "*" => Expr::Mul(Box::new(acc), Box::new(val)),
+                "/" => Expr::Div(Box::new(acc), Box::new(val)),
+                _ => unreachable!()
+            }
+        },
+    )(i)
+}
+
 pub(super) fn expr_1(i: &str) -> Res<&str, Expr> {
-    let (i, init) = expr_simple(i)?;
+    let (i, init) = expr_2(i)?;
     fold_many0_once(
         |i: &str| {
             context(
                 "expr_1",
-                tuple((multispace0, alt((tag("+"), tag("-"))), multispace0, expr_simple)),
+                tuple((multispace0, alt((tag("+"), tag("-"))), multispace0, expr_2)),
             )(i)
         },
         init,
@@ -47,7 +76,7 @@ pub(super) fn expr(i: &str) -> Res<&str, Expr> {
         |i: &str| {
             context(
                 "expr",
-                tuple((multispace0, alt((tag("=="), tag("!="),tag("<"),tag(">"))), multispace0, expr_1)),
+                tuple((multispace0, alt((tag("=="), tag("!="), tag("&&"), tag("||"), tag("<"), tag(">"))), multispace0, expr_1)),
             )(i)
         },
         init,
@@ -55,6 +84,8 @@ pub(super) fn expr(i: &str) -> Res<&str, Expr> {
             match op {
                 "==" => Expr::Eq(Box::new(acc), Box::new(val)),
                 "!=" => Expr::Neq(Box::new(acc), Box::new(val)),
+                "&&" => Expr::And(Box::new(acc), Box::new(val)),
+                "||" => Expr::Or(Box::new(acc), Box::new(val)),
                 ">" => Expr::GT(Box::new(acc), Box::new(val)),
                 "<" => Expr::LT(Box::new(acc), Box::new(val)),
                 _ => unreachable!()

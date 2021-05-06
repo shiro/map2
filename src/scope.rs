@@ -74,9 +74,9 @@ pub(crate) type GuardedVarMap = Arc<Mutex<VarMap>>;
 
 #[async_recursion]
 pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mut Ambient<'_>) -> ValueType {
+    use ValueType::*;
     match expr {
         Expr::Eq(left, right) => {
-            use ValueType::*;
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
                 (Bool(left), Bool(right)) => Bool(left == right),
                 (String(left), String(right)) => Bool(left == right),
@@ -85,7 +85,6 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             }
         }
         Expr::Neq(left, right) => {
-            use ValueType::*;
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
                 (Bool(left), Bool(right)) => Bool(left != right),
                 (String(left), String(right)) => Bool(left != right),
@@ -94,7 +93,6 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             }
         }
         Expr::LT(left, right) => {
-            use ValueType::*;
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
                 (Bool(left), Bool(right)) => Bool(left < right),
                 (String(left), String(right)) => Bool(left < right),
@@ -103,7 +101,6 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             }
         }
         Expr::GT(left, right) => {
-            use ValueType::*;
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
                 (Bool(left), Bool(right)) => Bool(left > right),
                 (String(left), String(right)) => Bool(left > right),
@@ -112,7 +109,6 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             }
         }
         Expr::Add(left, right) => {
-            use ValueType::*;
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
                 (Number(left), Number(right)) => Number(left + right),
                 (String(left), String(right)) => String(format!("{}{}", left, right)),
@@ -120,10 +116,42 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             }
         }
         Expr::Sub(left, right) => {
-            use ValueType::*;
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
                 (Number(left), Number(right)) => Number(left - right),
                 _ => panic!("cannot subtract unsupported types"),
+            }
+        }
+        Expr::Mul(left, right) => {
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Number(left), Number(right)) => Number(left * right),
+                _ => panic!("cannot multiply unsupported types"),
+            }
+        }
+        Expr::Div(left, right) => {
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Number(left), Number(right)) => {
+                    if right == 0.0 { panic!("error: division by zero"); }
+                    Number(left / right)
+                }
+                _ => panic!("cannot multiply unsupported types"),
+            }
+        }
+        Expr::Neg(expr) => {
+            match eval_expr(expr, var_map, amb).await {
+                (Bool(val)) => { Bool(!val) }
+                _ => panic!("cannot negate unsupported type"),
+            }
+        }
+        Expr::And(left, right) => {
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Bool(left), Bool(right)) => Bool(left == right),
+                _ => panic!("cannot perform \"and\" operation on unsupported types"),
+            }
+        }
+        Expr::Or(left, right) => {
+            match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
+                (Bool(left), Bool(right)) => Bool(left || right),
+                _ => panic!("cannot perform \"or\" operation on unsupported types"),
             }
         }
         Expr::Init(var_name, value) => {
@@ -491,9 +519,15 @@ pub(crate) enum Expr {
     Neq(Box<Expr>, Box<Expr>),
     LT(Box<Expr>, Box<Expr>),
     GT(Box<Expr>, Box<Expr>),
-    // INC(Expr),
+    // Inc(Expr),
+    // Dec(Expr),
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
+    Neg(Box<Expr>),
+    And(Box<Expr>, Box<Expr>),
+    Or(Box<Expr>, Box<Expr>),
     Init(String, Box<Expr>),
     Assign(String, Box<Expr>),
     KeyMapping(Vec<KeyMapping>),
