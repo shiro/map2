@@ -226,8 +226,8 @@ exit(1); // exits the application and indicates an error
 - [ ] proper error tracing
 - [ ] more command line options
 - [ ] more built-ins
-- [ ] comment support
 - [ ] lots of example scripts
+- [ ] configurable input fd patterns
 
 # Authors
 
