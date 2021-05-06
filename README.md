@@ -223,8 +223,6 @@ exit(1); // exits the application and indicates an error
 
 # Feature roadmap
 
-- [ ] all basic expressions (i.e. multiplication, division, string and number
-      concatenation, etc.)
 - [ ] proper error tracing
 - [ ] more command line options
 - [ ] more built-ins
