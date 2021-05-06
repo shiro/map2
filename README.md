@@ -3,6 +3,10 @@
 A scripting language that allows complex key remapping on Linux, written in
 Rust.
 
+All of the functionality related to interacting with graphical elements such as
+getting the active window information is currently only supported on X11.
+Wayland support is planned but probably won't be added for some time.
+
 For details check the [documentation](#documentation).
 
 # Install
@@ -239,6 +243,7 @@ print(/* this is an in-line comment */ "hello");
 - [ ] lots of example scripts
 - [ ] configurable input fd patterns
 - [ ] escaped characters in strings and key sequences
+- [ ] Wayland support (someday)
 
 # Authors
 
