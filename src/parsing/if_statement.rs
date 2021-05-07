@@ -1,51 +1,51 @@
 use super::*;
 
-pub(crate) fn if_stmt(input: &str) -> Res<&str, Stmt> {
-    context(
-        "if_stmt",
-        tuple((
-            tag("if"),
-            ws0,
-            tag("("),
-            ws0,
-            expr,
-            ws0,
-            tag(")"),
-            ws0,
-            block,
-            many0(tuple((
-                tag("else"),
-                ws0,
-                tag("if"),
-                ws0,
-                tag("("),
-                ws0,
-                expr,
-                ws0,
-                tag(")"),
-                ws0,
-                block,
-            ))),
-            opt(tuple((
-                ws0,
-                tag("else"),
-                ws0,
-                block,
-            ))),
-        )),
-    )(input).map(|(next, v)| {
-        let mut pairs: Vec<(Expr, Block)> = v.9.into_iter().map(|v| (v.6, v.10)).collect();
-        let first_pair = (v.4, v.8);
-        pairs.insert(0, first_pair);
-
-        let else_block = match v.10 {
-            Some(v) => Some(v.3),
-            _ => None,
-        };
-
-        (next, Stmt::If(pairs, else_block))
-    })
-}
+// pub(crate) fn if_stmt(input: &str) -> Res<&str, Stmt> {
+//     context(
+//         "if_stmt",
+//         tuple((
+//             tag("if"),
+//             ws0,
+//             tag("("),
+//             ws0,
+//             expr,
+//             ws0,
+//             tag(")"),
+//             ws0,
+//             block,
+//             many0(tuple((
+//                 tag("else"),
+//                 ws0,
+//                 tag("if"),
+//                 ws0,
+//                 tag("("),
+//                 ws0,
+//                 expr,
+//                 ws0,
+//                 tag(")"),
+//                 ws0,
+//                 block,
+//             ))),
+//             opt(tuple((
+//                 ws0,
+//                 tag("else"),
+//                 ws0,
+//                 block,
+//             ))),
+//         )),
+//     )(input).map(|(next, v)| {
+//         let mut pairs: Vec<(Expr, Block)> = v.9.into_iter().map(|v| (v.6, v.10)).collect();
+//         let first_pair = (v.4, v.8);
+//         pairs.insert(0, first_pair);
+//
+//         let else_block = match v.10 {
+//             Some(v) => Some(v.3),
+//             _ => None,
+//         };
+//
+//         (next, Stmt::If(pairs, else_block))
+//     })
+// }
 
 #[cfg(test)]
 mod tests {

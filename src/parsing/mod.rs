@@ -27,6 +27,7 @@ use for_loop::*;
 use return_statement::*;
 use continue_statement::*;
 use custom_combinators::*;
+use error::*;
 
 use crate::*;
 use crate::parsing::identifier::ident;
@@ -47,70 +48,67 @@ mod lambda;
 mod primitives;
 mod variable;
 mod for_loop;
-
-type Res<T, U> = IResult<T, U, VerboseError<T>>;
-
-fn make_generic_nom_err<'a>() -> NomErr<VerboseError<&'a str>> { NomErr::Error(VerboseError { errors: vec![] }) }
+mod error;
 
 
-fn stmt(input: &str) -> Res<&str, Stmt> {
-    context(
-        "stmt",
-        tuple((
-            alt((
-                return_statement,
-                continue_statement,
-                if_stmt,
-                for_loop,
-                map(tuple((expr, tag(";"))), |v| Stmt::Expr(v.0)),
-                map(block, Stmt::Block),
-            )),
-        )),
-    )(input).map(|(next, val)| (next, val.0))
+fn stmt(input: &str) -> ResNew<&str, Stmt> {
+    tuple((
+              alt((
+                  return_statement,
+                  continue_statement,
+                  // if_stmt,
+                  // for_loop,
+                  map(tuple((expr, tag(";"))), |v| Stmt::Expr(v.0)),
+                  // map(block, Stmt::Block),
+              )),
+          ),
+    )(input)
+        .map_err(|v| NomErr::Error(CustomError { input, expected: vec!["statement".to_string()] }))
+        .map(|(next, val)| (next, (val.0, None)))
 }
 
-fn block_body(input: &str) -> Res<&str, Block> {
-    context(
-        "block_body",
-        opt(tuple((
-            stmt,
-            many0(tuple((
-                ws0,
-                stmt,
-            ))),
-        ))),
+fn block_body(input: &str) -> ResNew<&str, Block> {
+    // opt(tuple((
+    //     stmt,
+    many0_err(tuple((
+        ws0,
+        stmt,
+    ))
+              // ))),
     )(input).map(|(next, v)| {
-        match v {
-            Some((s1, s2)) => {
-                (next, Block::new().tap_mut(|b| {
-                    let mut statements: Vec<Stmt> = s2.into_iter().map(|x| x.1).collect();
-                    statements.insert(0, s1);
-                    b.statements = statements;
-                }))
-            }
-            _ => (next, Block::new())
-        }
+        // match v {
+        //     Some((s1, (s2, last_err))) => {
+        let (s2, last_err) = v;
+        (next, (
+            Block::new().tap_mut(|b| {
+                let mut statements: Vec<Stmt> = s2.into_iter().map(|x| x.1.0).collect();
+                // statements.insert(0, s1);
+                b.statements = statements;
+            }),
+            Some(last_err)
+        ))
+        // }
+        // _ => (next, (Block::new()))
+        // }
     })
 }
 
-fn block(input: &str) -> Res<&str, Block> {
-    context(
-        "block",
-        tuple((
-            tag("{"),
-            ws0,
-            block_body,
-            ws0,
-            tag("}")
-        )),
-    )(input).map(|(next, v)| (next, v.2))
+fn block(input: &str) -> ResNew<&str, Block> {
+    tuple((
+              tag("{"),
+              ws0,
+              block_body,
+              ws0,
+              tag("}")
+          ),
+    )(input)
+        .map(|(next, v)| (next, v.2))
 }
 
-fn global_block(input: &str) -> Res<&str, Block> {
-    context(
-        "block",
-        tuple((ws0, block_body, ws0)),
-    )(input).map(|(next, v)| (next, v.1))
+fn global_block(input: &str) -> ResNew<&str, Block> {
+    tuple((ws0, block_body, ws0),
+    )(input)
+        .map(|(next, v)| (next, v.1))
 }
 
 

@@ -1,4 +1,4 @@
-use nom::{Compare, Err, InputIter, InputLength, InputTake};
+use nom::{Compare, Err, InputIter, InputLength, InputTake, Parser};
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until};
 use nom::character::complete::{char, digit1, multispace0, multispace1};
@@ -107,4 +107,30 @@ pub fn ws1<'a, E>(input: &'a str) -> IResult<&str, (), E> where E: ParseError<&'
             multispace0,
         )))
     )))(input)
+}
+
+
+pub fn many0_err<I, O, E, F>(mut f: F) -> impl FnMut(I) -> IResult<I, (Vec<O>, E), E>
+    where
+        I: Clone + PartialEq,
+        F: Parser<I, O, E>,
+        E: ParseError<I>,
+{
+    move |mut i: I| {
+        let mut acc = std::vec::Vec::with_capacity(4);
+        loop {
+            match f.parse(i.clone()) {
+                Err(Err::Error(err)) => return Ok((i, (acc, err))),
+                Err(e) => return Err(e),
+                Ok((i1, o)) => {
+                    if i1 == i {
+                        return Err(Err::Error(E::from_error_kind(i, ErrorKind::Many0)));
+                    }
+
+                    i = i1;
+                    acc.push(o);
+                }
+            }
+        }
+    }
 }

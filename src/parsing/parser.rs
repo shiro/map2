@@ -1,12 +1,21 @@
 use super::*;
+use nom::error::convert_error;
 
 pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
     match global_block(raw_script) {
-        Ok(v) => {
-            if v.0.is_empty() {
-                Ok(v.1)
+        Ok((v, (block, last_err))) => {
+            if v.is_empty() {
+                Ok(block)
             } else {
-                Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v.0))
+                if let Some(last_err) = last_err {
+                    let err = convert_custom_error(raw_script, last_err);
+                    eprintln!("{}", &*err);
+                } else {
+                    eprintln!("generic error");
+                }
+
+                Err(anyhow!("parsing failed unwrapping..."))
+                // Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v))
             }
         }
         Err(err) => Err(anyhow!("parsing failed: {}", err))

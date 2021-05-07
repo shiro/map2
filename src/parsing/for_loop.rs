@@ -1,22 +1,22 @@
 use super::*;
 
 
-pub(crate) fn for_loop(input: &str) -> Res<&str, Stmt> {
-    context(
-        "for_loop",
-        tuple((
-            tag("for"), ws0,
-            tag("("), ws0,
-            expr, ws0,
-            tag(";"), ws0,
-            expr, ws0,
-            tag(";"), ws0,
-            expr, ws0,
-            tag(")"), ws0,
-            block,
-        )),
-    )(input).map(|(next, v)| { (next, Stmt::For(v.4, v.8, v.12, v.16)) })
-}
+// pub(crate) fn for_loop(input: &str) -> Res<&str, Stmt> {
+//     context(
+//         "for_loop",
+//         tuple((
+//             tag("for"), ws0,
+//             tag("("), ws0,
+//             expr, ws0,
+//             tag(";"), ws0,
+//             expr, ws0,
+//             tag(";"), ws0,
+//             expr, ws0,
+//             tag(")"), ws0,
+//             block,
+//         )),
+//     )(input).map(|(next, v)| { (next, Stmt::For(v.4, v.8, v.12, v.16)) })
+// }
 
 
 #[cfg(test)]

@@ -9,12 +9,12 @@ pub(super) fn expr_4(input: &str) -> Res<&str, Expr> {
                 boolean,
                 string,
                 number,
-                lambda,
+                // lambda,
                 variable_initialization,
                 variable_assignment,
                 function_call,
                 key_mapping_inline,
-                key_mapping,
+                // key_mapping,
                 variable,
             )),
             ws0,
@@ -25,7 +25,7 @@ pub(super) fn expr_4(input: &str) -> Res<&str, Expr> {
 pub(super) fn expr_3(input: &str) -> Res<&str, Expr> {
     context("expr_3",
             alt((
-                map(tuple((tag("!"), expr_4)), |(_, v)| Expr::Neg(Box::new(v))),
+                map(tuple((tag("??"), expr_4)), |(_, v)| Expr::Neg(Box::new(v))),
                 expr_4,
             )))(input)
 }

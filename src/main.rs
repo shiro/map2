@@ -48,6 +48,7 @@ mod key_primitives;
 mod parsing;
 mod device;
 mod cli;
+mod test;
 
 
 struct IgnoreList(Vec<KeyAction>);
