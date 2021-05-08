@@ -55,47 +55,38 @@ fn stmt(input: &str) -> ResNew<&str, Stmt> {
     alt((
         return_statement,
         continue_statement,
-        // if_stmt,
+        if_stmt,
         // for_loop,
         map(
             tuple((expr, tag_custom(";"))),
-            |(v, _)| (Stmt::Expr(v.0), v.1)),
-        map(
-            tuple((expr, tag_custom(";"))),
-            |(v, _)| (Stmt::Expr(v.0), v.1)),
+            |(v, _)| (Stmt::Expr(v.0), v.1),
+        ),
         map(block, |(block, last_err)| (Stmt::Block(block), last_err)),
     ))(input)
-    // .map_err(|err| {
-    //     println!("error was: {:?}", err);
-    //     err
-    // })
-    // .map_err(|v| NomErr::Error(CustomError { input, expected: vec!["statement".to_string()] }))
-    // .map(|(next, val)| (next, val))
 }
 
 fn block_body(input: &str) -> ResNew<&str, Block> {
     let res = stmt(input);
 
-    let (input, first_stmt) = match res {
-        Ok(v) => (v.0, v.1.0),
+    let (input, (first_stmt, initial_last_err)) = match res {
+        Ok(v) => v,
         Err(NomErr::Error(last_err)) => return Ok((input, (Block::new(), Some(last_err)))),
         Err(_) => return Ok((input, (Block::new(), None))),
     };
 
+    let (input, (pairs, mut last_err)) = many0_err(tuple((ws0, stmt)))(input)?;
 
-    many0_err(tuple((
-        ws0,
-        stmt,
-    )))(input).map(|(next, v)| {
-        let (s2, last_err) = v;
-        let block = Block::new().tap_mut(|b| {
-            let mut statements: Vec<Stmt> = s2.into_iter().map(|x| x.1.0).collect();
-            statements.insert(0, first_stmt);
-            b.statements = statements;
-        });
+    if let Some(err) = initial_last_err {
+        last_err = last_err.or(err);
+    }
 
-        (next, (block, Some(last_err)))
-    })
+    let block = Block::new().tap_mut(|b| {
+        let mut statements: Vec<Stmt> = pairs.into_iter().map(|x| x.1.0).collect();
+        statements.insert(0, first_stmt);
+        b.statements = statements;
+    });
+
+    Ok((input, (block, Some(last_err))))
 }
 
 fn block(input: &str) -> ResNew<&str, Block> {

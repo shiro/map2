@@ -1,6 +1,7 @@
 use super::*;
 use nom::error::{ErrorKind, ParseError, FromExternalError};
 use nom::{Offset, InputLength};
+use std::fmt::Debug;
 
 pub(super) type Res<T, U> = IResult<T, U, VerboseError<T>>;
 
@@ -62,7 +63,6 @@ impl<I> ParseError<I> for CustomError<I> where I: InputLength {
     }
 
     fn from_char(input: I, ch: char) -> Self {
-        println!("woo");
         CustomError { input, expected: vec![ch.to_string()] }
     }
 

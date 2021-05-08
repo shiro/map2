@@ -1,51 +1,53 @@
 use super::*;
 
-// pub(crate) fn if_stmt(input: &str) -> Res<&str, Stmt> {
-//     context(
-//         "if_stmt",
-//         tuple((
-//             tag("if"),
-//             ws0,
-//             tag("("),
-//             ws0,
-//             expr,
-//             ws0,
-//             tag(")"),
-//             ws0,
-//             block,
-//             many0(tuple((
-//                 tag("else"),
-//                 ws0,
-//                 tag("if"),
-//                 ws0,
-//                 tag("("),
-//                 ws0,
-//                 expr,
-//                 ws0,
-//                 tag(")"),
-//                 ws0,
-//                 block,
-//             ))),
-//             opt(tuple((
-//                 ws0,
-//                 tag("else"),
-//                 ws0,
-//                 block,
-//             ))),
-//         )),
-//     )(input).map(|(next, v)| {
-//         let mut pairs: Vec<(Expr, Block)> = v.9.into_iter().map(|v| (v.6, v.10)).collect();
-//         let first_pair = (v.4, v.8);
-//         pairs.insert(0, first_pair);
-//
-//         let else_block = match v.10 {
-//             Some(v) => Some(v.3),
-//             _ => None,
-//         };
-//
-//         (next, Stmt::If(pairs, else_block))
-//     })
-// }
+pub(super) fn if_stmt(input: &str) -> ResNew<&str, Stmt> {
+    let (input, _) = tag_custom("if")(input)?;
+
+    let (input, v) = tuple((
+        ws0,
+        tag_custom("("),
+        ws0,
+        expr,
+        ws0,
+        tag_custom(")"),
+        ws0,
+        block,
+        many0_err(tuple((
+            ws0,
+            tag_custom("else"),
+            ws1,
+            tag_custom("if"),
+            ws0,
+            tag_custom("("),
+            ws0,
+            expr,
+            ws0,
+            tag_custom(")"),
+            ws0,
+            block,
+        ))),
+    ))(input)?;
+    let mut last_err = Some(v.8.1);
+    let mut pairs: Vec<(Expr, Block)> = v.8.0.into_iter().map(|v| (v.7.0, v.11.0)).collect();
+    let first_pair = (v.3.0, v.7.0);
+    pairs.insert(0, first_pair);
+
+    let mut input = input;
+    let mut else_block = None;
+    if let Ok((i, _)) = tuple::<_, _, CustomError<&str>, _>((ws0, tag_custom("else")))(input) {
+        let is_followed_by_if = tuple::<_, _, CustomError<&str>, _>((ws1, tag_custom("if")))(i).is_ok();
+
+        if !is_followed_by_if {
+            let (i, res) = tuple((ws0, block))(i)?;
+            else_block = Some(res.1.0);
+            last_err = None;
+            input = i;
+        }
+    };
+
+    let stmt = Stmt::If(pairs, else_block);
+    Ok((input, (stmt, last_err)))
+}
 
 #[cfg(test)]
 mod tests {

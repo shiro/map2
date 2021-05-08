@@ -1,7 +1,10 @@
-let a = |a|{
-  return a;
-};
+let a = 4;
 
-print(a(3));
+if (a == 4){
+  print(a);
+
+} else if (4 == 3){
+
+}
 
 exit();
