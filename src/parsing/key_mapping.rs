@@ -62,25 +62,23 @@ pub(super) fn key_mapping_inline(input: &str) -> ResNew<&str, Expr> {
     })
 }
 
-// pub(super) fn key_mapping(input: &str) -> Res<&str, Expr> {
-//     context(
-//         "key_mapping",
-//         tuple((
-//             key_action_with_flags,
-//             tag("::"),
-//             ws0,
-//             block,
-//         )),
-//     )(input).and_then(|(next, v)| {
-//         let (from, to) = (v.0, v.3);
-//
-//         let expr = match from {
-//             ParsedKeyAction::KeyClickAction(from) => { Expr::map_key_click_block(from, to) }
-//             ParsedKeyAction::KeyAction(from) => { Expr::map_key_block(from, to) },
-//         };
-//         Ok((next, expr))
-//     })
-// }
+pub(super) fn key_mapping(input: &str) -> ResNew<&str, Expr> {
+    tuple((
+        key_action_with_flags,
+        tag("::"),
+        ws0,
+        block,
+    ))(input).and_then(|(next, v)| {
+        let ((from, _), (to, last_err)) = (v.0, v.3);
+
+        let expr = match from {
+            ParsedKeyAction::KeyClickAction(from) => { Expr::map_key_click_block(from, to) }
+            ParsedKeyAction::KeyAction(from) => { Expr::map_key_block(from, to) }
+        };
+
+        Ok((next, (expr, last_err)))
+    })
+}
 
 
 #[cfg(test)]
