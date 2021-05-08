@@ -25,6 +25,7 @@ walkdir = "2.3.2"
 regex = "1.4.5"
 unicode-xid = "0.2.1"
 notify = "4.0.16"
+xdg = "2.2.0"
 
 [[bin]]
 name = "key-mods-rs"

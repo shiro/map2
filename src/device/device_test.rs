@@ -165,7 +165,7 @@ async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender
 
         for device_fd_path in get_fd_list(&device_fd_path_pattens) {
             let res = runner_it(&device_fd_path, writer.clone()).await;
-            let abort_tx= match res{
+            let abort_tx = match res {
                 Ok(v) => v,
                 Err(err) => {
                     eprintln!("{}", err);
@@ -201,10 +201,11 @@ async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender
 }
 
 
-pub(crate) async fn bind_udev_inputs(fd_patterns: Vec<&str>, reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
-    if fd_patterns.len() < 1 { bail!(anyhow!("need at least 1 pattern")); }
-
-    let fd_patterns_regex = fd_patterns.into_iter().map(|v| Regex::new(v).unwrap()).collect();
+pub(crate) async fn bind_udev_inputs(fd_patterns: &[impl AsRef<str>], reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
+    let fd_patterns_regex = fd_patterns.into_iter()
+        .map(|v| Regex::new(v.as_ref()))
+        .collect::<std::result::Result<_, _>>()
+        .map_err(|err| anyhow!("failed to parse regex: {}", err))?;
 
     task::spawn(async move {
         runner(fd_patterns_regex, reader_init_tx, writer_tx).await.unwrap();

@@ -459,6 +459,7 @@ dependencies = [
  "unicode-xid",
  "walkdir",
  "x11rb",
+ "xdg",
 ]
 
 [[package]]
@@ -1189,3 +1190,9 @@ dependencies = [
  "winapi 0.3.9",
  "winapi-wsapoll",
 ]
+
+[[package]]
+name = "xdg"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d089681aa106a86fade1b0128fb5daf07d5867a509ab036d99988dec80429a57"

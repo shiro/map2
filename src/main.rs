@@ -124,18 +124,10 @@ async fn main() -> Result<()> {
 
     let mut global_var_map = GuardedVarMap::new(Mutex::new(VarMap::new(None)));
 
-
-    // experimental udev stuff
-    let patterns = vec![
-        "/dev/input/by-id/.*-event-mouse",
-        "/dev/input/by-id/usb-Logitech_G700s.*-event-kbd",
-        "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
-    ];
-
     let (mut ev_reader_init_tx, mut ev_reader_init_rx) = oneshot::channel();
     let (ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
     // start coroutine
-    bind_udev_inputs(patterns, ev_reader_init_tx, ev_writer_tx).await?;
+    bind_udev_inputs(&configuration.devices, ev_reader_init_tx, ev_writer_tx).await?;
     let mut ev_reader_tx = ev_reader_init_rx.await?;
 
     let mut window_change_handlers = vec![];
