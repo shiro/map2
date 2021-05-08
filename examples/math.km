@@ -1,5 +1,3 @@
-for(let i=0; ; i=i+1){
-  print(33);
-}
+print(false);
 
 exit();

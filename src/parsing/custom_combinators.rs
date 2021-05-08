@@ -30,7 +30,7 @@ pub fn recognize_float(i: &str) -> IResult<&str, &str> {
 }
 
 /// This is a custom implementation of `nom::multi::fold_many0` that avoids the
-/// `Clone` bound on the initial value for the accumlator. The function returns
+/// `Clone` bound on the initial value for the accumulator. The function returns
 /// an `impl FnOnce` type instead of nom's usual `impl Fn` to avoid having to
 /// clone `init` despite being moved into the closure.
 pub fn fold_many0_once<I, O, E, F, G, R>(f: F, init: R, g: G) -> impl FnOnce(I) -> IResult<I, R, E>
@@ -181,12 +181,8 @@ pub fn fold_many0_once_err<I, O, E, F, G, R>(f: F, init: R, g: G) -> impl FnOnce
                     res = g(res, o);
                     input = i;
                 }
-                Err(Err::Error(err)) => {
-                    return Ok((input, (res, err)));
-                }
-                Err(e) => {
-                    return Err(e);
-                }
+                Err(Err::Error(err)) => return Ok((input, (res, err))),
+                Err(e) => return Err(e),
             }
         }
     }

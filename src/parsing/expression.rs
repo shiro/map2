@@ -1,4 +1,5 @@
 use super::*;
+use nom::combinator::not;
 
 pub(super) fn expr_4(input: &str) -> ResNew<&str, Expr> {
     alt((
@@ -20,11 +21,8 @@ pub(super) fn expr_3(input: &str) -> ResNew<&str, Expr> {
     // TODO fold this
     let (input, expr) = alt((
         map(
-            tuple((
-                tag_custom("??"),
-                expr_4
-            )),
-            |(_, (expr, last_err))| (Expr::Neg(Box::new(expr)), last_err),
+            tuple((tag_custom("!"), not(tag("{")), expr_3)),
+            |(_, _, (expr, last_err))| (Expr::Neg(Box::new(expr)), last_err),
         ),
         expr_4,
     ))(input)?;
