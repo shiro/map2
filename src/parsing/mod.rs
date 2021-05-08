@@ -53,7 +53,7 @@ mod error;
 
 fn stmt(input: &str) -> ResNew<&str, Stmt> {
     alt((
-        // return_statement,
+        return_statement,
         continue_statement,
         // if_stmt,
         // for_loop,

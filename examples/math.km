@@ -1,5 +1,7 @@
-let a = ((5 + 4) / 2) * 3;
+let a = |a|{
+  return a;
+};
 
-print(a);
+print(a(3));
 
 exit();

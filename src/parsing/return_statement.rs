@@ -1,9 +1,8 @@
 use super::*;
 
-// pub(super) fn return_statement(input: &str) -> Res<&str, Stmt> {
-//     context(
-//         "return_statement",
-//         tuple((tag("return"), ws1, expr, ws0, tag(";"))),
-//     )(input)
-//         .map(|(next, val)| (next, Stmt::Return(val.2)))
-// }
+pub(super) fn return_statement(input: &str) -> ResNew<&str, Stmt> {
+    let (input, _) = tag_custom("return")(input)?;
+
+    tuple((ws1, expr, ws0, tag_custom(";")))(input)
+        .map(|(next, (_, (expr, last_err), _, _))| (next, (Stmt::Return(expr), last_err)))
+}
