@@ -1,6 +1,7 @@
 use std::borrow::{BorrowMut};
 use std::fmt;
 use std::fmt::Formatter;
+use messaging::*;
 
 use crate::*;
 use crate::parsing::parser::{parse_key_sequence, parse_key_action_with_mods};
@@ -12,7 +13,7 @@ pub(crate) struct KeyActionCondition {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum ValueType {
+pub enum ValueType {
     Bool(bool),
     String(String),
     Lambda(Vec<String>, Block, GuardedVarMap),
@@ -45,7 +46,7 @@ impl fmt::Display for ValueType {
 }
 
 #[derive(Debug)]
-pub(crate) struct VarMap {
+pub struct VarMap {
     pub(crate) scope_values: HashMap<String, ValueType>,
     pub(crate) parent: Option<GuardedVarMap>,
 }
@@ -67,7 +68,7 @@ impl PartialEq for VarMap {
     }
 }
 
-pub(crate) type GuardedVarMap = Arc<Mutex<VarMap>>;
+pub type GuardedVarMap = Arc<Mutex<VarMap>>;
 
 
 #[async_recursion]
@@ -411,22 +412,22 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
     }
 }
 
-pub(crate) type SleepSender = tokio::sync::mpsc::Sender<Block>;
+pub type SleepSender = tokio::sync::mpsc::Sender<Block>;
 
-pub(crate) struct Ambient<'a> {
-    pub(crate) ev_writer_tx: mpsc::Sender<InputEvent>,
-    pub(crate) message_tx: Option<&'a mut ExecutionMessageSender>,
-    pub(crate) window_cycle_token: usize,
+pub struct Ambient<'a> {
+    pub ev_writer_tx: mpsc::Sender<InputEvent>,
+    pub message_tx: Option<&'a mut ExecutionMessageSender>,
+    pub window_cycle_token: usize,
 }
 
-pub(crate) enum BlockRet {
+pub enum BlockRet {
     None,
     Continue,
     Return(ValueType),
 }
 
 #[async_recursion]
-pub(crate) async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) -> BlockRet {
+pub async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) -> BlockRet {
     let mut var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
 
     'outer: for stmt in &block.statements {
@@ -496,17 +497,13 @@ fn arc_mutexes_are_equal<T>(first: &Arc<Mutex<T>>, second: &Arc<Mutex<T>>) -> bo
     where T: PartialEq { Arc::ptr_eq(first, second) || *first.lock().unwrap() == *second.lock().unwrap() }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Block {
-    // pub(crate) var_map: GuardedVarMap,
+pub struct Block {
     pub(crate) statements: Vec<Stmt>,
 }
 
 impl Block {
     pub(crate) fn new() -> Self {
-        Block {
-            // var_map: Arc::new(Mutex::new(VarMap { scope_values: Default::default(), parent: None })),
-            statements: vec![],
-        }
+        Block { statements: vec![] }
     }
 }
 

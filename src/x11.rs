@@ -5,10 +5,10 @@ use x11rb::protocol::xproto::{Atom, AtomEnum, ChangeWindowAttributesAux, Connect
 use x11rb::x11_utils::TryParse;
 
 #[derive(Debug, Clone)]
-pub(crate)  struct ActiveWindowInfo {
-    pub(crate) class: String,
-    pub(crate) instance: String,
-    pub(crate) name: String,
+pub struct ActiveWindowInfo {
+    pub class: String,
+    pub instance: String,
+    pub name: String,
 }
 
 #[allow(non_snake_case)]
@@ -34,7 +34,7 @@ pub fn x11_initialize() -> Result<X11State<impl Connection + Send + Sync>> {
     })
 }
 
-pub(crate)  fn x11_test<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Option<ActiveWindowInfo>> {
+pub fn x11_test<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Option<ActiveWindowInfo>> {
     loop {
         let event = state.con.wait_for_event()?;
 
@@ -48,7 +48,7 @@ pub(crate)  fn x11_test<S: Connection + Send + Sync>(state: &X11State<S>) -> Res
     }
 }
 
-pub(crate)  fn x11_get_active_window() -> Result<ActiveWindowInfo> {
+pub(crate) fn x11_get_active_window() -> Result<ActiveWindowInfo> {
     let (conn, screen) = x11rb::connect(None)?;
     let root = conn.setup().roots[screen].root;
 

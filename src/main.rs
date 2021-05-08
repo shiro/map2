@@ -1,97 +1,5 @@
-#![feature(type_ascription)]
-#![feature(async_closure)]
-#![feature(unboxed_closures)]
-#![feature(trait_alias)]
-#![feature(label_break_value)]
-#![feature(destructuring_assignment)]
-#![feature(seek_convenience)]
-
-#[macro_use]
-extern crate lazy_static;
-extern crate regex;
-
-use std::{io, time};
-use std::io::Write;
-use std::ops::DerefMut;
-use std::sync::Arc;
-use std::sync::Mutex;
-
-use anyhow::{anyhow, Result};
-use async_recursion::async_recursion;
-use evdev_rs::enums::EventCode;
-use evdev_rs::InputEvent;
-use nom::lib::std::collections::HashMap;
-use tokio::prelude::*;
-use tokio::sync::{mpsc, oneshot};
-use tokio::task;
-
-use crate::device::device_test::bind_udev_inputs;
-use crate::key_defs::*;
-use crate::key_primitives::*;
-use crate::scope::*;
-use crate::state::*;
-use crate::x11::{x11_initialize, x11_test};
-use crate::x11::ActiveWindowInfo;
-use crate::cli::parse_cli;
-
-mod tab_mod;
-mod caps_mod;
-mod rightalt_mod;
-mod x11;
-mod key_defs;
-mod state;
-mod scope;
-mod mappings;
-mod block_ext;
-mod key_primitives;
-mod parsing;
-mod device;
-mod cli;
-mod test;
-
-
-struct IgnoreList(Vec<KeyAction>);
-
-impl IgnoreList {
-    pub fn new() -> Self { IgnoreList(Default::default()) }
-
-    fn is_ignored(&self, key: &KeyAction) -> bool {
-        match self.0.iter().position(|x| x == key) {
-            None => false,
-            Some(_) => true
-        }
-    }
-
-    fn unignore(&mut self, key: &KeyAction) {
-        if let Some(pos) = self.0.iter().position(|x| x == key) {
-            self.0.remove(pos);
-        }
-    }
-
-    fn ignore(&mut self, key: &KeyAction) {
-        if let None = self.0.iter().position(|x| x == key) {
-            self.0.push(*key);
-        }
-    }
-}
-
-fn log_msg(msg: &str) {
-    let out_msg = format!("[DEBUG] {}\n", msg);
-
-    io::stderr().write_all(out_msg.as_bytes()).unwrap();
-}
-
-
-#[derive(Debug)]
-pub(crate) enum ExecutionMessage {
-    EatEv(KeyAction),
-    AddMapping(usize, KeyActionWithMods, Block, GuardedVarMap),
-    GetFocusedWindowInfo(mpsc::Sender<Option<ActiveWindowInfo>>),
-    RegisterWindowChangeCallback(Block, GuardedVarMap),
-    Exit(i32),
-}
-
-pub(crate) type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMessage>;
+use key_mods::*;
+use key_mods::messaging::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -118,13 +26,13 @@ async fn main() -> Result<()> {
 
 
     let mut state = State::new();
-    let mut global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings(&mut configuration.script_file)));
+    let global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings(&mut configuration.script_file)));
     let mut window_cycle_token: usize = 0;
     let mut mappings = CompiledKeyMappings::new();
 
-    let mut global_var_map = GuardedVarMap::new(Mutex::new(VarMap::new(None)));
+    let global_var_map = GuardedVarMap::new(Mutex::new(VarMap::new(None)));
 
-    let (mut ev_reader_init_tx, mut ev_reader_init_rx) = oneshot::channel();
+    let (ev_reader_init_tx, ev_reader_init_rx) = oneshot::channel();
     let (ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
     // start coroutine
     bind_udev_inputs(&configuration.devices, ev_reader_init_tx, ev_writer_tx).await?;
@@ -166,7 +74,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    enum ExecutionHandlerRet{
+    enum ExecutionHandlerRet {
         Normal,
         Exit(i32),
     }

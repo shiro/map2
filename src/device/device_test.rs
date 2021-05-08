@@ -201,7 +201,7 @@ async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender
 }
 
 
-pub(crate) async fn bind_udev_inputs(fd_patterns: &[impl AsRef<str>], reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
+pub async fn bind_udev_inputs(fd_patterns: &[impl AsRef<str>], reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
     let fd_patterns_regex = fd_patterns.into_iter()
         .map(|v| Regex::new(v.as_ref()))
         .collect::<std::result::Result<_, _>>()

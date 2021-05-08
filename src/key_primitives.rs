@@ -4,7 +4,7 @@ use crate::*;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct Key {
-    pub(crate) event_code: EventCode,
+    pub event_code: EventCode,
 }
 
 impl Key {
@@ -31,11 +31,11 @@ impl KeyValue {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) struct KeyModifierFlags {
-    pub(crate) ctrl: bool,
-    pub(crate) shift: bool,
-    pub(crate) alt: bool,
-    pub(crate) meta: bool,
+pub struct KeyModifierFlags {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub alt: bool,
+    pub meta: bool,
 }
 
 impl KeyModifierFlags {
@@ -83,9 +83,9 @@ impl KeyModifierState {
 
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) struct KeyAction {
-    pub(crate) key: Key,
-    pub(crate) value: i32,
+pub struct KeyAction {
+    pub key: Key,
+    pub value: i32,
 }
 
 impl KeyAction {
@@ -96,10 +96,10 @@ impl KeyAction {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) struct KeyActionWithMods {
-    pub(crate) key: Key,
-    pub(crate) value: i32,
-    pub(crate) modifiers: KeyModifierFlags,
+pub struct KeyActionWithMods {
+    pub key: Key,
+    pub value: i32,
+    pub modifiers: KeyModifierFlags,
 }
 
 impl KeyActionWithMods {
@@ -107,9 +107,9 @@ impl KeyActionWithMods {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub(crate) struct KeyClickActionWithMods {
-    pub(crate) key: Key,
-    pub(crate) modifiers: KeyModifierFlags,
+pub struct KeyClickActionWithMods {
+    pub key: Key,
+    pub modifiers: KeyModifierFlags,
 }
 
 impl KeyClickActionWithMods {
@@ -124,6 +124,6 @@ pub(crate) struct KeyMapping {
     pub(crate) to: Block,
 }
 
-pub(crate) static TYPE_UP: i32 = 0;
-pub(crate) static TYPE_DOWN: i32 = 1;
-pub(crate) static TYPE_REPEAT: i32 = 2;
+pub static TYPE_UP: i32 = 0;
+pub static TYPE_DOWN: i32 = 1;
+pub static TYPE_REPEAT: i32 = 2;

@@ -438,7 +438,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "key-mods-rs"
+name = "key_mods"
 version = "0.1.0"
 dependencies = [
  "anyhow",

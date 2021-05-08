@@ -5,13 +5,13 @@ use xdg::BaseDirectories;
 use std::path::PathBuf;
 use std::io::{BufReader, BufRead};
 
-pub(super) struct Configuration {
-    pub(super) script_file: fs::File,
-    pub(super) verbose: bool,
-    pub(super) devices: Vec<String>,
+pub struct Configuration {
+    pub script_file: fs::File,
+    pub verbose: bool,
+    pub devices: Vec<String>,
 }
 
-pub(super) fn parse_cli() -> Result<Configuration> {
+pub fn parse_cli() -> Result<Configuration> {
     let matches = App::new("key-mods")
         .version("1.0")
         .author("shiro <shiro@usagi.io>")
