@@ -5,7 +5,6 @@ pub(super) fn variable_initialization(input: &str) -> ResNew<&str, Expr> {
     let (input, _) = tag_custom("let")(input)
         .map_err(|_: NomErr<CustomError<_>>| make_generic_nom_err_options(input, vec!["variable initialization".to_string()]))?;
 
-
     tuple((
         remaining(tuple((
             ws1,

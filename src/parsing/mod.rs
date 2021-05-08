@@ -54,7 +54,7 @@ mod error;
 fn stmt(input: &str) -> ResNew<&str, Stmt> {
     alt((
         // return_statement,
-        // continue_statement,
+        continue_statement,
         // if_stmt,
         // for_loop,
         map(
@@ -63,7 +63,7 @@ fn stmt(input: &str) -> ResNew<&str, Stmt> {
         map(
             tuple((expr, tag_custom(";"))),
             |(v, _)| (Stmt::Expr(v.0), v.1)),
-        // map(block, Stmt::Block),
+        map(block, |(block, last_err)| (Stmt::Block(block), last_err)),
     ))(input)
     // .map_err(|err| {
     //     println!("error was: {:?}", err);
