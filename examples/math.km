@@ -1,3 +1,6 @@
 let d = ||{
   let a = 3;
 };
+
+print(
+exit();

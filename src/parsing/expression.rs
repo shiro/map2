@@ -9,7 +9,7 @@ pub(super) fn expr_4(input: &str) -> ResNew<&str, Expr> {
         lambda,
         variable_initialization,
         variable_assignment,
-        // function_call,
+        function_call,
         // key_mapping_inline,
         // key_mapping,
         // variable,

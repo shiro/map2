@@ -1,39 +1,38 @@
 use super::*;
 
-// pub(super) fn function_arg(input: &str) -> Res<&str, Expr> {
-//     context("function_arg", expr)(input)
-// }
+pub(super) fn function_arg(input: &str) -> ResNew<&str, Expr> {
+    expr(input)
+}
 
-// pub(super) fn function_call(input: &str) -> Res<&str, Expr> {
-//     context(
-//         "function_call",
-//         tuple((
-//             ident,
-//             tag("("),
-//             ws0,
-//             opt(tuple((
-//                 function_arg,
-//                 ws0,
-//                 many0(tuple((
-//                     tag(","),
-//                     ws0,
-//                     function_arg,
-//                     ws0,
-//                 ))),
-//             ))),
-//             tag(")"),
-//         )),
-//     )(input).map(|(next, v)| {
-//         match v.3 {
-//             Some(arg_v) => {
-//                 let mut args: Vec<Expr> = arg_v.2.into_iter().map(|x| x.2).collect();
-//                 args.insert(0, arg_v.0);
-//                 (next, Expr::FunctionCall(v.0, args))
-//             }
-//             _ => (next, Expr::FunctionCall(v.0, vec![]))
-//         }
-//     })
-// }
+pub(super) fn function_call(input: &str) -> ResNew<&str, Expr> {
+    let (input, (ident_res,_)) = tuple((ident, tag_custom("(")))(input)
+        .map_err(|_: NomErr<CustomError<_>>| make_generic_nom_err_options(input, vec!["function call".to_string()]))?;
+
+    tuple((
+        ws0,
+        opt(tuple((
+            function_arg,
+            ws0,
+            many0(tuple((
+                tag_custom(","),
+                ws0,
+                function_arg,
+                ws0,
+            ))),
+        ))),
+        tag_custom(")"),
+    ))(input).map(|(next, parts)| {
+        let expr = match parts.1 {
+            Some(arg_v) => {
+                let mut args: Vec<Expr> = arg_v.2.into_iter().map(|x| x.2.0).collect();
+                args.insert(0, arg_v.0.0);
+                 Expr::FunctionCall(ident_res.0, args)
+            }
+            _ => Expr::FunctionCall(ident_res.0, vec![])
+        };
+        (next, (expr,None))
+    })
+}
 
 #[cfg(test)]
 mod tests {
