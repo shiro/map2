@@ -237,10 +237,8 @@ print(/* this is an in-line comment */ "hello");
 
 # Feature roadmap
 
-- [ ] more command line options
 - [ ] more built-ins
 - [ ] lots of example scripts
-- [ ] configurable input fd patterns
 - [ ] escaped characters in strings and key sequences
 - [ ] Wayland support (someday)
 
