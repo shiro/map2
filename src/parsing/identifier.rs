@@ -10,14 +10,9 @@ pub(super) fn ident(input: &str) -> ResNew<&str, String> {
     };
 
     match id.0.as_ref() {
-        // From https://doc.rust-lang.org/grammar.html#keywords
-        "abstract" | "alignof" | "as" | "become" | "box" | "break" | "const" | "continue" |
-        "crate" | "do" | "else" | "enum" | "extern" | "false" | "final" | "fn" | "for" |
-        "if" | "impl" | "in" | "let" | "loop" | "macro" | "match" | "mod" | "move" |
-        "mut" | "offsetof" | "override" | "priv" | "proc" | "pub" | "pure" | "ref" |
-        "return" | "Self" | "self" | "sizeof" | "static" | "struct" | "super" | "trait" |
-        "true" | "type" | "typeof" | "unsafe" | "unsized" | "use" | "virtual" | "where" |
-        "while" | "yield" => Err(make_generic_nom_err_new(input)),
+        "break" | "continue" | "do" | "else" | "false" | "for" |
+        "if" | "in" | "let" | "loop" | "return" | "true" | "while"
+        => Err(make_generic_nom_err_new(input)),
         _ => Ok((rest, id)),
     }
 }
