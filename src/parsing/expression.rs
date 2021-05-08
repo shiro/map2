@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) fn expr_4(input: &str) -> ResNew<&str, Expr> {
     alt((
-        // map(tuple((tag("("), expr, tag(")"))), |(_, v, _)| v),
+        map(tuple((tag_custom("("), expr, tag_custom(")"))), |(_, v, _)| v),
         boolean,
         string,
         number,
@@ -12,7 +12,7 @@ pub(super) fn expr_4(input: &str) -> ResNew<&str, Expr> {
         function_call,
         // key_mapping_inline,
         // key_mapping,
-        // variable,
+        variable,
     ))(input)
 }
 

@@ -45,12 +45,11 @@ pub(super) fn variable_assignment(input: &str) -> ResNew<&str, Expr> {
     )
 }
 
-// pub(super) fn variable(input: &str) -> Res<&str, Expr> {
-//     context(
-//         "variable",
-//         ident,
-//     )(input).map(|(next, v)| (next, Expr::Name(v)))
-// }
+pub(super) fn variable(input: &str) -> ResNew<&str, Expr> {
+    ident(input)
+        .map(|(next, (name, last_err))|
+            (next, (Expr::Name(name), last_err)))
+}
 
 
 #[cfg(test)]
