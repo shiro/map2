@@ -16,64 +16,94 @@ pub(super) fn expr_4(input: &str) -> ResNew<&str, Expr> {
     ))(input)
 }
 
-// pub(super) fn expr_3(input: &str) -> Res<&str, Expr> {
-//     context("expr_3",
-//             alt((
-//                 map(tuple((tag("??"), expr_4)), |(_, v)| Expr::Neg(Box::new(v))),
-//                 expr_4,
-//             )))(input)
-// }
-//
-// pub(super) fn expr_2(i: &str) -> Res<&str, Expr> {
-//     let (i, init) = expr_3(i)?;
-//     fold_many0_once(
-//         |i: &str| {
-//             context(
-//                 "expr_2",
-//                 tuple((ws0, alt((tag("*"), tag("/"))), ws0, expr_3)),
-//             )(i)
-//         },
-//         init,
-//         |acc, (_, op, _, val)| {
-//             match op {
-//                 "*" => Expr::Mul(Box::new(acc), Box::new(val)),
-//                 "/" => Expr::Div(Box::new(acc), Box::new(val)),
-//                 _ => unreachable!()
-//             }
-//         },
-//     )(i)
-// }
-//
-// pub(super) fn expr_1(i: &str) -> Res<&str, Expr> {
-//     let (i, init) = expr_2(i)?;
-//     fold_many0_once(
-//         |i: &str| {
-//             context(
-//                 "expr_1",
-//                 tuple((ws0, alt((tag("+"), tag("-"))), ws0, expr_2)),
-//             )(i)
-//         },
-//         init,
-//         |acc, (_, op, _, val)| {
-//             match op {
-//                 "+" => Expr::Add(Box::new(acc), Box::new(val)),
-//                 "-" => Expr::Sub(Box::new(acc), Box::new(val)),
-//                 _ => unreachable!()
-//             }
-//         },
-//     )(i)
-// }
+pub(super) fn expr_3(input: &str) -> ResNew<&str, Expr> {
+    // TODO fold this
+    let (input, expr) = alt((
+        map(
+            tuple((
+                tag_custom("??"),
+                expr_4
+            )),
+            |(_, (expr, last_err))| (Expr::Neg(Box::new(expr)), last_err),
+        ),
+        expr_4,
+    ))(input)?;
+
+    Ok((input, expr))
+}
+
+pub(super) fn expr_2(i: &str) -> ResNew<&str, Expr> {
+    let (input, init) = expr_3(i)?;
+    let expr = fold_many0_once_err(
+        |input: &str| {
+            tuple((
+                ws0,
+                alt((tag_custom("*"), tag_custom("/"))),
+                ws0,
+                expr_3
+            ))(input)
+        },
+        init.0,
+        |acc, (_, op, _, (val, _))| {
+            match op {
+                "*" => Expr::Mul(Box::new(acc), Box::new(val)),
+                "/" => Expr::Div(Box::new(acc), Box::new(val)),
+                _ => unreachable!()
+            }
+        },
+    )(input);
+
+    match expr {
+        Err(v) => Err(v),
+        Ok((next, (expr, last_err))) => Ok((next, (expr, Some(last_err)))),
+    }
+}
+
+pub(super) fn expr_1(i: &str) -> ResNew<&str, Expr> {
+    let (input, init) = expr_2(i)?;
+    let expr = fold_many0_once_err(
+        |input: &str| {
+            tuple((
+                ws0,
+                alt((tag_custom("+"), tag_custom("-"))),
+                ws0,
+                expr_2,
+            ))(input)
+        },
+        init.0,
+        |acc, (_, op, _, (val, _))| {
+            match op {
+                "+" => Expr::Add(Box::new(acc), Box::new(val)),
+                "-" => Expr::Sub(Box::new(acc), Box::new(val)),
+                _ => unreachable!()
+            }
+        },
+    )(input);
+
+    match expr {
+        Err(v) => Err(v),
+        Ok((next, (expr, last_err))) => Ok((next, (expr, Some(last_err)))),
+    }
+}
 
 pub(super) fn expr(input: &str) -> ResNew<&str, Expr> {
-    let (input, init) = expr_4(input)?;
-        // .map_err(|v| NomErr::Error(CustomError { input, expected: vec!["expression".to_string()] }))?;
+    let (input, init) = expr_1(input)?;
 
     let expr = fold_many0_once_err(
         |i: &str| {
-            tuple((alt((tag("=="), tag("!="), tag("&&"), tag("||"), tag("<"), tag(">"))), ws0, expr_4))(i)
+            tuple((
+                ws0,
+                alt((
+                    tag_custom("=="),
+                    tag_custom("!="),
+                    tag_custom("&&"),
+                    tag_custom("||"),
+                    tag_custom("<"),
+                    tag_custom(">"))),
+                ws0, expr_1))(i)
         },
         init.0,
-        |acc, (op, _, (val, last_err))| {
+        |acc, (_, op, _, (val, last_err))| {
             match op {
                 "==" => Expr::Eq(Box::new(acc), Box::new(val)),
                 "!=" => Expr::Neq(Box::new(acc), Box::new(val)),
@@ -90,8 +120,6 @@ pub(super) fn expr(input: &str) -> ResNew<&str, Expr> {
         Err(v) => Err(v),
         Ok((next, (expr, last_err))) => Ok((next, (expr, Some(last_err)))),
     }
-    // .map(|(next, expr)| (next, (expr, None)))
-    // .map_err(|v| NomErr::Error(CustomError { input, expected: vec!["expression".to_string()] }))
 }
 
 
