@@ -1,8 +1,6 @@
 use super::*;
 use unicode_xid::UnicodeXID;
 
-use crate::parsing::{make_generic_nom_err, Res};
-
 pub(super) fn ident(input: &str) -> ResNew<&str, String> {
     let (rest, id) = match word(input) {
         Ok((rest, id)) => (rest, id),

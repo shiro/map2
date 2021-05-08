@@ -3,62 +3,26 @@ use nom::error::{ErrorKind, ParseError, FromExternalError};
 use nom::{Offset, InputLength};
 use std::fmt::Debug;
 
-pub(super) type Res<T, U> = IResult<T, U, VerboseError<T>>;
-
-pub(crate) fn make_generic_nom_err<'a>() -> NomErr<VerboseError<&'a str>> { NomErr::Error(VerboseError { errors: vec![] }) }
-
 
 pub(super) type ResNew<I, O> = IResult<I, (O, Option<CustomError<I>>), CustomError<I>>;
-// pub(super) type ResNewPair<I, O> = IResult<I, (O, Option<CustomError<I>>), CustomError<I>>;
-//
-// pub(super) fn add_last_err<I, O>(res: ResNew<I, O>) -> ResNewPair<I, O> {
-//     match res {
-//         Ok((next, v)) => Ok((next, (v, None))),
-//         Err(v) => Err(v),
-//     }
-// }
 
 pub(super) fn make_generic_nom_err_new<I>(input: I) -> NomErr<CustomError<I>> {
     NomErr::Error(CustomError { input, expected: vec![] })
 }
-
 pub(super) fn make_generic_nom_err_options<I>(input: I, options: Vec<String>) -> NomErr<CustomError<I>> {
     NomErr::Error(CustomError { input, expected: options })
 }
 
 
-// pub fn tag<T, Input, Error: ParseError<Input>>(
-//     tag: T,
-// ) -> impl Fn(Input) -> IResult<Input, Input, Error>
-//     where
-//         Input: InputTake + Compare<T>,
-//         T: InputLength + Clone,
-// {
-
-// pub(super) fn adapter<Input>() -> impl Fn(Input) -> IResult<Input, Input, Error>
-// {
-//     move |input|{
-//
-//     }
-// }
 
 #[derive(Debug, PartialEq)]
 pub(super) struct CustomError<I> {
-    // Token(I, Vec<String>),
-    // Generic(I),
     pub(super) input: I,
     pub(super) expected: Vec<String>,
-
-    // Nom(I, ErrorKind),
 }
 
 impl<I> ParseError<I> for CustomError<I> where I: InputLength {
     fn from_error_kind(input: I, kind: ErrorKind) -> Self {
-        // CustomError::Nom(input, kind)
-        // CustomError::Token(input, vec![])
-        // match kind{
-        //
-        // };
         CustomError { input, expected: vec![] }
     }
 
@@ -106,10 +70,9 @@ pub(super) fn convert_custom_error<I: core::ops::Deref<Target=str>>(
 
     let mut result = String::new();
 
-    // let expected = err.expected.get(0).map(|v: &String| &**v).unwrap_or("something idk");
     let expected;
     if err.expected.is_empty() {
-        expected = "something idk".to_string();
+        expected = "valid token (no suggestion)".to_string();
     } else {
         let mut options = err.expected.clone();
         options.sort();
@@ -154,7 +117,6 @@ pub(super) fn convert_custom_error<I: core::ops::Deref<Target=str>>(
 
         // The (1-indexed) column number is the offset of our substring into that line
         let column_number: usize = line.offset(&substring) + 1;
-
 
         write!(
             &mut result,
