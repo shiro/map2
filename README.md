@@ -237,7 +237,6 @@ print(/* this is an in-line comment */ "hello");
 
 # Feature roadmap
 
-- [ ] proper error tracing
 - [ ] more command line options
 - [ ] more built-ins
 - [ ] lots of example scripts
