@@ -1,7 +1,3 @@
-let a = 3;
-let b = 3;
-let c = 3
-
-print(res);
-
-exit();
+let d = ||{
+  let a = 3;
+};

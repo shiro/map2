@@ -4,9 +4,7 @@ use std::fmt::Formatter;
 
 use crate::*;
 use crate::parsing::parser::{parse_key_sequence, parse_key_action_with_mods};
-use x11rb::protocol::xproto::lookup_color;
 use evdev_rs::enums::int_to_ev_key;
-use std::convert::{TryInto, TryFrom};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition {
@@ -138,7 +136,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         }
         Expr::Neg(expr) => {
             match eval_expr(expr, var_map, amb).await {
-                (Bool(val)) => { Bool(!val) }
+                Bool(val) => { Bool(!val) }
                 _ => panic!("cannot negate unsupported type"),
             }
         }

@@ -4,32 +4,31 @@ use nom::multi::many1;
 
 use super::*;
 
-pub(super) fn key_sequence(input: &str) -> Res<&str, Vec<ParsedKeyAction>> {
-    context(
-        "key_sequence",
-        tuple((
-            tag("\""),
-            many1(
-                alt((
-                    map_res(take(1usize), key_action),
-                    map_res(
-                        recognize(terminated(take_until("}"), tag("}"))),
-                        key_action,
-                    ),
-                )),
-            ),
-            tag("\""),
-        )),
-    )(input).and_then(|(next, val)| Ok((next, val.1.into_iter()
-        .map(|v| {
-            if !v.0.is_empty() { return Err(make_generic_nom_err()); }
-            Ok(v.1)
-        })
-        .fold_ok(vec![], |mut acc, v| {
-            acc.push(v);
-            acc
-        })?
-    )))
+pub(super) fn key_sequence(input: &str) -> ResNew<&str, Vec<ParsedKeyAction>> {
+    tuple((
+        tag("\""),
+        many1(
+            alt((
+                map_res(take(1usize), key_action),
+                map_res(
+                    recognize(terminated(take_until("}"), tag("}"))),
+                    key_action,
+                ),
+            )),
+        ),
+        tag("\""),
+    ))(input).and_then(|(next, val)| {
+        let seq = val.1.into_iter()
+            .map(|v| {
+                if !v.0.is_empty() { return Err(make_generic_nom_err_new(input)); }
+                Ok(v.1.0)
+            })
+            .fold_ok(vec![], |mut acc, v| {
+                acc.push(v);
+                acc
+            })?;
+        Ok((next, (seq, None)))
+    })
 }
 
 #[cfg(test)]

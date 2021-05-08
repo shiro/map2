@@ -1,18 +1,18 @@
 use super::*;
 
-pub(super) fn key_flags(input: &str) -> Res<&str, KeyModifierFlags> {
-    context("key_flags", many0(one_of("^!+#")))(input).and_then(|(next, val)| {
+pub(super) fn key_flags(input: &str) -> ResNew<&str, KeyModifierFlags> {
+    many0(one_of("^!+#"))(input).and_then(|(next, val)| {
         let mut flags = KeyModifierFlags::new();
         for v in val {
             match v {
-                '!' => { if !flags.alt { flags.alt(); } else { return Err(make_generic_nom_err()); } }
-                '^' => { if !flags.ctrl { flags.ctrl(); } else { return Err(make_generic_nom_err()); } }
-                '+' => { if !flags.shift { flags.shift(); } else { return Err(make_generic_nom_err()); } }
-                '#' => { if !flags.meta { flags.meta(); } else { return Err(make_generic_nom_err()); } }
+                '!' => { if !flags.alt { flags.alt(); } else { return Err(make_generic_nom_err_new(input)); } }
+                '^' => { if !flags.ctrl { flags.ctrl(); } else { return Err(make_generic_nom_err_new(input)); } }
+                '+' => { if !flags.shift { flags.shift(); } else { return Err(make_generic_nom_err_new(input)); } }
+                '#' => { if !flags.meta { flags.meta(); } else { return Err(make_generic_nom_err_new(input)); } }
                 _ => unreachable!()
             }
         };
-        Ok((next, flags))
+        Ok((next, (flags, None)))
     })
 }
 
@@ -22,11 +22,11 @@ pub(super) enum ParsedSingleKey {
     CapitalKey(Key),
 }
 
-pub(super) fn key(input: &str) -> Res<&str, ParsedSingleKey> {
-    context("key", alt(( // multiple asci chars or 1 arbitrary char
-                         ident,
-                         map(take(1usize), |v: &str| v.to_string())
-    )))(input)
+pub(super) fn key(input: &str) -> ResNew<&str, ParsedSingleKey> {
+    alt(( // multiple asci chars or 1 arbitrary char
+          map(ident, |v| v.0),
+          map(take(1usize), |v: &str| v.to_string())
+    ))(input)
         .and_then(|(next, val)| {
             let mut key_name = val.to_uppercase();
 
@@ -39,38 +39,37 @@ pub(super) fn key(input: &str) -> Res<&str, ParsedSingleKey> {
                     }
 
                     Key::from_str(&EventType::EV_KEY, key_name.as_str())
-                        .map_err(|_| make_generic_nom_err())?
+                        .map_err(|_| make_generic_nom_err_new(input))?
                 }
             };
 
             // only 1 char and it's uppercase
             let mut it = val.chars();
             if it.next().unwrap().is_uppercase() && it.next().is_none() {
-                return Ok((next, ParsedSingleKey::CapitalKey(key.clone())));
+                return Ok((next, (ParsedSingleKey::CapitalKey(key.clone()), None)));
             }
 
-            Ok((next, ParsedSingleKey::Key(key.clone())))
+            Ok((next, (ParsedSingleKey::Key(key.clone()), None)))
         })
 }
 
-fn key_state(input: &str) -> Res<&str, i32> {
-    context("key_state", alt((
+fn key_state(input: &str) -> ResNew<&str, i32> {
+    alt((
         tag("down"), tag("up"),
-    )))(input).map(|(next, v)| (next, match v.to_uppercase().as_str() {
-        "UP" => 0,
-        "DOWN" => 1,
+    ))(input).map(|(next, v)| (next, match v.to_uppercase().as_str() {
+        "UP" => (0, None),
+        "DOWN" => (1, None),
         _ => unreachable!()
     }))
 }
 
-pub(super) fn key_with_state(input: &str) -> Res<&str, (ParsedSingleKey, i32)> {
-    context(
-        "special_key", tuple((
-            key,
-            ws0,
-            key_state,
-        )))(input)
-        .map(|(next, val)| (next, (val.0, val.2)))
+pub(super) fn key_with_state(input: &str) -> ResNew<&str, (ParsedSingleKey, i32)> {
+    tuple((
+        key,
+        ws0,
+        key_state,
+    ))(input)
+        .map(|(next, val)| (next, ((val.0.0, val.2.0), None)))
 }
 
 

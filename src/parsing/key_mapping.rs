@@ -1,30 +1,28 @@
 use super::*;
 
-pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
-    context(
-        "key_mapping_inline",
-        tuple((
-            key_action_with_flags,
-            tag("::"),
-            alt((
-                key_sequence,
-                map(key_action_with_flags, |v| vec![v]),
-            ))
-        )),
+pub(super) fn key_mapping_inline(input: &str) -> ResNew<&str, Expr> {
+    tuple((
+        key_action_with_flags,
+        tag("::"),
+        alt((
+            key_sequence,
+            map(key_action_with_flags, |v| (vec![v.0], None)),
+        ))
+    )
     )(input).and_then(|(next, v)| {
-        let (from, mut to) = (v.0, v.2);
+        let (from, mut to) = (v.0.0, v.2.0);
 
-        Ok((next, match from {
+        let expr = match from {
             ParsedKeyAction::KeyAction(from) => {
                 if to.len() == 1 {
                     let to = to.remove(0);
                     // action to click
                     if let ParsedKeyAction::KeyClickAction(to) = to {
-                        return Ok((next, Expr::map_key_action_click(from, to)));
+                        return Ok((next, (Expr::map_key_action_click(from, to), None)));
                     }
                     // action to action
                     if let ParsedKeyAction::KeyAction(to) = to {
-                        return Ok((next, Expr::map_key_action_action(from, to)));
+                        return Ok((next, (Expr::map_key_action_action(from, to), None)));
                     }
                 }
 
@@ -41,11 +39,11 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
                 if to.len() == 1 {
                     // click to click
                     if let Some(ParsedKeyAction::KeyClickAction(to)) = to.get(0) {
-                        return Ok((next, Expr::map_key_click(&from, to)));
+                        return Ok((next, (Expr::map_key_click(&from, to), None)));
                     }
                     // click to action
                     if let ParsedKeyAction::KeyAction(to) = to.remove(0) {
-                        return Ok((next, Expr::map_key_click_action(from, to)));
+                        return Ok((next, (Expr::map_key_click_action(from, to), None)));
                     }
                 }
 
@@ -58,7 +56,9 @@ pub(super) fn key_mapping_inline(input: &str) -> Res<&str, Expr> {
                         .collect()),
                 )
             }
-        }))
+        };
+
+        Ok((next, (expr, None)))
     })
 }
 

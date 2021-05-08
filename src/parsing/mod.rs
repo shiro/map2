@@ -5,8 +5,8 @@ use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::combinator::{map, opt};
-use nom::Err as NomErr;
-use nom::error::{context, VerboseError};
+use nom::{Err as NomErr, Parser};
+use nom::error::{context, VerboseError, ParseError};
 use nom::IResult;
 use nom::multi::many0;
 use nom::sequence::*;
@@ -52,63 +52,85 @@ mod error;
 
 
 fn stmt(input: &str) -> ResNew<&str, Stmt> {
-    tuple((
-              alt((
-                  return_statement,
-                  continue_statement,
-                  // if_stmt,
-                  // for_loop,
-                  map(tuple((expr, tag(";"))), |v| Stmt::Expr(v.0)),
-                  // map(block, Stmt::Block),
-              )),
-          ),
-    )(input)
-        .map_err(|v| NomErr::Error(CustomError { input, expected: vec!["statement".to_string()] }))
-        .map(|(next, val)| (next, (val.0, None)))
+    alt((
+        // return_statement,
+        // continue_statement,
+        // if_stmt,
+        // for_loop,
+        map(
+            tuple((expr, tag_custom(";"))),
+            |(v, _)| (Stmt::Expr(v.0), v.1)),
+        map(
+            tuple((expr, tag_custom(";"))),
+            |(v, _)| (Stmt::Expr(v.0), v.1)),
+        // map(block, Stmt::Block),
+    ))(input)
+    // .map_err(|err| {
+    //     println!("error was: {:?}", err);
+    //     err
+    // })
+    // .map_err(|v| NomErr::Error(CustomError { input, expected: vec!["statement".to_string()] }))
+    // .map(|(next, val)| (next, val))
 }
 
 fn block_body(input: &str) -> ResNew<&str, Block> {
-    // opt(tuple((
-    //     stmt,
+    let res = stmt(input);
+
+    let (input, first_stmt) = match res {
+        Ok(v) => (v.0, v.1.0),
+        Err(NomErr::Error(last_err)) => return Ok((input, (Block::new(), Some(last_err)))),
+        Err(_) => return Ok((input, (Block::new(), None))),
+    };
+
+
     many0_err(tuple((
         ws0,
         stmt,
-    ))
-              // ))),
-    )(input).map(|(next, v)| {
-        // match v {
-        //     Some((s1, (s2, last_err))) => {
+    )))(input).map(|(next, v)| {
         let (s2, last_err) = v;
-        (next, (
-            Block::new().tap_mut(|b| {
-                let mut statements: Vec<Stmt> = s2.into_iter().map(|x| x.1.0).collect();
-                // statements.insert(0, s1);
-                b.statements = statements;
-            }),
-            Some(last_err)
-        ))
-        // }
-        // _ => (next, (Block::new()))
-        // }
+        let block = Block::new().tap_mut(|b| {
+            let mut statements: Vec<Stmt> = s2.into_iter().map(|x| x.1.0).collect();
+            statements.insert(0, first_stmt);
+            b.statements = statements;
+        });
+
+        (next, (block, Some(last_err)))
     })
 }
 
 fn block(input: &str) -> ResNew<&str, Block> {
-    tuple((
-              tag("{"),
-              ws0,
-              block_body,
-              ws0,
-              tag("}")
-          ),
-    )(input)
-        .map(|(next, v)| (next, v.2))
+    let (input, _) = tag_custom("{")(input)
+        .map_err(|_: NomErr<CustomError<_>>| make_generic_nom_err_options(input, vec!["block".to_string()]))?;
+
+    let (input, _) = ws0(input)?;
+    let (input, (block, last_err)) = block_body(input)?;
+    let (input, _) = ws0(input)?;
+    let (input, _) = match tag_custom("}")(input) {
+        Ok(v) => v,
+        Err(NomErr::Error(err)) => return Err(NomErr::Error(match last_err {
+            Some(last_err) => last_err.or(err),
+            None => err,
+        })),
+        Err(err) => return Err(err),
+    };
+
+    Ok((input, (block, None)))
 }
 
 fn global_block(input: &str) -> ResNew<&str, Block> {
     tuple((ws0, block_body, ws0),
     )(input)
-        .map(|(next, v)| (next, v.1))
+        .and_then(|(next, v)| {
+            let body_res = v.1;
+            if !next.is_empty() {
+                return match body_res.1 {
+                    Some(err) => Err(NomErr::Error(err)),
+                    None => Err(make_generic_nom_err_new(input)),
+                };
+            }
+
+            Ok((next, body_res))
+        })
 }
 
 

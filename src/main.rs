@@ -32,7 +32,6 @@ use crate::scope::*;
 use crate::state::*;
 use crate::x11::{x11_initialize, x11_test};
 use crate::x11::ActiveWindowInfo;
-use crate::device::device_logging::print_event_debug;
 use crate::cli::parse_cli;
 
 mod tab_mod;

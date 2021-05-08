@@ -8,7 +8,7 @@ pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
                 Ok(block)
             } else {
                 if let Some(last_err) = last_err {
-                    let err = convert_custom_error(raw_script, last_err);
+                    let err = convert_custom_error(raw_script, &last_err);
                     eprintln!("{}", &*err);
                 } else {
                     eprintln!("generic error");
@@ -18,7 +18,14 @@ pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
                 // Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v))
             }
         }
-        Err(err) => Err(anyhow!("parsing failed: {}", err))
+        Err(err) => {
+            if let NomErr::Error(err) = &err {
+                let err = convert_custom_error(raw_script, err);
+                eprintln!("{}", &*err);
+            }
+
+            Err(anyhow!("parsing failed: {}", err))
+        }
     }
 }
 
@@ -28,7 +35,7 @@ pub(crate) fn parse_key_sequence(raw: &str) -> Result<Vec<KeyAction>> {
     match key_sequence(&raw) {
         Ok(v) => {
             if v.0.is_empty() {
-                Ok(v.1.to_key_actions())
+                Ok(v.1.0.to_key_actions())
             } else {
                 Err(anyhow!("parsing failed, remaining input:\n'{}'\n", v.0))
             }
@@ -42,7 +49,7 @@ pub(crate) fn parse_key_action_with_mods(from: &str, to: Block) -> Result<Expr> 
     if !from.0.is_empty() { return Err(anyhow!("failed to parse mapping trigger")); }
     let from = from.1;
 
-    let expr = match from {
+    let expr = match from.0 {
         ParsedKeyAction::KeyClickAction(from) => { Expr::map_key_click_block(from, to) }
         ParsedKeyAction::KeyAction(from) => { Expr::map_key_block(from, to) }
     };

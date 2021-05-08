@@ -29,20 +29,17 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
     }
 }
 
-pub(super) fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
-    context(
-        "key_action",
-        alt((
-            map(tuple((tag("{"), key_with_state, tag("}"))), |(_, v, _)| (v.0, Some(v.1))),
-            map(
-                alt((
-                    key,
-                    map(tuple((tag("{"), key, tag("}"))), |v| v.1),
-                )),
-                |v| (v, None),
-            ),
-        )),
-    )(input).and_then(|(next, (parsed_key, state))| {
+pub(super) fn key_action(input: &str) -> ResNew<&str, ParsedKeyAction> {
+    alt((
+        map(tuple((tag("{"), key_with_state, tag("}"))), |(_, (v, _), _)| (v.0, Some(v.1))),
+        map(
+            alt((
+                map(key, |v| v.0),
+                map(tuple((tag("{"), key, tag("}"))), |v| v.1.0),
+            )),
+            |v| (v, None),
+        ),
+    ))(input).and_then(|(next, (parsed_key, state))| {
         let mut mods = KeyModifierFlags::new();
         let key;
 
@@ -63,27 +60,24 @@ pub(super) fn key_action(input: &str) -> Res<&str, ParsedKeyAction> {
             }
         };
 
-        Ok((next, action))
+        Ok((next, (action, None)))
     })
 }
 
-pub(super) fn key_action_with_flags(input: &str) -> Res<&str, ParsedKeyAction> {
-    context(
-        "key_action_with_flags",
-        tuple((
-            key_flags,
-            key_action,
-        )),
-    )(input).and_then(|(next, parts)| {
+pub(super) fn key_action_with_flags(input: &str) -> ResNew<&str, ParsedKeyAction> {
+    tuple((
+        key_flags,
+        key_action,
+    ))(input).and_then(|(next, parts)| {
         let flags = parts.0;
         let mut action = parts.1;
 
-        match &mut action {
-            ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags) }
-            ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags) }
+        match &mut action.0 {
+            ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags.0) }
+            ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags.0) }
         }
 
-        Ok((next, action))
+        Ok((next, (action.0, None)))
     })
 }
 
