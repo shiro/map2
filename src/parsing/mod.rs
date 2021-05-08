@@ -56,7 +56,7 @@ fn stmt(input: &str) -> ResNew<&str, Stmt> {
         return_statement,
         continue_statement,
         if_stmt,
-        // for_loop,
+        for_loop,
         map(
             tuple((expr, tag_custom(";"))),
             |(v, _)| (Stmt::Expr(v.0), v.1),
