@@ -1,3 +1,6 @@
 print(false);
 
-exit();
++[::a;
+
+//exit();
+

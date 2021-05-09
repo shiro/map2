@@ -31,11 +31,11 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
 
 pub(super) fn key_action(input: &str) -> ResNew<&str, ParsedKeyAction> {
     alt((
-        map(tuple((tag("{"), key_with_state, tag("}"))), |(_, (v, _), _)| (v.0, Some(v.1))),
+        map(tuple((tag_custom("{"), key_with_state, tag_custom("}"))), |(_, (v, _), _)| (v.0, Some(v.1))),
         map(
             alt((
+                map(tuple((tag_custom("{"), key, tag_custom("}"))), |v| v.1.0),
                 map(key, |v| v.0),
-                map(tuple((tag("{"), key, tag("}"))), |v| v.1.0),
             )),
             |v| (v, None),
         ),

@@ -66,7 +66,7 @@ fn key_state(input: &str) -> ResNew<&str, i32> {
 pub(super) fn key_with_state(input: &str) -> ResNew<&str, (ParsedSingleKey, i32)> {
     tuple((
         key,
-        ws0,
+        ws1,
         key_state,
     ))(input)
         .map(|(next, val)| (next, ((val.0.0, val.2.0), None)))

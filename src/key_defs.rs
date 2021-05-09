@@ -6,17 +6,6 @@ use crate::*;
 pub(crate) const fn make_key(event_code: EventCode) -> Key { Key { event_code } }
 
 pub const INPUT_EV_DUMMY_TIME: TimeVal = TimeVal { tv_sec: 0, tv_usec: 0 };
-// pub const INPUT_EV_SYN: input_event = InputEvent { event_code: EventCode::EV_REP(), value: 0, time: INPUT_EV_DUMMY_TIME };
-
-
-// pub static KEY_MOUSE5: Key = make_key(277);
-// pub static KEY_MOUSE6: Key = make_key(278);
-// pub static KEY_MOUSE7: Key = make_key(279);
-// pub static KEY_MOUSE8: Key = make_key(280);
-// pub static KEY_MOUSE9: Key = make_key(281);
-// pub static KEY_MOUSE10: Key = make_key(282);
-// pub static KEY_MOUSE11: Key = make_key(283);
-// pub static KEY_MOUSE12: Key = make_key(284);
 
 pub static SYN_REPORT: InputEvent = InputEvent { event_code: EventCode::EV_SYN(EV_SYN::SYN_REPORT), value: 0, time: INPUT_EV_DUMMY_TIME };
 
@@ -85,6 +74,8 @@ lazy_static! {
         m.insert(" ", Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap());
         m.insert("'", Key::from_str(&EventType::EV_KEY, "KEY_APOSTROPHE").unwrap());
         m.insert(",", Key::from_str(&EventType::EV_KEY, "KEY_COMMA").unwrap());
+        m.insert("[", Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap());
+        m.insert("]", Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap());
         m.insert("-", Key::from_str(&EventType::EV_KEY, "KEY_MINUS").unwrap());
         m.insert(".", Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap());
         m.insert("/", Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap());

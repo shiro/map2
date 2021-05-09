@@ -22,7 +22,7 @@ pub(super) struct CustomError<I> {
 }
 
 impl<I> ParseError<I> for CustomError<I> where I: InputLength {
-    fn from_error_kind(input: I, kind: ErrorKind) -> Self {
+    fn from_error_kind(input: I, _: ErrorKind) -> Self {
         CustomError { input, expected: vec![] }
     }
 
@@ -86,6 +86,7 @@ pub(super) fn convert_custom_error<I: core::ops::Deref<Target=str>>(
     let offset = input.offset(&substring);
 
     if input.is_empty() {
+        // TODO handle EOF
         // match kind {
         //     VerboseErrorKind::Char(c) => {
         //         write!(&mut result, "{}: expected '{}', got empty input\n\n", i, c)
