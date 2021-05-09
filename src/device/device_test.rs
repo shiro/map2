@@ -1,3 +1,4 @@
+use super::*;
 use std::{io, thread, time, fs};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -76,31 +77,6 @@ fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>,
     }
 }
 
-
-async fn init_virtual_output_device(
-    mut reader_rx: mpsc::Receiver<InputEvent>,
-) -> Result<()> {
-    let mut new_device = UninitDevice::new()
-        .ok_or(anyhow!("failed to instantiate udev device"))?
-        .unstable_force_init();
-    virt_device::setup_virt_device(&mut new_device).unwrap();
-
-    let input_device = UInputDevice::create_from_device(&new_device)?;
-
-    task::spawn(async move {
-        loop {
-            let msg = reader_rx.recv().await;
-            let ev: InputEvent = match msg {
-                Some(v) => v,
-                None => return Err(anyhow!("message channel closed unexpectedly")),
-            };
-            input_device.write_event(&ev)?;
-        }
-        Ok(())
-    });
-    Ok(())
-}
-
 async fn runner_it(fd_path: &Path,
                    writer: mpsc::Sender<InputEvent>)
                    -> Result<oneshot::Sender<()>> {
@@ -119,15 +95,18 @@ async fn runner_it(fd_path: &Path,
     Ok(abort_tx)
 }
 
-async fn runner(device_fd_path_pattens: Vec<Regex>, reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>, writer: mpsc::Sender<InputEvent>)
-                -> Result<()> {
+async fn runner
+(device_fd_path_pattens: Vec<Regex>,
+ reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>,
+ writer: mpsc::Sender<InputEvent>,
+) -> Result<()> {
     task::spawn(async move {
         let (reader_tx, reader_rx) = mpsc::channel(128);
 
         // send the reader to the client
         reader_init.send(reader_tx.clone());
 
-        init_virtual_output_device(reader_rx).await.unwrap();
+        virtual_output_device::init_virtual_output_device(reader_rx).await.unwrap();
 
         #[derive(Debug)]
         enum FsWatchEvent {

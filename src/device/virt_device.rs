@@ -3,32 +3,26 @@ use evdev_rs::*;
 use evdev_rs::Device;
 use evdev_rs::enums::*;
 
-fn clone_code_bits(dev: &Device, ev_code: &EventCode, max: &EventCode) -> Result<()> {
+fn set_code_bits(dev: &Device, ev_code: &EventCode, max: &EventCode) -> Result<()> {
     for code in ev_code.iter() {
         if code == *max {
             break;
         }
 
         dev.enable(&code).unwrap();
-        // println!("    Event code: {}", code);
-        // match code {
-        //     EventCode::EV_ABS(k) => print_abs_bits(src, &k),
-        //     // _ => (),
-        // }
     }
     Ok(())
 }
 
-fn clone_bits(dev: &Device) -> Result<()> {
-    // println!("Supported events:");
+fn set_bits(dev: &Device) -> Result<()> {
     for ev_type in EventType::EV_SYN.iter() {
         match ev_type {
-            EventType::EV_KEY => clone_code_bits(
+            EventType::EV_KEY => set_code_bits(
                 dev,
                 &EventCode::EV_KEY(EV_KEY::KEY_RESERVED),
                 &EventCode::EV_KEY(EV_KEY::KEY_MAX),
             )?,
-            EventType::EV_REL => clone_code_bits(
+            EventType::EV_REL => set_code_bits(
                 dev,
                 &EventCode::EV_REL(EV_REL::REL_X),
                 &EventCode::EV_REL(EV_REL::REL_MAX),
@@ -50,22 +44,9 @@ fn clone_bits(dev: &Device) -> Result<()> {
     Ok(())
 }
 
-fn clone_props(dev: &Device) -> Result<()> {
-    for input_prop in InputProp::INPUT_PROP_POINTER.iter() {
-        dev.enable(&input_prop)?;
-    }
-    Ok(())
-}
-
-pub(crate) fn setup_virt_device(dev: &Device) -> Result<()> {
+pub(crate) fn init_virtual_device(dev: &Device) -> Result<()> {
     dev.set_name("Virtual Device");
-
-    // clone_props(dev)?;
-    clone_bits(dev)?;
-
-    // dst.set_phys(phys);
-    // dst.set_uniq(uniq);
-
+    set_bits(dev)?;
 
     Ok(())
 }
