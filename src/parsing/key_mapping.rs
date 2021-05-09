@@ -3,7 +3,7 @@ use super::*;
 pub(super) fn key_mapping_inline(input: &str) -> ResNew<&str, Expr> {
     tuple((
         key_action_with_flags,
-        tag("::"),
+        tag_custom("::"),
         alt((
             key_sequence,
             map(key_action_with_flags, |v| (vec![v.0], None)),
@@ -65,7 +65,7 @@ pub(super) fn key_mapping_inline(input: &str) -> ResNew<&str, Expr> {
 pub(super) fn key_mapping(input: &str) -> ResNew<&str, Expr> {
     tuple((
         key_action_with_flags,
-        tag("::"),
+        tag_custom("::"),
         ws0,
         block,
     ))(input).and_then(|(next, v)| {

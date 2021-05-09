@@ -1,5 +1,6 @@
 use evdev_rs::enums::{EV_SYN, EventCode, EventType};
 use evdev_rs::TimeVal;
+use tap::Tap;
 
 use crate::*;
 
@@ -69,23 +70,40 @@ pub static ref KEY_KPD7: Key = Key::from_str(&EventType::EV_KEY, "KEY_KP7").unwr
 
 
 lazy_static! {
-    pub(crate) static ref KEY_ALIAS_TABLE: HashMap<&'static str, Key> = {
+    pub(crate) static ref KEY_ALIAS_TABLE: HashMap<&'static str, (Key, KeyModifierFlags)> = {
         let mut m = HashMap::new();
-        m.insert(" ", Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap());
-        m.insert("'", Key::from_str(&EventType::EV_KEY, "KEY_APOSTROPHE").unwrap());
-        m.insert(",", Key::from_str(&EventType::EV_KEY, "KEY_COMMA").unwrap());
-        m.insert("[", Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap());
-        m.insert("]", Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap());
-        m.insert("-", Key::from_str(&EventType::EV_KEY, "KEY_MINUS").unwrap());
-        m.insert(".", Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap());
-        m.insert("/", Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap());
-        m.insert(";", Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap());
-        m.insert("=", Key::from_str(&EventType::EV_KEY, "KEY_EQUAL").unwrap());
-        m.insert("SHIFT", Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap());
-        m.insert("ALT", Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap());
-        m.insert("META", Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap());
-        m.insert("CTRL", Key::from_str(&EventType::EV_KEY, "KEY_LEFTCTRL").unwrap());
-        m.insert("CAPS", Key::from_str(&EventType::EV_KEY, "KEY_CAPSLOCK").unwrap());
+        m.insert(" ", (Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap(), KeyModifierFlags::new()));
+        m.insert("#", (Key::from_str(&EventType::EV_KEY, "KEY_3").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("$", (Key::from_str(&EventType::EV_KEY, "KEY_4").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("%", (Key::from_str(&EventType::EV_KEY, "KEY_5").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("&", (Key::from_str(&EventType::EV_KEY, "KEY_7").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("'", (Key::from_str(&EventType::EV_KEY, "KEY_APOSTROPHE").unwrap(), KeyModifierFlags::new()));
+        m.insert("(", (Key::from_str(&EventType::EV_KEY, "KEY_9").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert(")", (Key::from_str(&EventType::EV_KEY, "KEY_0").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("*", (Key::from_str(&EventType::EV_KEY, "KEY_8").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert(",", (Key::from_str(&EventType::EV_KEY, "KEY_COMMA").unwrap(), KeyModifierFlags::new()));
+        m.insert("-", (Key::from_str(&EventType::EV_KEY, "KEY_MINUS").unwrap(), KeyModifierFlags::new()));
+        m.insert(".", (Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap(), KeyModifierFlags::new()));
+        m.insert("/", (Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap(), KeyModifierFlags::new()));
+        m.insert(":", (Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap(), KeyModifierFlags::new()));
+        m.insert(";", (Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap(), KeyModifierFlags::new()));
+        m.insert("<", (Key::from_str(&EventType::EV_KEY, "KEY_COMMA").unwrap(), KeyModifierFlags::new()));
+        m.insert("=", (Key::from_str(&EventType::EV_KEY, "KEY_EQUAL").unwrap(), KeyModifierFlags::new()));
+        m.insert(">", (Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap(), KeyModifierFlags::new()));
+        m.insert("?", (Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap(), KeyModifierFlags::new()));
+        m.insert("@", (Key::from_str(&EventType::EV_KEY, "KEY_1").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("[", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new()));
+        m.insert("\"", (Key::from_str(&EventType::EV_KEY, "KEY_APOSTROPHE").unwrap(), KeyModifierFlags::new()));
+        m.insert("]", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap(), KeyModifierFlags::new()));
+        m.insert("^", (Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("{", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("|", (Key::from_str(&EventType::EV_KEY, "KEY_BACKSLASH").unwrap(), KeyModifierFlags::new()));
+        m.insert("}", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("SHIFT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap(), KeyModifierFlags::new()));
+        m.insert("ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
+        m.insert("META", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap(), KeyModifierFlags::new()));
+        m.insert("CTRL", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTCTRL").unwrap(), KeyModifierFlags::new()));
+        m.insert("CAPS", (Key::from_str(&EventType::EV_KEY, "KEY_CAPSLOCK").unwrap(), KeyModifierFlags::new()));
         m
     };
 }

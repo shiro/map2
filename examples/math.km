@@ -1,6 +1,9 @@
-print(false);
+//print(false);
 
-+[::a;
+sleep(200);
 
-//exit();
+send("@");
+
+sleep(200);
+exit();
 

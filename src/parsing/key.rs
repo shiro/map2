@@ -16,13 +16,7 @@ pub(super) fn key_flags(input: &str) -> ResNew<&str, KeyModifierFlags> {
     })
 }
 
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub(super) enum ParsedSingleKey {
-    Key(Key),
-    CapitalKey(Key),
-}
-
-pub(super) fn key(input: &str) -> ResNew<&str, ParsedSingleKey> {
+pub(super) fn key(input: &str) -> ResNew<&str, (Key, KeyModifierFlags)> {
     alt(( // multiple asci chars or 1 arbitrary char
           map(ident, |v| v.0),
           map(take(1usize), |v: &str| v.to_string())
@@ -30,26 +24,28 @@ pub(super) fn key(input: &str) -> ResNew<&str, ParsedSingleKey> {
         .and_then(|(next, val)| {
             let mut key_name = val.to_uppercase();
 
-            let key = match KEY_ALIAS_TABLE.get(&*key_name) {
-                Some(key) => *key,
+            let (key, mut flags) = match KEY_ALIAS_TABLE.get(&*key_name) {
+                Some(v) => *v,
                 None => {
                     if !key_name.starts_with("KEY_") && !key_name.starts_with("BTN_") {
                         key_name = "KEY_".to_string()
                             .tap_mut(|s| s.push_str(&key_name));
                     }
 
-                    Key::from_str(&EventType::EV_KEY, key_name.as_str())
-                        .map_err(|_| make_generic_nom_err_new(input))?
+                    let key = Key::from_str(&EventType::EV_KEY, key_name.as_str())
+                        .map_err(|_| make_generic_nom_err_new(input))?;
+
+                    (key, KeyModifierFlags::new())
                 }
             };
 
             // only 1 char and it's uppercase
             let mut it = val.chars();
             if it.next().unwrap().is_uppercase() && it.next().is_none() {
-                return Ok((next, (ParsedSingleKey::CapitalKey(key.clone()), None)));
+                flags.shift();
             }
 
-            Ok((next, (ParsedSingleKey::Key(key.clone()), None)))
+            Ok((next, ((key, flags), None)))
         })
 }
 
@@ -63,7 +59,7 @@ fn key_state(input: &str) -> ResNew<&str, i32> {
     }))
 }
 
-pub(super) fn key_with_state(input: &str) -> ResNew<&str, (ParsedSingleKey, i32)> {
+pub(super) fn key_with_state(input: &str) -> ResNew<&str, ((Key, KeyModifierFlags), i32)> {
     tuple((
         key,
         ws1,

@@ -11,8 +11,8 @@ pub(super) fn expr_4(input: &str) -> ResNew<&str, Expr> {
         variable_initialization,
         variable_assignment,
         function_call,
-        key_mapping_inline,
         key_mapping,
+        key_mapping_inline,
         variable,
     ))(input)
 }
