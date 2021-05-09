@@ -76,20 +76,21 @@ mod tests {
     #[test]
     fn test_special_key() {
         assert_eq!(key_with_state("a down"), nom_ok((
-            ParsedSingleKey::Key(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap()),
+            (Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), KeyModifierFlags::new()),
             1,
         )));
     }
 
     #[test]
     fn test_key() {
-        assert_eq!(key("d"), nom_ok(ParsedSingleKey::Key(
-            Key::from_str(&EventType::EV_KEY, "KEY_D").unwrap())
-        ));
+        assert_eq!(key("d"), nom_ok((
+            Key::from_str(&EventType::EV_KEY, "KEY_D").unwrap(),
+            KeyModifierFlags::new()
+        )));
 
-        assert_eq!(key("btn_forward"), nom_ok(ParsedSingleKey::Key(
-            Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap())
-        ));
+        assert_eq!(key("btn_forward"), nom_ok((
+            Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap(),
+            KeyModifierFlags::new())));
     }
 
     #[test]

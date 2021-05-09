@@ -147,9 +147,9 @@ mod tests {
 
     #[test]
     fn test_key() {
-        assert_eq!(key("a"), nom_ok(ParsedSingleKey::Key(*KEY_A)));
-        assert_eq!(key("A"), nom_ok(ParsedSingleKey::CapitalKey(*KEY_A)));
-        assert_eq!(key("enter"), nom_ok(ParsedSingleKey::Key(*KEY_ENTER)));
+        assert_eq!(key("a"), nom_ok((*KEY_A, KeyModifierFlags::new())));
+        assert_eq!(key("A"), nom_ok((*KEY_A, KeyModifierFlags::new().tap_mut(|f| f.shift()))));
+        assert_eq!(key("enter"), nom_ok((*KEY_ENTER, KeyModifierFlags::new())));
         assert!(matches!(key("entert"), Err(..)));
     }
 

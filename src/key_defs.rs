@@ -93,7 +93,8 @@ lazy_static! {
         m.insert("?", (Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap(), KeyModifierFlags::new()));
         m.insert("@", (Key::from_str(&EventType::EV_KEY, "KEY_1").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
         m.insert("[", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new()));
-        m.insert("\"", (Key::from_str(&EventType::EV_KEY, "KEY_APOSTROPHE").unwrap(), KeyModifierFlags::new()));
+        // TODO implement escaped chars so this doesn't break sequence parsing
+        // m.insert("\"", (Key::from_str(&EventType::EV_KEY, "KEY_APOSTROPHE").unwrap(), KeyModifierFlags::new()));
         m.insert("]", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap(), KeyModifierFlags::new()));
         m.insert("^", (Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
         m.insert("{", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
