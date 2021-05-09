@@ -1,9 +1,8 @@
-//print(false);
+let sum = 1 + 2;
 
-sleep(200);
+print("sum of 1 and 2 is: " + sum);
 
-send("@");
 
-sleep(200);
-exit();
+let complicated = (sum / 2) * (22 - 3) / (4 * 5);
 
+print("second calculation:" + complicated);
