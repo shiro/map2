@@ -1,4 +1,4 @@
-# Key mods RS
+# Key mods
 
 A scripting language that allows complex key remapping on Linux, written in
 Rust.

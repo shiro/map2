@@ -26,10 +26,15 @@ regex = "1.4.5"
 unicode-xid = "0.2.1"
 notify = "4.0.16"
 xdg = "2.2.0"
+man = "0.3.0"
 
 [[bin]]
 name = "key-mods-rs"
 path = "src/main.rs"
+
+[[bin]]
+name = "man-gen"
+path = "src/man/man.rs"
 
 #[[bin]]
 #name = "dev-test"
