@@ -237,12 +237,11 @@ print(/* this is an in-line comment */ "hello");
 
 # Feature roadmap
 
-- [ ] Wayland support (someday)
-- [ ] man page entry
 - [ ] lots of example scripts
 - [ ] more built-ins
 - [ ] escaped characters in strings and key sequences
 - [ ] update documentation and refactor code
+- [ ] Wayland support (someday)
 
 # Authors
 
