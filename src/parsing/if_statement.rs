@@ -55,41 +55,46 @@ mod tests {
 
     #[test]
     fn test_if() {
-        assert_eq!(if_stmt("if(true){ a::b; }"), nom_ok( Stmt::If(vec![
-            (nom_eval(expr("true")), nom_eval(block("{a::b;}"))),
-        ], None,
-        )));
-        assert_eq!(stmt("if(true){ a::b; }"), nom_ok( Stmt::If(vec![
-            (nom_eval(expr("true")), nom_eval(block("{a::b;}"))),
-        ], None,
-        )));
+        assert_eq!(nom_no_last_err(if_stmt("if(true){ a::b; }")),
+                   nom_ok(Stmt::If(vec![
+                       (nom_eval(expr("true")), nom_eval(block("{a::b;}"))),
+                   ], None,
+                   )));
+        assert_eq!(nom_no_last_err(stmt("if(true){ a::b; }")),
+                   nom_ok(Stmt::If(vec![
+                       (nom_eval(expr("true")), nom_eval(block("{a::b;}"))),
+                   ], None,
+                   )));
 
-        assert_eq!(stmt("if(\"a\" == \"a\"){ a::b; }"), nom_ok( Stmt::If(vec![
-            (nom_eval(expr("\"a\" == \"a\"")), nom_eval(block("{a::b;}"))),
-        ], None,
-        )));
-        assert_eq!(stmt("if(foo() == \"a\"){ a::b; }"), nom_ok( Stmt::If(vec![
-            (Expr::Eq(
-                Box::new(Expr::FunctionCall("foo".to_string(), vec![])),
-                Box::new(Expr::Value(ValueType::String("a".to_string()))),
-            ),
-             nom_eval(block("{a::b;}"))),
-        ], None,
-        )));
+        assert_eq!(nom_no_last_err(stmt("if(\"a\" == \"a\"){ a::b; }")),
+                   nom_ok(Stmt::If(vec![
+                       (nom_eval(expr("\"a\" == \"a\"")), nom_eval(block("{a::b;}"))),
+                   ], None,
+                   )));
+        assert_eq!(nom_no_last_err(stmt("if(foo() == \"a\"){ a::b; }")),
+                   nom_ok(Stmt::If(vec![
+                       (Expr::Eq(
+                           Box::new(Expr::FunctionCall("foo".to_string(), vec![])),
+                           Box::new(Expr::Value(ValueType::String("a".to_string()))),
+                       ),
+                        nom_eval(block("{a::b;}"))),
+                   ], None,
+                   )));
     }
 
     #[test]
     fn test_else_if() {
-        assert_eq!(if_stmt("if(true){ a::b; }else if(false){ a::b; }"), nom_ok( Stmt::If(vec![
-            (nom_eval(expr("true")), nom_eval(block("{a::b;}"))),
-            (nom_eval(expr("false")), nom_eval(block("{a::b;}"))),
-        ], None,
-        )));
+        assert_eq!(nom_no_last_err(if_stmt("if(true){ a::b; }else if(false){ a::b; }")),
+                   nom_ok(Stmt::If(vec![
+                       (nom_eval(expr("true")), nom_eval(block("{a::b;}"))),
+                       (nom_eval(expr("false")), nom_eval(block("{a::b;}"))),
+                   ], None,
+                   )));
     }
 
     #[test]
     fn test_else() {
-        assert_eq!(if_stmt("if(true){ a::b; }else{ a::b; }"), nom_ok( Stmt::If(vec![
+        assert_eq!(if_stmt("if(true){ a::b; }else{ a::b; }"), nom_ok(Stmt::If(vec![
             (nom_eval(expr("true")), nom_eval(block("{a::b;}"))),
         ], Some(nom_eval(block("{a::b;}"))),
         )));

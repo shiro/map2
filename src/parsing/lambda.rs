@@ -6,7 +6,7 @@ pub(super) fn lambda(input: &str) -> ResNew<&str, Expr> {
 
     tuple((
         ws0,
-        opt((tuple((
+        opt(tuple((
             ident,
             ws0,
             many0(tuple((
@@ -15,7 +15,7 @@ pub(super) fn lambda(input: &str) -> ResNew<&str, Expr> {
                 ident,
                 ws0,
             ))),
-        )))),
+        ))),
         tag_custom("|"),
         ws0,
         block,

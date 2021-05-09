@@ -127,30 +127,35 @@ mod tests {
 
     #[test]
     fn test_operator_equal() {
-        assert_eq!(expr("true == true"), nom_ok( Expr::Eq(
-            Box::new(Expr::Value(ValueType::Bool(true))),
-            Box::new(Expr::Value(ValueType::Bool(true))),
-        )));
-        assert_eq!(expr("\"hello world\" == \"hello world\""), nom_ok( Expr::Eq(
-            Box::new(Expr::Value(ValueType::String("hello world".to_string()))),
-            Box::new(Expr::Value(ValueType::String("hello world".to_string()))),
-        )));
-        assert_eq!(expr("\"22hello\" == true"), nom_ok( Expr::Eq(
-            Box::new(Expr::Value(ValueType::String("22hello".to_string()))),
-            Box::new(Expr::Value(ValueType::Bool(true))),
-        )));
+        assert_eq!(nom_no_last_err(expr("true == true")),
+                   nom_ok(Expr::Eq(
+                       Box::new(Expr::Value(ValueType::Bool(true))),
+                       Box::new(Expr::Value(ValueType::Bool(true))),
+                   )));
+        assert_eq!(nom_no_last_err(expr("\"hello world\" == \"hello world\"")),
+                   nom_ok(Expr::Eq(
+                       Box::new(Expr::Value(ValueType::String("hello world".to_string()))),
+                       Box::new(Expr::Value(ValueType::String("hello world".to_string()))),
+                   )));
+        assert_eq!(nom_no_last_err(expr("\"22hello\" == true")),
+                   nom_ok(Expr::Eq(
+                       Box::new(Expr::Value(ValueType::String("22hello".to_string()))),
+                       Box::new(Expr::Value(ValueType::Bool(true))),
+                   )));
     }
 
     #[test]
     fn test_add_sub() {
-        assert_eq!(expr("33 + 33"), nom_ok( Expr::Add(
-            Box::new(Expr::Value(ValueType::Number(33.0))),
-            Box::new(Expr::Value(ValueType::Number(33.0))),
-        )));
+        assert_eq!(nom_no_last_err(expr("33 + 33")),
+                   nom_ok(Expr::Add(
+                       Box::new(Expr::Value(ValueType::Number(33.0))),
+                       Box::new(Expr::Value(ValueType::Number(33.0))),
+                   )));
 
-        assert_eq!(expr("33 - 33"), nom_ok( Expr::Sub(
-            Box::new(Expr::Value(ValueType::Number(33.0))),
-            Box::new(Expr::Value(ValueType::Number(33.0))),
-        )));
+        assert_eq!(nom_no_last_err(expr("33 - 33")),
+                   nom_ok(Expr::Sub(
+                       Box::new(Expr::Value(ValueType::Number(33.0))),
+                       Box::new(Expr::Value(ValueType::Number(33.0))),
+                   )));
     }
 }

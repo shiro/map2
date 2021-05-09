@@ -1,3 +1,6 @@
+#[cfg(test)]
+use tests::*;
+
 use anyhow::*;
 use evdev_rs::enums::EventType;
 use futures::StreamExt;
@@ -50,8 +53,6 @@ mod variable;
 mod for_loop;
 mod error;
 
-#[cfg(test)]
-use tests::*;
 
 
 fn stmt(input: &str) -> ResNew<&str, Stmt> {
@@ -138,10 +139,16 @@ mod tests {
 
     pub(super) fn nom_eval<'a, T>(value: ResNew<&str, T>) -> T { value.unwrap().1.0 }
 
+    pub(super) fn nom_no_last_err<'a, T>(value: ResNew<&str, T>) -> ResNew<&str, T> {
+        match value {
+            Ok((input, (val, _))) => Ok((input, (val, None))),
+            Err(err) => Err(err)
+        }
+    }
+
     #[test]
     fn test_key() {
         assert_eq!(key("a"), nom_ok(ParsedSingleKey::Key(*KEY_A)));
-        // assert_eq!(key("mouse5"), Ok(("", ParsedSingleKey::Key(*KEY_MOUSE5))));
         assert_eq!(key("A"), nom_ok(ParsedSingleKey::CapitalKey(*KEY_A)));
         assert_eq!(key("enter"), nom_ok(ParsedSingleKey::Key(*KEY_ENTER)));
         assert!(matches!(key("entert"), Err(..)));
@@ -180,24 +187,28 @@ mod tests {
 
     #[test]
     fn test_block() {
-        assert_eq!(block_body("a::b;"), nom_ok(Block::new()
-            .tap_mut(|b| { b.statements.push(stmt("a::b;").unwrap().1.0); })
-        ));
+        assert_eq!(nom_no_last_err(block_body("a::b;")),
+                   nom_ok(Block::new()
+                       .tap_mut(|b| { b.statements.push(stmt("a::b;").unwrap().1.0); })
+                   ));
 
-        assert_eq!(block("{ let foo = true; }"), nom_ok(Block::new()
-            .tap_mut(|b| { b.statements.push(stmt("let foo = true;").unwrap().1.0); })
-        ));
+        assert_eq!(nom_no_last_err(block("{ let foo = true; }")),
+                   nom_ok(Block::new()
+                       .tap_mut(|b| { b.statements.push(stmt("let foo = true;").unwrap().1.0); })
+                   ));
 
-        assert_eq!(block("{ let foo = true; a::b; b::c; }"), nom_ok(Block::new()
-            .tap_mut(|b| {
-                b.statements.push(nom_eval(stmt("let foo = true;")));
-                b.statements.push(nom_eval(stmt("a::b;")));
-                b.statements.push(nom_eval(stmt("b::c;")));
-            })
-        ));
+        assert_eq!(nom_no_last_err(block("{ let foo = true; a::b; b::c; }")),
+                   nom_ok(Block::new()
+                       .tap_mut(|b| {
+                           b.statements.push(nom_eval(stmt("let foo = true;")));
+                           b.statements.push(nom_eval(stmt("a::b;")));
+                           b.statements.push(nom_eval(stmt("b::c;")));
+                       })
+                   ));
 
-        assert_eq!(block_body("if(true){a::b;}"), nom_ok(Block::new().tap_mut(|b| {
-            b.statements = vec![nom_eval(if_stmt("if(true){a::b;}"))];
-        })));
+        assert_eq!(nom_no_last_err(block_body("if(true){a::b;}")),
+                   nom_ok(Block::new().tap_mut(|b| {
+                       b.statements = vec![nom_eval(if_stmt("if(true){a::b;}"))];
+                   })));
     }
 }
