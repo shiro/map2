@@ -32,9 +32,8 @@ let sum = |argument1, argument2|{
   return argument1 + argument2;
 };
 
-let my_sum = sum(1,2);
+let my_sum = sum(1, 2);
 print("the sum of 1 and 2 is: " + my_sum);
-
 
 // do something when the active window changes
 on_window_change(||{
