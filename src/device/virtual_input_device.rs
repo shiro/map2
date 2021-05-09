@@ -1,19 +1,20 @@
-use super::*;
-use std::{io, thread, time, fs};
+use std::{fs, io, thread, time};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{anyhow, bail, Result, Error};
+use anyhow::{anyhow, Result};
 use evdev_rs::*;
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
-use tokio::task;
-use walkdir::{WalkDir};
-
-use crate::device::{device_util, virt_device};
 use tokio::sync::oneshot::Sender;
+use tokio::task;
+use walkdir::WalkDir;
+
+use crate::device::virt_device;
+
+use super::*;
 
 fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     let mut list = vec![];

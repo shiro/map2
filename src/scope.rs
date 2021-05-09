@@ -228,7 +228,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             return value.clone();
         }
         Expr::Lambda(params, block) => {
-            let mut lambda_var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
+            let lambda_var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
             return ValueType::Lambda(params.clone(), block.clone(), lambda_var_map);
         }
         Expr::KeyAction(action) => {
@@ -379,7 +379,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                     ValueType::Void
                 }
                 name => {
-                    let (lambda_params, lambda_block, mut lambda_var_map) = match eval_expr(&Expr::Name(name.to_string()), var_map, amb).await {
+                    let (lambda_params, lambda_block, lambda_var_map) = match eval_expr(&Expr::Name(name.to_string()), var_map, amb).await {
                         ValueType::Lambda(params, block, var_map) => (params, block, var_map),
                         ValueType::Void => panic!("function '{}' not found in this scope", name),
                         _ => panic!("variable '{}' is not a lambda function", name),

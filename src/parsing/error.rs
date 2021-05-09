@@ -1,6 +1,6 @@
 use super::*;
 use nom::error::{ErrorKind, ParseError, FromExternalError};
-use nom::{Offset, InputLength};
+use nom::{InputLength};
 use std::fmt::Debug;
 
 
@@ -9,10 +9,10 @@ pub(super) type ResNew<I, O> = IResult<I, (O, Option<CustomError<I>>), CustomErr
 pub(super) fn make_generic_nom_err_new<I>(input: I) -> NomErr<CustomError<I>> {
     NomErr::Error(CustomError { input, expected: vec![] })
 }
+
 pub(super) fn make_generic_nom_err_options<I>(input: I, options: Vec<String>) -> NomErr<CustomError<I>> {
     NomErr::Error(CustomError { input, expected: options })
 }
-
 
 
 #[derive(Debug, PartialEq)]
@@ -40,7 +40,7 @@ impl<I> ParseError<I> for CustomError<I> where I: InputLength {
         other
     }
 
-    fn append(_: I, _: ErrorKind, mut other: Self) -> Self { other }
+    fn append(_: I, _: ErrorKind, other: Self) -> Self { other }
 }
 
 impl<I, E> FromExternalError<I, E> for CustomError<I> {

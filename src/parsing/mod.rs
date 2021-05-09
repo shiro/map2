@@ -8,7 +8,7 @@ use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::combinator::{map, opt};
-use nom::{Err as NomErr, Parser};
+use nom::{Err as NomErr};
 use nom::error::{context, VerboseError, ParseError};
 use nom::IResult;
 use nom::multi::many0;
@@ -52,7 +52,6 @@ mod primitives;
 mod variable;
 mod for_loop;
 mod error;
-
 
 
 fn stmt(input: &str) -> ResNew<&str, Stmt> {

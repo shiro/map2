@@ -1,5 +1,5 @@
-use clap::{App, Arg, SubCommand};
-use anyhow::{Error, Result, anyhow};
+use clap::{App, Arg, };
+use anyhow::{Result, anyhow};
 use std::fs;
 use xdg::BaseDirectories;
 use std::path::PathBuf;
