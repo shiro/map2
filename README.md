@@ -9,13 +9,56 @@ Wayland support is planned but probably won't be added for some time.
 
 For details check the [documentation](#documentation).
 
-# Install
+# Examples
 
-## Arch Linux
+Key mods is a very flexible scripting language that can utilize logic control
+statements, arithmetic and provides lots of useful built-in functions.
 
-Just run:
+```
+// change the 'a' key to 'b'
+a::b;
+
+// map the 'c' key to a code block
+c::{
+  // output text to standard output
+  print("hello world");
+  
+  // type the text using the virtual keyboard
+  send("some text{enter}");
+};
+
+// define variables and lambda functions
+let sum = |argument1, argument2|{
+  return argument1 + argument2;
+};
+
+let my_sum = sum(1,2);
+print("the sum of 1 and 2 is: " + my_sum);
+
+
+// do something when the active window changes
+on_window_change(||{
+  if(active_window_class() == "firefox"){
+    print("firefox is now the active window");
+  }else{
+    print("firefox is not the active window");
+  }
+});
+```
+
+For more examples check the [examples directory](examples/README.md).
+
+# Getting started
+
+## Install
+
+### Arch Linux
+
+Build from source:
 
 `makepkg -si`
+
+The package will be added to the AUR after the initial release.
 
 # Documentation
 
