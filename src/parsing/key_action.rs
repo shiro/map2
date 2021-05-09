@@ -88,23 +88,23 @@ mod tests {
 
     #[test]
     fn test_key_action() {
-        assert_eq!(key_action("{a down}"), Ok(("", ParsedKeyAction::KeyAction(
+        assert_eq!(key_action("{a down}"), nom_ok( ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new())
-        ))));
+        )));
 
-        assert_eq!(key_action("{btn_forward down}"), Ok(("", ParsedKeyAction::KeyAction(
+        assert_eq!(key_action("{btn_forward down}"), nom_ok( ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap(), 1, KeyModifierFlags::new())
-        ))));
+        )));
     }
 
     #[test]
     fn test_flags() {
-        assert_eq!(key_action_with_flags("+{a down}"), Ok(("", ParsedKeyAction::KeyAction(
+        assert_eq!(key_action_with_flags("+{a down}"), nom_ok( ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.shift()))
-        ))));
+        )));
 
-        assert_eq!(key_action_with_flags("!{j down}"), Ok(("", ParsedKeyAction::KeyAction(
+        assert_eq!(key_action_with_flags("!{j down}"), nom_ok( ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_J").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.alt()))
-        ))));
+        )));
     }
 }

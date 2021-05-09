@@ -79,39 +79,39 @@ mod tests {
 
     #[test]
     fn test_special_key() {
-        assert_eq!(key_with_state("a down"), Ok(("", (
+        assert_eq!(key_with_state("a down"), nom_ok((
             ParsedSingleKey::Key(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap()),
             1,
-        ))));
+        )));
     }
 
     #[test]
     fn test_key() {
-        assert_eq!(key("d"), Ok(("", ParsedSingleKey::Key(
+        assert_eq!(key("d"), nom_ok(ParsedSingleKey::Key(
             Key::from_str(&EventType::EV_KEY, "KEY_D").unwrap())
-        )));
+        ));
 
-        assert_eq!(key("btn_forward"), Ok(("", ParsedSingleKey::Key(
+        assert_eq!(key("btn_forward"), nom_ok(ParsedSingleKey::Key(
             Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap())
-        )));
+        ));
     }
 
     #[test]
     fn test_key_flags() {
-        assert_eq!(key_flags("!"), Ok(("", KeyModifierFlags::new().tap_mut(|v| v.alt()))));
-        assert_eq!(key_flags("^"), Ok(("", KeyModifierFlags::new().tap_mut(|v| v.ctrl()))));
-        assert_eq!(key_flags("+"), Ok(("", KeyModifierFlags::new().tap_mut(|v| v.shift()))));
-        assert_eq!(key_flags("#"), Ok(("", KeyModifierFlags::new().tap_mut(|v| v.meta()))));
+        assert_eq!(key_flags("!"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.alt())));
+        assert_eq!(key_flags("^"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.ctrl())));
+        assert_eq!(key_flags("+"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.shift())));
+        assert_eq!(key_flags("#"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.meta())));
 
-        assert_eq!(key_flags("!#"), Ok(("", KeyModifierFlags::new().tap_mut(|v| {
+        assert_eq!(key_flags("!#"), nom_ok(KeyModifierFlags::new().tap_mut(|v| {
             v.alt();
             v.meta()
-        }))));
-        assert_eq!(key_flags("#!"), Ok(("", KeyModifierFlags::new()
+        })));
+        assert_eq!(key_flags("#!"), nom_ok(KeyModifierFlags::new()
             .tap_mut(|v| {
                 v.alt();
                 v.meta();
-            }))));
-        assert_eq!(key_flags("#a!"), Ok(("a!", KeyModifierFlags::new().tap_mut(|v| v.meta()))));
+            })));
+        assert_eq!(key_flags("#a!"), nom_ok_rest("a!", KeyModifierFlags::new().tap_mut(|v| v.meta())));
     }
 }

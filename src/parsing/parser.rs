@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn test_key_sequence() {
         assert_eq!(parse_key_sequence("hello{enter}world").unwrap(),
-                   key_sequence("\"hello{enter}world\"").unwrap().1.to_key_actions(),
+                   nom_eval(key_sequence("\"hello{enter}world\"")).to_key_actions(),
         );
     }
 }

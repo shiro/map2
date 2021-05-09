@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_weird_names() {
-        assert_eq!(ident("_foobar"), Ok(("", "_foobar".to_string())));
-        assert_eq!(ident("btn_forward"), Ok(("", "btn_forward".to_string())));
+        assert_eq!(ident("_foobar"), nom_ok( "_foobar".to_string()));
+        assert_eq!(ident("btn_forward"), nom_ok( "btn_forward".to_string()));
     }
 }

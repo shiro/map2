@@ -40,16 +40,16 @@ mod tests {
 
     #[test]
     fn test_primitives() {
-        assert!(matches!(boolean("true"), Ok(("", Expr::Value(ValueType::Bool(true))))));
-        assert!(matches!(boolean("false"), Ok(("", Expr::Value(ValueType::Bool(false))))));
+        assert_eq!(boolean("true"), nom_ok(Expr::Value(ValueType::Bool(true))));
+        assert_eq!(boolean("false"), nom_ok(Expr::Value(ValueType::Bool(false))));
         assert!(matches!(boolean("foo"), Err(..)));
 
-        assert_eq!(string("\"hello world\""), Ok(("", Expr::Value(ValueType::String("hello world".to_string())))));
+        assert_eq!(string("\"hello world\""), nom_ok(Expr::Value(ValueType::String("hello world".to_string()))));
     }
 
     #[test]
     fn test_number() {
-        assert!(matches!(number("42"), Ok(("", Expr::Value(ValueType::Number(42.0))))));
-        assert!(matches!(number("-42.5"), Ok(("", Expr::Value(ValueType::Number(-42.5))))));
+        assert_eq!(number("42"), nom_ok(Expr::Value(ValueType::Number(42.0))));
+        assert_eq!(number("-42.5"), nom_ok( Expr::Value(ValueType::Number(-42.5))));
     }
 }

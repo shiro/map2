@@ -57,9 +57,9 @@ mod tests {
 
     #[test]
     fn test_assignment() {
-        assert_eq!(ident("hello2"), Ok(("", "hello2".to_string())));
+        assert_eq!(ident("hello2"), nom_ok( "hello2".to_string()));
         assert_eq!(variable_assignment("foo = true"),
-                   Ok(("", Expr::Assign("foo".to_string(), Box::new(boolean("true").unwrap().1))))
+                   nom_ok( Expr::Assign("foo".to_string(), Box::new(nom_eval(boolean("true")))))
         );
 
         assert!(matches!(ident("2hello"), Err(..)));
@@ -67,10 +67,10 @@ mod tests {
 
     #[test]
     fn test_lambda() {
-        assert_eq!(variable_initialization("let a = || {}"), Ok(("", Expr::Init(
+        assert_eq!(variable_initialization("let a = || {}"), nom_ok( Expr::Init(
             "a".to_string(),
-            Box::new(expr("||{}").unwrap().1),
+            Box::new(nom_eval(expr("||{}"))),
         )
-        )));
+        ));
     }
 }

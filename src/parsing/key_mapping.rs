@@ -87,28 +87,28 @@ mod tests {
 
     #[test]
     fn test_key_mapping_inline() {
-        assert_eq!(key_mapping_inline("a::b"), Ok(("", Expr::map_key_click(
+        assert_eq!(key_mapping_inline("a::b"), nom_ok( Expr::map_key_click(
             &KeyClickActionWithMods::new(*KEY_A),
             &KeyClickActionWithMods::new(*KEY_B),
-        ))));
+        )));
 
-        assert_eq!(key_mapping_inline("A::b"), Ok(("", Expr::map_key_click(
+        assert_eq!(key_mapping_inline("A::b"), nom_ok( Expr::map_key_click(
             &KeyClickActionWithMods::new(*KEY_A).tap_mut(|v| { v.modifiers.shift(); }),
             &KeyClickActionWithMods::new(*KEY_B),
-        ))));
+        )));
     }
 
     #[test]
     fn test_key_mapping() {
-        assert_eq!(key_mapping("a::{}"), Ok(("", Expr::map_key_click_block(
+        assert_eq!(key_mapping("a::{}"), nom_ok( Expr::map_key_click_block(
             KeyClickActionWithMods::new(*KEY_A),
             Block::new(),
-        ))));
+        )));
     }
 
     #[test]
     fn test_key_sequence() {
-        assert_eq!(key_mapping_inline("a::\"ab\""), Ok(("", Expr::KeyMapping(vec![
+        assert_eq!(key_mapping_inline("a::\"ab\""), nom_ok( Expr::KeyMapping(vec![
             KeyMapping {
                 from: KeyActionWithMods::new(*KEY_A, TYPE_DOWN, KeyModifierFlags::new()),
                 to: Block::new().tap_mut(|b| {
@@ -122,15 +122,15 @@ mod tests {
             },
             KeyMapping { from: KeyActionWithMods::new(*KEY_A, TYPE_REPEAT, KeyModifierFlags::new()), to: Block::new() },
             KeyMapping { from: KeyActionWithMods::new(*KEY_A, TYPE_UP, KeyModifierFlags::new()), to: Block::new() },
-        ]))));
+        ])));
     }
 
     #[test]
     fn test_key_mapping_complex() {
         // TODO add when implemented
-        // assert_eq!(key_mapping("{a down}::{}"), Ok(("", Expr::map_key_click_block(
+        // assert_eq!(key_mapping("{a down}::{}"), nom_ok( Expr::map_key_click_block(
         //     KeyClickActionWithMods::new(*KEY_A),
         //     Block::new(),
-        // ))));
+        // )));
     }
 }

@@ -28,12 +28,12 @@ mod tests {
     fn test_for_loop() {
         assert_eq!(
             for_loop("for(let i=0; i<20; i=i+1){}"),
-            Ok(("", Stmt::For(
+            nom_ok( Stmt::For(
                 Expr::Init("i".to_string(), Box::new(Expr::Value(ValueType::Number(0.0)))),
                 Expr::LT(Box::new(Expr::Name("i".to_string())), Box::new(Expr::Value(ValueType::Number(20.0)))),
-                expr("i=i+1").unwrap().1,
+                nom_eval(expr("i=i+1")),
                 Block::new(),
-            )))
+            ))
         );
     }
 }

@@ -40,17 +40,17 @@ mod tests {
 
     #[test]
     fn test_function_call() {
-        assert_eq!(function_call("foobar()"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![]))));
-        assert_eq!(function_call("foobar(\"hello\", true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
+        assert_eq!(function_call("foobar()"), nom_ok( Expr::FunctionCall("foobar".to_string(), vec![])));
+        assert_eq!(function_call("foobar(\"hello\", true)"), nom_ok( Expr::FunctionCall("foobar".to_string(), vec![
             Expr::Value(ValueType::String("hello".to_string())),
             Expr::Value(ValueType::Bool(true)),
-        ]))));
-        assert_eq!(function_call("foobar(true == true)"), Ok(("", Expr::FunctionCall("foobar".to_string(), vec![
-            expr("true == true").unwrap().1
-        ]))));
+        ])));
+        assert_eq!(function_call("foobar(true == true)"), nom_ok( Expr::FunctionCall("foobar".to_string(), vec![
+            nom_eval(expr("true == true"))
+        ])));
 
-        assert_eq!(function_call("print(variable)"), Ok(("", Expr::FunctionCall("print".to_string(), vec![
-            variable("variable").unwrap().1
-        ]))));
+        assert_eq!(function_call("print(variable)"), nom_ok( Expr::FunctionCall("print".to_string(), vec![
+            nom_eval(variable("variable"))
+        ])));
     }
 }

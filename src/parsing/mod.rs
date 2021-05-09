@@ -50,6 +50,9 @@ mod variable;
 mod for_loop;
 mod error;
 
+#[cfg(test)]
+use tests::*;
+
 
 fn stmt(input: &str) -> ResNew<&str, Stmt> {
     alt((
@@ -127,29 +130,30 @@ fn global_block(input: &str) -> ResNew<&str, Block> {
 
 #[cfg(test)]
 mod tests {
-    use nom::error::{ErrorKind, VerboseErrorKind};
-    use tap::Tap;
-
-    use crate::block_ext::ExprVecExt;
-
     use super::*;
+
+    pub(super) fn nom_ok<'a, T>(value: T) -> ResNew<&'a str, T> { Ok(("", (value, None))) }
+
+    pub(super) fn nom_ok_rest<T>(rest: &str, value: T) -> ResNew<&str, T> { Ok((rest, (value, None))) }
+
+    pub(super) fn nom_eval<'a, T>(value: ResNew<&str, T>) -> T { value.unwrap().1.0 }
 
     #[test]
     fn test_key() {
-        assert_eq!(key("a"), Ok(("", ParsedSingleKey::Key(*KEY_A))));
+        assert_eq!(key("a"), nom_ok(ParsedSingleKey::Key(*KEY_A)));
         // assert_eq!(key("mouse5"), Ok(("", ParsedSingleKey::Key(*KEY_MOUSE5))));
-        assert_eq!(key("A"), Ok(("", ParsedSingleKey::CapitalKey(*KEY_A))));
-        assert_eq!(key("enter"), Ok(("", ParsedSingleKey::Key(*KEY_ENTER))));
+        assert_eq!(key("A"), nom_ok(ParsedSingleKey::CapitalKey(*KEY_A)));
+        assert_eq!(key("enter"), nom_ok(ParsedSingleKey::Key(*KEY_ENTER)));
         assert!(matches!(key("entert"), Err(..)));
     }
 
     #[test]
     fn test_key_action() {
-        assert_eq!(key_action_with_flags("!a"), Ok(("", ParsedKeyAction::KeyClickAction(
+        assert_eq!(key_action_with_flags("!a"), nom_ok(ParsedKeyAction::KeyClickAction(
             KeyClickActionWithMods::new_with_mods(
                 *KEY_A,
                 KeyModifierFlags::new().tap_mut(|v| v.alt()),
-            )))));
+            ))));
 
         // assert_eq!(key_action("!#^a"), Ok(("", ParsedKeyAction::KeyClickAction(
         //     KeyClickActionWithMods::new_with_mods(
@@ -176,26 +180,24 @@ mod tests {
 
     #[test]
     fn test_block() {
-        assert_eq!(block_body("a::b;"), Ok(("", Block::new()
-            .tap_mut(|b| { b.statements.push(stmt("a::b;").unwrap().1); })
-        )));
+        assert_eq!(block_body("a::b;"), nom_ok(Block::new()
+            .tap_mut(|b| { b.statements.push(stmt("a::b;").unwrap().1.0); })
+        ));
 
-        assert_eq!(block("{ let foo = true; }"), Ok(("", Block::new()
-            .tap_mut(|b| { b.statements.push(stmt("let foo = true;").unwrap().1); })
-        )));
+        assert_eq!(block("{ let foo = true; }"), nom_ok(Block::new()
+            .tap_mut(|b| { b.statements.push(stmt("let foo = true;").unwrap().1.0); })
+        ));
 
-        assert_eq!(block("{ let foo = true; a::b; b::c; }"), Ok(("", Block::new()
+        assert_eq!(block("{ let foo = true; a::b; b::c; }"), nom_ok(Block::new()
             .tap_mut(|b| {
-                b.statements.push(stmt("let foo = true;").unwrap().1);
-                b.statements.push(stmt("a::b;").unwrap().1);
-                b.statements.push(stmt("b::c;").unwrap().1);
+                b.statements.push(nom_eval(stmt("let foo = true;")));
+                b.statements.push(nom_eval(stmt("a::b;")));
+                b.statements.push(nom_eval(stmt("b::c;")));
             })
-        )));
+        ));
 
-        assert_eq!(block_body("if(true){a::b;}"), Ok(("", Block::new().tap_mut(|b| {
-            b.statements = vec![
-                if_stmt("if(true){a::b;}").unwrap().1
-            ];
-        }))));
+        assert_eq!(block_body("if(true){a::b;}"), nom_ok(Block::new().tap_mut(|b| {
+            b.statements = vec![nom_eval(if_stmt("if(true){a::b;}"))];
+        })));
     }
 }
