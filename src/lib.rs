@@ -35,9 +35,6 @@ pub use crate::state::*;
 pub use crate::x11::{x11_initialize, x11_test};
 pub use crate::x11::ActiveWindowInfo;
 
-pub mod tab_mod;
-pub mod caps_mod;
-pub mod rightalt_mod;
 pub mod x11;
 pub mod key_defs;
 pub mod state;
