@@ -29,7 +29,7 @@ xdg = "2.2.0"
 man = "0.3.0"
 
 [[bin]]
-name = "key-mods-rs"
+name = "key-mods"
 path = "src/main.rs"
 
 [[bin]]
