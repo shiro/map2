@@ -99,6 +99,7 @@ lazy_static! {
         m.insert("{", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
         m.insert("|", (Key::from_str(&EventType::EV_KEY, "KEY_BACKSLASH").unwrap(), KeyModifierFlags::new()));
         m.insert("}", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
+        m.insert("~", (Key::from_str(&EventType::EV_KEY, "KEY_GRAVE").unwrap(), KeyModifierFlags::new()));
         m.insert("SHIFT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap(), KeyModifierFlags::new()));
         m.insert("ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("META", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap(), KeyModifierFlags::new()));
