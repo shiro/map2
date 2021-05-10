@@ -119,7 +119,7 @@ impl KeyClickActionWithMods {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct KeyMapping {
+pub struct KeyMapping {
     pub(crate) from: KeyActionWithMods,
     pub(crate) to: Block,
 }

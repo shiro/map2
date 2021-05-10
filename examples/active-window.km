@@ -16,4 +16,4 @@ on_window_change(||{
     // map 'a' back to 'a' since it might have been remapped
     a::a;
   }
-}
+});
