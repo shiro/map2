@@ -3,6 +3,13 @@ use crate::messaging::ExecutionMessage;
 use evdev_rs::enums::int_to_ev_key;
 use crate::parsing::parser::{parse_key_action_with_mods, parse_key_sequence};
 
+pub async fn throw_error<'a>(err: anyhow::Error, exit_code: i32, amb: &mut Ambient<'a>) -> ValueType {
+    amb.message_tx.borrow_mut().as_ref().unwrap()
+        .send(ExecutionMessage::FatalError(err, exit_code))
+        .await.unwrap();
+    return ValueType::Void;
+}
+
 pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &GuardedVarMap, amb: &mut Ambient<'_>) -> ValueType {
     match &**name {
         "exit" => {
@@ -14,7 +21,7 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
 
             let exit_code = match val {
                 ValueType::Number(exit_code) => exit_code as i32,
-                _ => panic!("the first parameter to 'exit' must be a number"),
+                _ => return throw_error(anyhow!("the first parameter to 'exit' must be a number"), 1, amb).await,
             };
 
             amb.message_tx.as_ref().unwrap().send(ExecutionMessage::Exit(exit_code)).await.unwrap();
@@ -24,7 +31,7 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
             let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
             let val = match val {
                 ValueType::String(val) => val,
-                _ => panic!("invalid parameter passed to function 'send'"),
+                _ => return throw_error(anyhow!("invalid parameter passed to function 'send'"), 1, amb).await,
             };
 
             let actions = parse_key_sequence(&*val).unwrap();
@@ -46,7 +53,9 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
             ValueType::Void
         }
         "on_window_change" => {
-            if args.len() != 1 { panic!("function takes 1 argument") }
+            if args.len() != 1 {
+                return throw_error(anyhow!("function takes 1 argument"), 1, amb).await;
+            }
 
             let inner_block;
             let inner_var_map;
@@ -54,7 +63,7 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
                 inner_block = _block;
                 inner_var_map = _var_map;
             } else {
-                panic!("type mismatch, function takes lambda argument");
+                return throw_error(anyhow!("type mismatch, function takes lambda argument"), 1, amb).await;
             }
 
             amb.message_tx.as_ref().unwrap().send(ExecutionMessage::RegisterWindowChangeCallback(inner_block, inner_var_map)).await.unwrap();
@@ -64,13 +73,14 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
             let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
             match val {
                 ValueType::Number(millis) => tokio::time::sleep(time::Duration::from_millis(millis as u64)).await,
-                _ => panic!("sleep expects a number argument"),
+                _ => return throw_error(anyhow!("sleep expects a number argument"), 1, amb).await,
             }
 
             ValueType::Void
         }
         "print" => {
             let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
+            // TODO write to abstract interface
             println!("{}", val);
             ValueType::Void
         }
@@ -78,7 +88,7 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
             let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
             let val = match val {
                 ValueType::Number(val) => val,
-                _ => panic!("only numbers can be converted to keys"),
+                _ => return throw_error(anyhow!("only numbers can be converted to keys"), 1, amb).await,
             };
             let val = val as u32;
 
@@ -90,7 +100,7 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
             let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
             let val = match val {
                 ValueType::Number(val) => val,
-                _ => panic!("only numbers can be converted to chars"),
+                _ => return throw_error(anyhow!("only numbers can be converted to chars"), 1, amb).await,
             };
 
             let val = val as u8 as char;
@@ -100,7 +110,7 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
             let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
             let val = match val {
                 ValueType::String(val) => val,
-                _ => panic!("only chars can be converted to chars"),
+                _ => return throw_error(anyhow!("only chars can be converted to chars"), 1, amb).await,
             };
             if val.len() != 1 { panic!("string needs to contain exactly 1 character") }
 
@@ -115,7 +125,7 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
             );
             let (from, to) = match val {
                 (ValueType::String(from), ValueType::Lambda(_, to, var_map)) => (from, (to, var_map)),
-                _ => panic!("invalid arguments passed to 'map_key'"),
+                _ => return throw_error(anyhow!("invalid arguments passed to 'map_key'"), 1, amb).await,
             };
 
             let mappings = match parse_key_action_with_mods(&*from, to.0).unwrap() {
@@ -136,8 +146,8 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
         name => {
             let (lambda_params, lambda_block, lambda_var_map) = match eval_expr(&Expr::Name(name.to_string()), var_map, amb).await {
                 ValueType::Lambda(params, block, var_map) => (params, block, var_map),
-                ValueType::Void => panic!("function '{}' not found in this scope", name),
-                _ => panic!("variable '{}' is not a lambda function", name),
+                ValueType::Void => return throw_error(anyhow!("function '{}' not found in this scope", name), 1, amb).await,
+                _ => return throw_error(anyhow!("variable '{}' is not a lambda function", name), 1, amb).await,
             };
 
             // we need to clone the lambda's var_map since each lambda execution needs to not affect the next one

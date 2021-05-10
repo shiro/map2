@@ -1,4 +1,5 @@
 use crate::*;
+use anyhow::Error;
 
 #[derive(Debug)]
 pub enum ExecutionMessage {
@@ -7,6 +8,7 @@ pub enum ExecutionMessage {
     GetFocusedWindowInfo(mpsc::Sender<Option<ActiveWindowInfo>>),
     RegisterWindowChangeCallback(Block, GuardedVarMap),
     Exit(i32),
+    FatalError(Error, i32),
 }
 
 pub type ExecutionMessageSender = tokio::sync::mpsc::Sender<ExecutionMessage>;
