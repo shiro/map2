@@ -1,4 +1,6 @@
 # Key mods
+ 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A scripting language that allows complex key remapping on Linux, written in
 Rust.
