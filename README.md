@@ -73,7 +73,7 @@ of file descriptor paths, regular expressions are also supported.
 For example, in order to grab a keyboard and Logitech mouse, one might specify
 the device list as such:
 
-devices.list:
+*devices.list:*
 ```
 /dev/input/by-id/usb-Logitech_G700s.*-event-kbd
 /dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd
@@ -83,7 +83,7 @@ In order to find out which file descriptor corresponds to which physical device
 one should examine `/dev/input/by-id/` and  `/dev/input/by-path/`.
 After defining the device list we can test it using a short script.
 
-example.km
+*example.km:*
 ```
 // maps 'a' to 'b'
 a::b;
