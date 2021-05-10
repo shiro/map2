@@ -55,6 +55,48 @@ For more examples check the [examples directory](examples/README.md).
 
 # Getting started
 
+In order to execute a script simply pass it as an argument to the `key-mods`
+command provided by this package.
+
+```
+$ key-mods script-name.km
+```
+
+By default a script is able to **output** events though a virtual output device,
+but in order for a script to **intercept** input events from physical devices it is
+necessary to define which devices should be *grabbed* (all events will pass
+through the script).
+
+To describe which devices should be grabbed it is necessary to provide a list
+of file descriptor paths, regular expressions are also supported.
+
+For example, in order to grab a keyboard and Logitech mouse, one might specify
+the device list as such:
+
+devices.list:
+```
+/dev/input/by-id/usb-Logitech_G700s.*-event-kbd
+/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd
+```
+
+In order to find out which file descriptor corresponds to which physical device
+one should examine `/dev/input/by-id/` and  `/dev/input/by-path/`.
+After defining the device list we can test it using a short script.
+
+example.km
+```
+// maps 'a' to 'b'
+a::b;
+```
+
+And finally execute the script which should successfully remap the keys.
+
+`$ key-mods -d devices.list example.km`
+
+Each device can only be grabbed once. Attempting to run several scripts that
+attempt to grab the same device simultaneously will produce warnings and the
+device will not be grabbed.
+
 ## Install
 
 ### Arch Linux
