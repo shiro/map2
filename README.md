@@ -103,11 +103,23 @@ device will not be grabbed.
 
 ### Arch Linux
 
-Build from source:
+Install stable version:
 
-`makepkg -si`
+`$ yay -S map2`
 
-The package will be added to the AUR after the initial release.
+Install latest version:
+
+`$ yay -S map2-git`
+
+Build local package from cloned source:
+
+`$ makepkg -si`
+
+### Other distributions
+
+- download the latest release from the [releases page](https://github.com/shiro/map2/releases)
+- unpack the archive
+- copy the files to the respective folders
 
 # Documentation
 
@@ -340,16 +352,24 @@ print(/* this is an in-line comment */ "hello");
 
 # Feature roadmap
 
-- [ ] lots of example scripts
 - [ ] more built-ins
 - [ ] escaped characters in strings and key sequences
 - [ ] update documentation and refactor code
+- [ ] better tests to avoid regressions
+- [ ] pre-packaged binaries for various distros
+- [ ] mouse events
 - [ ] Wayland support (someday)
 
-# Authors
+# Contributing
 
-- shiro <shiro@usagi.io>
+If you want to report bugs, add suggestions or help out with development please
+check the [issues page](https://github.com/shiro/map2/issues) and open an issue
+if it doesn't exist yet.
 
 # License
 
 MIT
+
+# Authors
+
+- shiro <shiro@usagi.io>
