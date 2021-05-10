@@ -4,5 +4,7 @@
   Basic arithmetic operations.
 - [active window](active-window.m2)  
   Reacting to active window changes and querying information.
-
-More examples will be added soon!
+- [control statements](control-statements.m2)  
+  Basic control statements (if, for)
+- [functions](functions.m2)  
+  Functions, parameters and return values
