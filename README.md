@@ -1,4 +1,4 @@
-# Key mods
+# Map2
  
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -13,7 +13,7 @@ For details check the [documentation](#documentation).
 
 # Examples
 
-Key mods is a very flexible scripting language that can utilize logic control
+Map2 is a very flexible scripting language that can utilize logic control
 statements, arithmetic and provides lots of useful built-in functions.
 
 ```
@@ -57,11 +57,11 @@ For more examples check the [examples directory](examples/README.md).
 
 # Getting started
 
-In order to execute a script simply pass it as an argument to the `key-mods`
+In order to execute a script simply pass it as an argument to the `map2`
 command provided by this package.
 
 ```
-$ key-mods script-name.km
+$ map2 script-name.m2
 ```
 
 By default a script is able to **output** events though a virtual output device,
@@ -85,7 +85,7 @@ In order to find out which file descriptor corresponds to which physical device
 one should examine `/dev/input/by-id/` and  `/dev/input/by-path/`.
 After defining the device list we can test it using a short script.
 
-*example.km:*
+*example.m2:*
 ```
 // maps 'a' to 'b'
 a::b;
@@ -93,7 +93,7 @@ a::b;
 
 And finally execute the script which should successfully remap the keys.
 
-`$ key-mods -d devices.list example.km`
+`$ map2 -d devices.list example.m2`
 
 Each device can only be grabbed once. Attempting to run several scripts that
 attempt to grab the same device simultaneously will produce warnings and the

@@ -1,7 +1,0 @@
-let foo = |a|{
-  return true;
-};
-
-if(foo(22)){
-  print("yay");
-}

@@ -1,0 +1,29 @@
+[package]
+name = "evdev-rs"
+version = "0.5.0"
+authors = ["Nayan Deshmukh <nayan26deshmukh@gmail.com>"]
+license = "MIT/Apache-2.0"
+keywords = ["evdev"]
+readme = "README.md"
+repository = "https://github.com/ndesh26/evdev-rs"
+homepage = "https://github.com/ndesh26/evdev-rs"
+documentation = "http://ndesh26.github.io/evdev-rs"
+edition = "2018"
+description = """
+Bindings to libevdev for interacting with evdev devices. It moves the
+common tasks when dealing with evdev devices into a library and provides
+a library interface to the callers, thus avoiding erroneous ioctls, etc.
+"""
+
+[features]
+default = []
+
+[dependencies]
+serde = { version = "1.0", default-features = false, features=["derive"], optional = true }
+evdev-sys = { path = "evdev-sys", version = "0.2.2" }
+libc = "0.2.67"
+bitflags = "1.2.1"
+log = "0.4.8"
+
+[package.metadata.docs.rs]
+features = ["serde"]

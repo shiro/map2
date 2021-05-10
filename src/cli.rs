@@ -12,7 +12,7 @@ pub struct Configuration {
 }
 
 pub fn parse_cli() -> Result<Configuration> {
-    let matches = App::new("key-mods")
+    let matches = App::new("map2")
         .version("1.0")
         .author("shiro <shiro@usagi.io>")
         .about("A scripting language that allows complex key remapping on Linux.")
@@ -34,7 +34,7 @@ pub fn parse_cli() -> Result<Configuration> {
 
     let device_list_config_name = "devices.list";
 
-    let xdg_dirs = BaseDirectories::with_prefix("key-mods")
+    let xdg_dirs = BaseDirectories::with_prefix("map2")
         .map_err(|_| anyhow!("failed to initialize XDG directory configuration"))?;
 
     let script_path = matches.value_of("script file").unwrap().to_string();

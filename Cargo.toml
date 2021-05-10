@@ -1,5 +1,5 @@
 [package]
-name = "key_mods"
+name = "map2"
 version = "0.1.0"
 authors = ["shiro <shiro@usagi.io>"]
 edition = "2018"
@@ -29,13 +29,9 @@ xdg = "2.2.0"
 man = "0.3.0"
 
 [[bin]]
-name = "key-mods"
+name = "map2"
 path = "src/main.rs"
 
 [[bin]]
 name = "man-gen"
 path = "src/man/man.rs"
-
-#[[bin]]
-#name = "dev-test"
-#path = "src/device/device-test.rs"

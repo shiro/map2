@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/key-mods-rs.iml" filepath="$PROJECT_DIR$/.idea/key-mods-rs.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/map2.iml" filepath="$PROJECT_DIR$/.idea/map2.iml" />
     </modules>
   </component>
 </project>

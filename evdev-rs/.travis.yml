@@ -1,0 +1,62 @@
+os: linux
+dist: xenial
+language: rust
+rust:
+  - stable
+  - beta
+  - nightly
+
+env:
+  global:
+    - TARGET=x86_64-unknown-linux-gnu
+    - PKG_CONFIG_PATH=$HOME/local/lib/pkgconfig
+    - LD_LIBRARY_PATH=$HOME/local/lib:$LD_LIBRARY_PATH
+
+jobs:
+  include:
+    - env: TARGET=arm-unknown-linux-gnueabi
+      addons:
+        apt:
+          packages:
+            - gcc-arm-linux-gnueabi
+            - libc6-armel-cross
+            - libc6-dev-armel-cross
+    - env: TARGET=arm-unknown-linux-gnueabihf
+      addons:
+        apt:
+          packages:
+            - gcc-arm-linux-gnueabihf
+            - libc6-armhf-cross
+            - libc6-dev-armhf-cross
+  allow_failures:
+    - rust: nightly
+
+addons:
+  apt:
+    packages:
+      - build-essential
+
+before_script:
+  - pip install 'travis-cargo<0.2' --user && export PATH=$HOME/.local/bin:$PATH
+  - rustup target add $TARGET
+  - rustup component add rustfmt
+
+script:
+  - cargo fmt -- --check
+  - travis_retry cargo build --target $TARGET --verbose
+  - travis_retry cargo build --target $TARGET --all-features --verbose
+  - |
+      if [ $TARGET == "x86_64-unknown-linux-gnu" ]
+      then
+        sudo --preserve-env env "PATH=$PATH" cargo test --verbose
+        sudo --preserve-env env "PATH=$PATH" cargo test --all-features --verbose
+      fi
+  - cargo doc --no-deps --all-features -p evdev-sys -p evdev-rs
+
+after_success:
+  - travis-cargo --only stable doc-upload
+  - travis-cargo coveralls
+
+notifications:
+  email:
+    on_success: never

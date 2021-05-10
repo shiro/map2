@@ -1,5 +1,5 @@
-use key_mods::*;
-use key_mods::messaging::*;
+use map2::*;
+use map2::messaging::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {

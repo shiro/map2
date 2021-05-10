@@ -1,8 +1,8 @@
-.TH KEY\ MODS 1
+.TH MAP2 1
 .SH NAME
-Key\ mods \- A scripting language that allows complex key remapping on Linux.
+Map2 \- A scripting language that allows complex key remapping on Linux.
 .SH SYNOPSIS
-\fBKey\ mods\fR [FLAGS]
+\fBMap2\fR [FLAGS]
 .SH FLAGS
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
@@ -12,7 +12,7 @@ Prints verbose information
 \fB\-d\fR, \fB\-\-devices\fR
 Selects the input devices
 .SH DEVICES
-In order to capture device input it is necessary to configure which devices should get captured. A list of devices can be specified by providing a device list argument or by defining a default configuration in the user's configuration directory ($XDG_CONFIG_HOME/key\-mods/device.list).
+In order to capture device input it is necessary to configure which devices should get captured. A list of devices can be specified by providing a device list argument or by defining a default configuration in the user's configuration directory ($XDG_CONFIG_HOME/map2/device.list).
 
 
 .SH LICENSE
@@ -34,12 +34,12 @@ The program panicked.
 .SH EXAMPLES
 .TP
 run a script
-\fB$ key\-mods example.km\fR
+\fB$ map2 example.m2\fR
 .br
 Runs the specified script.
 .TP
 run a script and capture devices matched by the device list
-\fB$ key\-mods \-d device.list example.km\fR
+\fB$ map2 \-d device.list example.m2\fR
 .br
 Captures devices that match the selectors in `device.list` and runs the script.
 
