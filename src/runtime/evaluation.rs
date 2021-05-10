@@ -7,6 +7,7 @@ use crate::*;
 use crate::parsing::parser::{parse_key_sequence, parse_key_action_with_mods};
 use evdev_rs::enums::int_to_ev_key;
 use super::builtin_functions::evaluate_builtin;
+use super::builtin_functions::throw_error;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct KeyActionCondition {
@@ -156,19 +157,13 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             }
         }
         Expr::Init(var_name, value) => {
-            let value = match eval_expr(value, var_map, amb).await {
-                ValueType::Void => panic!("unexpected value"),
-                v => v,
-            };
+            let value = eval_expr(value, var_map, amb).await;
 
             var_map.lock().unwrap().scope_values.insert(var_name.clone(), value);
             return ValueType::Void;
         }
         Expr::Assign(var_name, value) => {
-            let value = match eval_expr(value, var_map, amb).await {
-                ValueType::Void => panic!("unexpected value"),
-                v => v,
-            };
+            let value = eval_expr(value, var_map, amb).await;
 
             let mut map = var_map.clone();
             loop {
@@ -251,7 +246,13 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
             return ValueType::Void;
         }
         Expr::FunctionCall(name, args) => {
-            evaluate_builtin(name, args, var_map, amb).await
+            match evaluate_builtin(name, args, var_map, amb).await {
+                Ok(v) => v,
+                Err(err) => {
+                    throw_error(err, 1, amb).await;
+                    ValueType::Void
+                }
+            }
         }
     }
 }

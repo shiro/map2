@@ -39,8 +39,14 @@ print("the sum of 1 and 2 is: " + my_sum);
 on_window_change(||{
   if(active_window_class() == "firefox"){
     print("firefox is now the active window");
+    
+    // map 'F1' to ctrl+'t' (open new browser tab)
+    f1::^t;
   }else{
     print("firefox is not the active window");
+    
+    // map 'F1' back
+    f1::f1;
   }
 });
 ```
@@ -265,6 +271,17 @@ provided it defaults to '0'.
 ```
 exit(); // exits the application and indicates success
 exit(1); // exits the application and indicates an error
+```
+
+#### execute(command: String, ...arguments: String[]): String | Void
+
+Executes the given command with the provided arguments.  
+The standard output of the command is returned as a string if the command
+succeeds. If the command fails, `Void` is returned.
+
+```
+let message = execute("echo", "hello", "world");
+let now = execute("date");
 ```
 
 ## Comments
