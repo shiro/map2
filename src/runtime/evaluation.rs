@@ -110,7 +110,8 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         Expr::Add(left, right) => {
             match (eval_expr(left, var_map, amb).await, eval_expr(right, var_map, amb).await) {
                 (Number(left), Number(right)) => Number(left + right),
-                (String(left), String(right)) => String(format!("{}{}", left, right)),
+                (String(left), right) => String(format!("{}{}", left, right)),
+                (left, String(right)) => String(format!("{}{}", left, right)),
                 _ => panic!("cannot add unsupported types"),
             }
         }
