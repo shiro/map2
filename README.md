@@ -123,6 +123,9 @@ Install precompiled binary:
 - unpack the archive
 - copy the files to the respective folders
 
+*if there's an error with system libraries being too old, try building from
+source instead.*
+
 Build local package from cloned source:
 
 - `$ cargo build --release`
