@@ -1,5 +1,8 @@
 print("start");
 
+// kill script key
+!{pagedown}::{ exit(); };
+
 let key_pressed = false;
 let tab_pressed = false;
 
