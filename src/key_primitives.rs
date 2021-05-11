@@ -18,9 +18,11 @@ impl Key {
 
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) enum KeyValue { KEEP, UP, DOWN }
+#[allow(unused)]
+pub enum KeyValue { KEEP, UP, DOWN }
 
 impl KeyValue {
+    #[allow(unused)]
     fn to_event_value(&self) -> i32 {
         match self {
             KeyValue::KEEP => 2,
@@ -55,15 +57,15 @@ impl KeyModifierFlags {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub(crate) struct KeyModifierState {
-    pub(crate) left_ctrl: bool,
-    pub(crate) right_ctrl: bool,
-    pub(crate) left_shift: bool,
-    pub(crate) right_shift: bool,
-    pub(crate) left_alt: bool,
-    pub(crate) right_alt: bool,
-    pub(crate) left_meta: bool,
-    pub(crate) right_meta: bool,
+pub struct KeyModifierState {
+    pub left_ctrl: bool,
+    pub right_ctrl: bool,
+    pub left_shift: bool,
+    pub right_shift: bool,
+    pub left_alt: bool,
+    pub right_alt: bool,
+    pub left_meta: bool,
+    pub right_meta: bool,
 }
 
 impl KeyModifierState {

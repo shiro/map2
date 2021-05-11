@@ -1,9 +1,9 @@
-
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
 
 pub use std::{io, time};
+pub use std::borrow::BorrowMut;
 pub use std::io::Write;
 pub use std::ops::DerefMut;
 pub use std::sync::Arc;
@@ -13,7 +13,6 @@ pub use anyhow::{anyhow, Result};
 pub use async_recursion::async_recursion;
 pub use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent;
-pub use std::borrow::BorrowMut;
 pub use nom::lib::std::collections::HashMap;
 pub use tokio::prelude::*;
 pub use tokio::sync::{mpsc, oneshot};

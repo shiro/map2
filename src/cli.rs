@@ -1,9 +1,10 @@
-use clap::{App, Arg, };
-use anyhow::{Result, anyhow};
 use std::fs;
-use xdg::BaseDirectories;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::io::{BufReader, BufRead};
+
+use anyhow::{anyhow, Result};
+use clap::{App, Arg, };
+use xdg::BaseDirectories;
 
 pub struct Configuration {
     pub script_file: fs::File,

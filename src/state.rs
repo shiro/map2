@@ -1,15 +1,6 @@
-use crate::*;
 use ignore_list::*;
 
-pub(crate) enum SimpleModifierName {
-    Tab,
-    CapsLock,
-    Ctrl,
-    Shift,
-    Meta,
-    Alt,
-}
-
+use crate::*;
 
 #[derive(Clone)]
 pub struct CompiledKeyMappings(pub HashMap<KeyActionWithMods, Arc<tokio::sync::Mutex<(Block, GuardedVarMap)>>>);
@@ -43,9 +34,5 @@ impl State {
             ignore_list: IgnoreList::new(),
             active_window: None,
         }
-    }
-
-    pub(crate) fn is_any_modifier_down(&self) -> bool {
-        return self.leftalt_is_down || self.leftcontrol_is_down || self.shift_is_down || self.meta_is_down;
     }
 }

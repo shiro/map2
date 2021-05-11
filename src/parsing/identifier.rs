@@ -1,10 +1,11 @@
-use super::*;
 use unicode_xid::UnicodeXID;
+
+use super::*;
 
 pub(super) fn ident(input: &str) -> ResNew<&str, String> {
     let (rest, id) = match word(input) {
         Ok((rest, id)) => (rest, id),
-        Err(err) => return Err(make_generic_nom_err_options(input, vec!["identifier".to_string()])),
+        Err(_) => return Err(make_generic_nom_err_options(input, vec!["identifier".to_string()])),
     };
 
     match id.0.as_ref() {

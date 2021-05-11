@@ -8,11 +8,8 @@ use evdev_rs::*;
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
-use tokio::sync::oneshot::Sender;
 use tokio::task;
 use walkdir::WalkDir;
-
-use crate::device::virt_device;
 
 use super::*;
 
@@ -81,7 +78,10 @@ fn read_from_fd_runner(device: Device, reader_rx: mpsc::Sender<InputEvent>,
 async fn runner_it(fd_path: &Path,
                    writer: mpsc::Sender<InputEvent>)
                    -> Result<oneshot::Sender<()>> {
-    let fd_file = fs::File::open(&fd_path).expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
+    let fd_file = fs::OpenOptions::new()
+        .read(true)
+        .open(&fd_path)
+        .expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
     let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
     let mut device = Device::new_from_file(fd_file_nb).expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
     device.grab(GrabMode::Grab)
@@ -105,7 +105,7 @@ async fn runner
         let (reader_tx, reader_rx) = mpsc::channel(128);
 
         // send the reader to the client
-        reader_init.send(reader_tx.clone());
+        reader_init.send(reader_tx.clone()).unwrap();
 
         virtual_output_device::init_virtual_output_device(reader_rx).await.unwrap();
 
@@ -116,7 +116,7 @@ async fn runner
         }
 
         let (fs_event_tx, mut fs_event_rx) = mpsc::channel(128);
-        thread::spawn(move || {
+        thread::spawn(move || -> Result<()> {
             let (watch_tx, watch_rx) = std::sync::mpsc::channel();
             let mut watcher: notify::RecommendedWatcher = notify::Watcher::new(watch_tx, time::Duration::from_secs(2))?;
             watcher.watch("/dev/input", notify::RecursiveMode::Recursive)?;
@@ -138,7 +138,6 @@ async fn runner
                     Err(e) => return Err(anyhow!("watch error: {:?}", e)),
                 }
             }
-            Ok(())
         });
 
         let mut device_map = HashMap::new();
@@ -174,6 +173,7 @@ async fn runner
                 }
             }
         }
+        #[allow(unreachable_code)]
         Ok::<(), anyhow::Error>(())
     });
 

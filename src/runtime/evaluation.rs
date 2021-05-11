@@ -1,11 +1,11 @@
-use std::borrow::{BorrowMut};
+use std::borrow::BorrowMut;
 use std::fmt;
 use std::fmt::Formatter;
+
 use messaging::*;
 
 use crate::*;
-use crate::parsing::parser::{parse_key_sequence, parse_key_action_with_mods};
-use evdev_rs::enums::int_to_ev_key;
+
 use super::builtin_functions::evaluate_builtin;
 use super::builtin_functions::throw_error;
 
@@ -334,9 +334,6 @@ pub async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mu
 
     BlockRet::None
 }
-
-fn mutexes_are_equal<T>(first: &Mutex<T>, second: &Mutex<T>) -> bool
-    where T: PartialEq { std::ptr::eq(first, second) || *first.lock().unwrap() == *second.lock().unwrap() }
 
 fn arc_mutexes_are_equal<T>(first: &Arc<Mutex<T>>, second: &Arc<Mutex<T>>) -> bool
     where T: PartialEq { Arc::ptr_eq(first, second) || *first.lock().unwrap() == *second.lock().unwrap() }

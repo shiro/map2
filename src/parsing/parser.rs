@@ -1,5 +1,5 @@
+
 use super::*;
-use nom::error::convert_error;
 
 pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
     match global_block(raw_script) {

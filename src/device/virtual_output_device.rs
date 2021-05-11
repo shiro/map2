@@ -1,14 +1,18 @@
+use evdev_rs::{UInputDevice, UninitDevice};
+
 use crate::*;
+
 use super::*;
-use evdev_rs::{UninitDevice, UInputDevice};
 
 pub async fn init_virtual_output_device(
     mut reader_rx: mpsc::Receiver<InputEvent>,
 ) -> Result<()> {
     let mut new_device = UninitDevice::new()
-        .ok_or(anyhow!("failed to instantiate udev device"))?
+        .ok_or(anyhow!("failed to instantiate udev device: libevdev didn't return a device"))?
         .unstable_force_init();
-    virt_device::init_virtual_device(&mut new_device).unwrap();
+
+    virt_device::init_virtual_device(&mut new_device)
+        .map_err(|err| anyhow!("failed to instantiate udev device: {}", err))?;
 
     let input_device = UInputDevice::create_from_device(&new_device)?;
 
@@ -21,6 +25,7 @@ pub async fn init_virtual_output_device(
             };
             input_device.write_event(&ev)?;
         }
+        #[allow(unreachable_code)]
         Ok(())
     });
     Ok(())

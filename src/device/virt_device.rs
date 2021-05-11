@@ -1,7 +1,9 @@
-use anyhow::{Result};
+use anyhow::Result;
 use evdev_rs::*;
 use evdev_rs::Device;
 use evdev_rs::enums::*;
+
+use crate::*;
 
 fn set_code_bits(dev: &Device, ev_code: &EventCode, max: &EventCode) -> Result<()> {
     for code in ev_code.iter() {
@@ -9,7 +11,8 @@ fn set_code_bits(dev: &Device, ev_code: &EventCode, max: &EventCode) -> Result<(
             break;
         }
 
-        dev.enable(&code).unwrap();
+        dev.enable(&code)
+            .map_err(|err|anyhow!("failed to enable code bit: {}", err))?;
     }
     Ok(())
 }

@@ -1,21 +1,21 @@
-#[cfg(test)]
-use tests::*;
-
 use anyhow::*;
 use evdev_rs::enums::EventType;
-use futures::StreamExt;
+use nom::Err as NomErr;
 use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
 use nom::combinator::{map, opt};
-use nom::{Err as NomErr};
-use nom::error::{context, VerboseError, ParseError};
+use nom::error::{ParseError};
 use nom::IResult;
 use nom::multi::many0;
 use nom::sequence::*;
 use tap::Tap;
 
+use continue_statement::*;
+use custom_combinators::*;
+use error::*;
 use expression::*;
+use for_loop::*;
 use function::*;
 use identifier::*;
 use if_statement::*;
@@ -25,15 +25,12 @@ use key_mapping::*;
 use key_sequence::*;
 use lambda::*;
 use primitives::*;
-use variable::*;
-use for_loop::*;
 use return_statement::*;
-use continue_statement::*;
-use custom_combinators::*;
-use error::*;
+#[cfg(test)]
+use tests::*;
+use variable::*;
 
 use crate::*;
-use crate::runtime::evaluation::*;
 
 pub mod parser;
 mod return_statement;

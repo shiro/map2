@@ -1,5 +1,6 @@
-use super::*;
 use nom::combinator::not;
+
+use super::*;
 
 pub(super) fn expr_4(input: &str) -> ResNew<&str, Expr> {
     alt((
@@ -101,7 +102,7 @@ pub(super) fn expr(input: &str) -> ResNew<&str, Expr> {
                 ws0, expr_1))(i)
         },
         init.0,
-        |acc, (_, op, _, (val, last_err))| {
+        |acc, (_, op, _, (val, _))| {
             match op {
                 "==" => Expr::Eq(Box::new(acc), Box::new(val)),
                 "!=" => Expr::Neq(Box::new(acc), Box::new(val)),

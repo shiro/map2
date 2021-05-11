@@ -1,22 +1,9 @@
-use crate::*;
-use crate::messaging::ExecutionMessage;
 use evdev_rs::enums::int_to_ev_key;
-use crate::parsing::parser::{parse_key_action_with_mods, parse_key_sequence};
 use tokio::process::Command;
 
-
-async fn join_parallel<T: Send + 'static>(
-    futs: impl IntoIterator<Item=impl futures::Future<Output=T> + Send + 'static>,
-) -> Vec<T> {
-    let tasks: Vec<_> = futs.into_iter().map(tokio::spawn).collect();
-    // unwrap the Result because it is introduced by tokio::spawn()
-    // and isn't something our caller can handle
-    futures::future::join_all(tasks)
-        .await
-        .into_iter()
-        .map(Result::unwrap)
-        .collect()
-}
+use crate::*;
+use crate::messaging::ExecutionMessage;
+use crate::parsing::parser::{parse_key_action_with_mods, parse_key_sequence};
 
 pub async fn throw_error<'a>(err: anyhow::Error, exit_code: i32, amb: &mut Ambient<'a>) -> ValueType {
     amb.message_tx.borrow_mut().as_ref().unwrap()
@@ -169,7 +156,7 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
             // append arguments to command
             for arg in parsed_args.iter().skip(1) { cmd.arg(arg); }
 
-            let mut child_process = cmd.output().await
+            let child_process = cmd.output().await
                 .map_err(|err| anyhow!("failed to spawn child process: {}", err))?;
 
             // trim trailing newline

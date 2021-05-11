@@ -1,5 +1,6 @@
-use super::*;
 use nom::number::complete::double;
+
+use super::*;
 
 pub(super) fn string(input: &str) -> ResNew<&str, Expr> {
     tuple((tag_custom("\""), take_until("\""), tag_custom("\"")))(input)

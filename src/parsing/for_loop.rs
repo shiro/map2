@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub(super) fn for_loop(input: &str) -> ResNew<&str, Stmt> {
     tuple((
         tag_custom("for"), ws0,

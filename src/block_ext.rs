@@ -1,23 +1,8 @@
 use crate::*;
 
 impl Block {
-    pub(crate) fn append_stmt(mut self, stmt: Stmt) -> Self {
-        self.statements.push(stmt);
-        self
-    }
-
     pub(crate) fn push_expr(&mut self, expr: Expr) -> &mut Self {
         self.statements.push(Stmt::Expr(expr));
-        self
-    }
-
-    pub(crate) fn extend_with(mut self, expr_vec: Vec<Expr>) -> Self {
-        self.statements.extend(expr_vec.into_iter().map(|expr| Stmt::Expr(expr)));
-        self
-    }
-
-    pub(crate) fn sleep_for(mut self, duration: time::Duration) -> Self {
-        self.statements.push(Stmt::Expr(Expr::SleepAction(duration)));
         self
     }
 }
@@ -209,7 +194,6 @@ impl Expr {
 pub(crate) trait ExprVecExt {
     fn append_click(self, key: Key) -> Self;
     fn append_action(self, action: KeyAction) -> Self;
-    fn sleep_for_millis(self, duration: u64) -> Self;
 }
 
 impl ExprVecExt for Vec<Expr> {
@@ -222,10 +206,6 @@ impl ExprVecExt for Vec<Expr> {
     fn append_action(mut self, action: KeyAction) -> Self {
         self.push(Expr::KeyAction(action));
         self
-    }
-
-    fn sleep_for_millis(self, duration: u64) -> Self {
-        unimplemented!();
     }
 }
 

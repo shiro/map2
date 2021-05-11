@@ -1,5 +1,4 @@
 use super::*;
-use nom::combinator::consumed;
 
 pub(super) fn variable_initialization(input: &str) -> ResNew<&str, Expr> {
     let (input, _) = tag_custom("let")(input)

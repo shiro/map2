@@ -1,8 +1,9 @@
-use super::*;
-use nom::error::{ErrorKind, ParseError, FromExternalError};
-use nom::{InputLength};
 use std::fmt::Debug;
 
+use nom::InputLength;
+use nom::error::{ErrorKind, FromExternalError, ParseError};
+
+use super::*;
 
 pub(super) type ResNew<I, O> = IResult<I, (O, Option<CustomError<I>>), CustomError<I>>;
 
@@ -33,7 +34,7 @@ impl<I> ParseError<I> for CustomError<I> where I: InputLength {
     fn or(mut self, mut other: Self) -> Self {
         if other.input.input_len() < self.input.input_len() {
             return other;
-        } else if (other.input.input_len() > self.input.input_len()) {
+        } else if other.input.input_len() > self.input.input_len() {
             return self;
         }
         other.expected.append(&mut self.expected);
@@ -44,7 +45,7 @@ impl<I> ParseError<I> for CustomError<I> where I: InputLength {
 }
 
 impl<I, E> FromExternalError<I, E> for CustomError<I> {
-    fn from_external_error(input: I, kind: ErrorKind, e: E) -> Self {
+    fn from_external_error(input: I, _: ErrorKind, _: E) -> Self {
         Self { input, expected: vec![] }
     }
 }
