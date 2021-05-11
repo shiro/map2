@@ -1,10 +1,3 @@
-#![feature(type_ascription)]
-#![feature(async_closure)]
-#![feature(unboxed_closures)]
-#![feature(trait_alias)]
-#![feature(label_break_value)]
-#![feature(destructuring_assignment)]
-#![feature(seek_convenience)]
 
 #[macro_use]
 extern crate lazy_static;

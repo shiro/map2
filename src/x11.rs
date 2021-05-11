@@ -60,9 +60,9 @@ pub(crate) fn x11_get_active_window() -> Result<ActiveWindowInfo> {
 
     // Collect the replies to the atoms
     let (net_wm_name, utf8_string) = (net_wm_name, utf8_string);
-    let (wm_class, string) = (
-        AtomEnum::WM_CLASS.into(): Atom,
-        AtomEnum::STRING.into(): Atom,
+    let (wm_class, string): (u32, u32) = (
+        AtomEnum::WM_CLASS.into(),
+        AtomEnum::STRING.into(),
     );
 
     // Get the property from the window that we need
