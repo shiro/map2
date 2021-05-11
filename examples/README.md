@@ -8,3 +8,6 @@
   Basic control statements (if, for)
 - [functions](functions.m2)  
   Functions, parameters and return values
+- [shiro's daily driver](shiro-daily-driver.m2)  
+  The script [shiro](https://github.com/shiro) uses all the time and can't live
+  without

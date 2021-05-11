@@ -117,9 +117,17 @@ Build local package from cloned source:
 
 ### Other distributions
 
+Install precompiled binary:
+
 - download the latest release from the [releases page](https://github.com/shiro/map2/releases)
 - unpack the archive
 - copy the files to the respective folders
+
+Build local package from cloned source:
+
+- `$ cargo build --release`
+- copy the compiled binary somewhere in your `PATH` (i.e. `$ cp
+  target/release/map2 /usr/bin`)
 
 # Documentation
 
