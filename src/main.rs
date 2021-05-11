@@ -1,5 +1,6 @@
 use map2::*;
 use map2::messaging::*;
+use std::ops::Deref;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -82,7 +83,7 @@ async fn main() -> Result<()> {
             }
             ExecutionMessage::AddMapping(token, from, to, var_map) => {
                 if token == current_token {
-                    mappings.0.insert(from, Arc::new(tokio::sync::Mutex::new((to, var_map))));
+                    mappings.0.insert(from, Arc::new((to, var_map)));
                 }
             }
             ExecutionMessage::GetFocusedWindowInfo(tx) => {
@@ -178,9 +179,8 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         let mut message_tx = message_tx.clone();
         let ev_writer = ev_writer.clone();
         task::spawn(async move {
-            let mut guard = block.lock().await;
-            let var_map = guard.deref_mut();
-            eval_block(&var_map.0, &mut var_map.1, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
+            let (block, var_map) = block.deref();
+            eval_block(&block, &var_map, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
         });
         return Ok(());
     }

@@ -272,12 +272,12 @@ pub enum BlockRet {
 }
 
 #[async_recursion]
-pub async fn eval_block<'a>(block: &Block, var_map: &mut GuardedVarMap, amb: &mut Ambient<'a>) -> BlockRet {
+pub async fn eval_block<'a>(block: &Block, var_map: &GuardedVarMap, amb: &mut Ambient<'a>) -> BlockRet {
     let mut var_map = GuardedVarMap::new(Mutex::new(VarMap::new(Some(var_map.clone()))));
 
     'outer: for stmt in &block.statements {
         match stmt {
-            Stmt::Expr(expr) => { eval_expr(expr, &mut var_map, amb).await; }
+            Stmt::Expr(expr) => { eval_expr(expr, &var_map, amb).await; }
             Stmt::Block(nested_block) => {
                 let ret = eval_block(nested_block, &mut var_map, amb).await;
                 match ret {

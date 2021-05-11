@@ -7,26 +7,26 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-input-linux-sys = "0.3.1"
-libc = "0.2.71"
-tap = "1.0.1"
-itertools = "0.10.0"
 anyhow = "1.0"
-x11rb = "0.7.0"
-tokio = { version = "0.3.4", features = ["full"] }
-futures = "0.3"
-lazy_static = "1.4.0"
 async-recursion = "0.3.2"
-nom = "6.1.2"
-tokio-file-unix = "0.5.1"
 clap = "2.33.3"
 evdev-rs = { path = "evdev-rs" }
-walkdir = "2.3.2"
-regex = "1.4.5"
-unicode-xid = "0.2.1"
-notify = "4.0.16"
-xdg = "2.2.0"
+futures = "0.3"
+input-linux-sys = "0.3.1"
+itertools = "0.10.0"
+lazy_static = "1.4.0"
+libc = "0.2.71"
 man = "0.3.0"
+nom = "6.1.2"
+notify = "4.0.16"
+regex = "1.4.5"
+tap = "1.0.1"
+tokio = { version = "0.3.4", features = ["full"] }
+tokio-file-unix = "0.5.1"
+unicode-xid = "0.2.1"
+walkdir = "2.3.2"
+x11rb = "0.7.0"
+xdg = "2.2.0"
 
 [[bin]]
 name = "map2"

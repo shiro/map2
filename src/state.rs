@@ -3,7 +3,7 @@ use ignore_list::*;
 use crate::*;
 
 #[derive(Clone)]
-pub struct CompiledKeyMappings(pub HashMap<KeyActionWithMods, Arc<tokio::sync::Mutex<(Block, GuardedVarMap)>>>);
+pub struct CompiledKeyMappings(pub HashMap<KeyActionWithMods, Arc<(Block, GuardedVarMap)>>);
 
 impl CompiledKeyMappings { pub fn new() -> Self { CompiledKeyMappings(Default::default()) } }
 
