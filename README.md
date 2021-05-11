@@ -186,6 +186,21 @@ a::+b; // maps 'a' to 'shift+b'
 #!^a::+b; // maps 'meta+alt+ctrl+a' to 'shift+b'
 ```
 
+## Key symbols
+
+To descript keys in key mappings and sequences it is possible to either use
+literal key symbols (such as 'a') or any valid input event as defined in
+[input-event-codes.h](https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h)
+(such as 'KEY_A'). In the case of special keys such as 'left mouse button',
+input events need to be used (i.e. `BTN_MOUSE`).
+
+**Non-US keyboard layouts:** Alternative keys that require modifiers (such as
+'@', '%', etc.) probably won't work and get mapped to different keys. To fix
+this use the modifier flags and the original key instead. (i.e. on the US
+layout the '@' symbol requires pressing shift+'2', meaning that `+2` should be
+used in simple mappings and `{shift down}2{shift up}` should be used in key
+sequences.)
+
 ## Variables
 
 Variables can be initialized using the `let` keyword. Assigning a value to a
