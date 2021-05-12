@@ -1,7 +1,5 @@
 use evdev_rs::{UInputDevice, UninitDevice};
-
 use crate::*;
-
 use super::*;
 
 pub async fn init_virtual_output_device(
@@ -14,7 +12,8 @@ pub async fn init_virtual_output_device(
     virt_device::init_virtual_device(&mut new_device)
         .map_err(|err| anyhow!("failed to instantiate udev device: {}", err))?;
 
-    let input_device = UInputDevice::create_from_device(&new_device)?;
+    let input_device = UInputDevice::create_from_device(&new_device)
+        .map_err(|err| anyhow!("failed to initialize uinput device: {}", err))?;
 
     task::spawn(async move {
         loop {
@@ -23,10 +22,11 @@ pub async fn init_virtual_output_device(
                 Some(v) => v,
                 None => return Err(anyhow!("message channel closed unexpectedly")),
             };
-            input_device.write_event(&ev)?;
+            input_device.write_event(&ev)
+                .map_err(|err| anyhow!("failed to write event into uinput device: {}", err))?;
         }
         #[allow(unreachable_code)]
-        Ok(())
+            Ok(())
     });
     Ok(())
 }

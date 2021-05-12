@@ -107,7 +107,9 @@ async fn runner
         // send the reader to the client
         reader_init.send(reader_tx.clone()).unwrap();
 
-        virtual_output_device::init_virtual_output_device(reader_rx).await.unwrap();
+        virtual_output_device::init_virtual_output_device(reader_rx).await
+            .map_err(|err| anyhow!("uinput error: {}", err))
+            .unwrap();
 
         #[derive(Debug)]
         enum FsWatchEvent {
@@ -174,7 +176,7 @@ async fn runner
             }
         }
         #[allow(unreachable_code)]
-        Ok::<(), anyhow::Error>(())
+            Ok::<(), anyhow::Error>(())
     });
 
     Ok(())
