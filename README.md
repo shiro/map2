@@ -57,6 +57,14 @@ For more examples check the [examples directory](examples/README.md).
 
 # Getting started
 
+**tldr:**
+
+- find the input device file descriptors you want to grab
+- write them into a file (i.e. `devices.list`)
+- write a script file for remapping the keys
+- run `$ map2 -d devices.list script_name.m2`
+
+
 In order to execute a script simply pass it as an argument to the `map2`
 command provided by this package.
 
