@@ -142,6 +142,9 @@ Build local package from cloned source:
 
 # Documentation
 
+- [start automatically on startup/login](docs/start-automatically.md)
+
+
 ## Mappings
 
 Basic mappings simply map one key to a different one.
