@@ -86,7 +86,7 @@ async fn runner_it(fd_path: &Path,
     let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
     let mut device = Device::new_from_file(fd_file_nb).expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
     device.grab(GrabMode::Grab)
-        .map_err(|err| anyhow!("failed to grab device '{}': {}", fd_path.to_str().unwrap_or("..."), err))?;
+        .map_err(|err| anyhow!("failed to grab device '{}': {}", fd_path.to_string_lossy(), err))?;
 
     // spawn tasks for reading devices
     let (abort_tx, abort_rx) = oneshot::channel();
@@ -171,6 +171,7 @@ async fn runner
                 }
                 FsWatchEvent::REMOVE(path) => {
                     if let Some(abort_tx) = device_map.remove(&path) {
+                        // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
                         let _ = abort_tx.send(());
                     }
                 }
