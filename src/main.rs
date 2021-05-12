@@ -27,11 +27,9 @@ async fn main() -> Result<()> {
 
 
     let mut state = State::new();
-    let global_scope = Arc::new(tokio::sync::Mutex::new(mappings::bind_mappings(&mut configuration.script_file)));
+    let global_scope = mappings::bind_mappings(&mut configuration.script_file);
     let mut window_cycle_token: usize = 0;
     let mut mappings = CompiledKeyMappings::new();
-
-    let global_var_map = GuardedVarMap::new(Mutex::new(VarMap::new(None)));
 
     let (ev_reader_init_tx, ev_reader_init_rx) = oneshot::channel();
     let (ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
@@ -40,18 +38,17 @@ async fn main() -> Result<()> {
     let mut ev_reader_tx = ev_reader_init_rx.await?;
 
     let mut window_change_handlers = vec![];
-
     {
         let mut message_tx = message_tx.clone();
-        let global_scope = global_scope.clone();
         let ev_reader_tx = ev_reader_tx.clone();
-        let mut global_var_map = global_var_map.clone();
         task::spawn(async move {
-            eval_block(&mut *global_scope.lock().await, &mut global_var_map, &mut Ambient {
+            let mut amb = Ambient {
                 ev_writer_tx: ev_reader_tx,
                 window_cycle_token,
                 message_tx: Some(&mut message_tx),
-            }).await;
+            };
+
+            eval_block(&global_scope, &mut GuardedVarMap::new(Mutex::new(VarMap::new(None))), &mut amb).await;
         });
     }
 
