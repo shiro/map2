@@ -1,6 +1,7 @@
 use map2::*;
 use map2::messaging::*;
 use std::ops::Deref;
+use std::thread;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -33,6 +34,12 @@ async fn main() -> Result<()> {
 
     let (ev_reader_init_tx, ev_reader_init_rx) = oneshot::channel();
     let (ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
+
+    // add a small delay if run from TTY so we don't miss 'enter up' which is often released when the device is grabbed
+    if atty::is(atty::Stream::Stdout) {
+        thread::sleep(time::Duration::from_millis(300));
+    }
+
     // start coroutine
     bind_udev_inputs(&configuration.devices, ev_reader_init_tx, ev_writer_tx).await?;
     let mut ev_reader_tx = ev_reader_init_rx.await?;

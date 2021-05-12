@@ -27,6 +27,7 @@ unicode-xid = "0.2.1"
 walkdir = "2.3.2"
 x11rb = "0.7.0"
 xdg = "2.2.0"
+atty = "0.2"
 
 [[bin]]
 name = "map2"

@@ -498,6 +498,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-recursion",
+ "atty",
  "clap",
  "evdev-rs",
  "futures 0.3.14",
