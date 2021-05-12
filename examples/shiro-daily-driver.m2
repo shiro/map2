@@ -53,7 +53,7 @@ let lalt = false;
 
 let ralt = false;
 {rightalt down}::{ralt = true; send("{rightalt down}");};
-{rightalt up}::{ralt = false; send("{rightalt up}");};
+!{rightalt up}::{ralt = false; send("{rightalt up}");};
 
 
 let directional_mod = |key, direction|{

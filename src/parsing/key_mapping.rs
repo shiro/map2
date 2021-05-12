@@ -113,6 +113,7 @@ mod tests {
                 from: KeyActionWithMods::new(*KEY_A, TYPE_DOWN, KeyModifierFlags::new()),
                 to: Block::new().tap_mut(|b| {
                     b.statements = vec![
+                        Stmt::Expr(Expr::ReleaseRestoreModifiers(KeyModifierFlags::new(), KeyModifierFlags::new(), 0)),
                         Stmt::Expr(Expr::KeyAction(KeyAction::new(*KEY_A, TYPE_DOWN))),
                         Stmt::Expr(Expr::KeyAction(KeyAction::new(*KEY_A, TYPE_UP))),
                         Stmt::Expr(Expr::KeyAction(KeyAction::new(*KEY_B, TYPE_DOWN))),

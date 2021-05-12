@@ -81,6 +81,10 @@ impl KeyModifierState {
             right_meta: false,
         }
     }
+    pub fn is_ctrl(&self) -> bool{ self.left_ctrl || self.right_ctrl}
+    pub fn is_alt(&self) -> bool{ self.left_alt || self.right_alt}
+    pub fn is_shift(&self) -> bool{ self.left_shift || self.right_shift}
+    pub fn is_meta(&self) -> bool{ self.left_meta || self.right_meta}
 }
 
 

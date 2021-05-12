@@ -254,6 +254,47 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                 }
             }
         }
+        Expr::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+            let actual_state = &amb.modifier_state;
+
+            // takes into account the actual state of a modifier and decides weather to release/restore it or not
+            let release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
+                if *to_type == 1 { // restore mods if actual mod is still pressed
+                    if *is_actual_down {
+                        futures::executor::block_on(amb.ev_writer_tx.send(
+                            KeyAction { key: *key, value: *to_type }.to_input_ev()
+                        )).unwrap();
+                    }
+                } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
+                    if *is_actual_down != false {
+                        futures::executor::block_on(amb.ev_writer_tx.send(
+                            KeyAction { key: *key, value: *to_type }.to_input_ev()
+                        )).unwrap();
+                    }
+                }
+            };
+
+            if from_flags.ctrl && !to_flags.ctrl {
+                release_or_restore_modifier(&actual_state.left_ctrl, &*KEY_LEFT_CTRL);
+                release_or_restore_modifier(&actual_state.right_ctrl, &*KEY_RIGHT_CTRL);
+            }
+            if from_flags.shift && !to_flags.shift {
+                release_or_restore_modifier(&actual_state.left_shift, &*KEY_LEFT_SHIFT);
+                release_or_restore_modifier(&actual_state.right_shift, &*KEY_RIGHT_SHIFT);
+            }
+            if from_flags.alt && !to_flags.alt {
+                release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFT_ALT);
+                release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHT_ALT);
+            }
+            if from_flags.meta && !to_flags.meta {
+                release_or_restore_modifier(&actual_state.left_meta, &*KEY_LEFT_META);
+                release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHT_META);
+            }
+
+            // TODO eat keys we just released, un-eat keys we just restored
+
+            return ValueType::Void;
+        }
     }
 }
 
@@ -263,6 +304,7 @@ pub struct Ambient<'a> {
     pub ev_writer_tx: mpsc::Sender<InputEvent>,
     pub message_tx: Option<&'a mut ExecutionMessageSender>,
     pub window_cycle_token: usize,
+    pub modifier_state: KeyModifierState,
 }
 
 pub enum BlockRet {
@@ -378,6 +420,9 @@ pub enum Expr {
     KeyAction(KeyAction),
     EatKeyAction(KeyAction),
     SleepAction(time::Duration),
+
+    // internal
+    ReleaseRestoreModifiers(KeyModifierFlags, KeyModifierFlags, i32),
 }
 
 #[derive(Debug, Clone, PartialEq)]

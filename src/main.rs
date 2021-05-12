@@ -53,6 +53,7 @@ async fn main() -> Result<()> {
                 ev_writer_tx: ev_reader_tx,
                 window_cycle_token,
                 message_tx: Some(&mut message_tx),
+                modifier_state: KeyModifierState::new(),
             };
 
             eval_block(&global_scope, &mut GuardedVarMap::new(Mutex::new(VarMap::new(None))), &mut amb).await;
@@ -73,6 +74,7 @@ async fn main() -> Result<()> {
                                ev_writer_tx,
                                message_tx: Some(&mut message_tx),
                                window_cycle_token,
+                               modifier_state: KeyModifierState::new(),
                            },
                 ).await;
             });
@@ -130,14 +132,14 @@ async fn main() -> Result<()> {
 fn update_modifiers(state: &mut State, ev: &InputEvent) {
     let ignore_list = &mut state.ignore_list;
     vec![
-        (*KEY_LEFT_CTRL, &mut state.leftcontrol_is_down),
-        // (*KEY_RIGHT_CTRL, &mut state.leftcontrol_is_down, &mut state.ignore_list),
-        (*KEY_LEFT_ALT, &mut state.leftalt_is_down),
-        // (*KEY_RIGHT_ALT, &mut state.leftalt_is_down),
-        (*KEY_LEFT_SHIFT, &mut state.shift_is_down),
-        // (*KEY_RIGHT_SHIFT, &mut state.shift_is_down, &mut state.ignore_list),
-        (*KEY_LEFT_META, &mut state.meta_is_down),
-        // (*KEY_RIGHT_META, &mut state.meta_is_down, &mut state.ignore_list),
+        (*KEY_LEFT_CTRL, &mut state.modifiers.left_ctrl),
+        (*KEY_RIGHT_CTRL, &mut state.modifiers.right_ctrl),
+        (*KEY_LEFT_ALT, &mut state.modifiers.left_alt),
+        (*KEY_RIGHT_ALT, &mut state.modifiers.right_alt),
+        (*KEY_LEFT_SHIFT, &mut state.modifiers.left_shift),
+        (*KEY_RIGHT_SHIFT, &mut state.modifiers.right_shift),
+        (*KEY_LEFT_META, &mut state.modifiers.left_meta),
+        (*KEY_RIGHT_META, &mut state.modifiers.right_meta),
     ]
         .iter_mut()
         .for_each(|(a, b)| {
@@ -165,10 +167,10 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
     }
 
     let mut from_modifiers = KeyModifierFlags::new();
-    from_modifiers.ctrl = state.leftcontrol_is_down.clone();
-    from_modifiers.alt = state.leftalt_is_down.clone();
-    from_modifiers.shift = state.shift_is_down.clone();
-    from_modifiers.meta = state.meta_is_down.clone();
+    from_modifiers.ctrl = state.modifiers.is_ctrl();
+    from_modifiers.alt = state.modifiers.is_alt();
+    from_modifiers.shift = state.modifiers.is_shift();
+    from_modifiers.meta = state.modifiers.is_meta();
 
     let from_key_action = KeyActionWithMods {
         key: Key { event_code: ev.event_code },
@@ -182,9 +184,12 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         let block = block.clone();
         let mut message_tx = message_tx.clone();
         let ev_writer = ev_writer.clone();
+        let modifier_state = state.modifiers.clone();
         task::spawn(async move {
             let (block, var_map) = block.deref();
-            eval_block(&block, &var_map, &mut Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token }).await;
+            let mut amb = Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token, modifier_state };
+
+            eval_block(&block, &var_map, &mut amb).await;
         });
         return Ok(());
     }

@@ -8,28 +8,9 @@ impl Block {
 }
 
 impl Expr {
-    fn _map_block(from: &KeyActionWithMods, to: &mut Block) {
-        // release modifiers from the trigger
-        if from.modifiers.ctrl {
-            to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })));
-            to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })));
-        }
-        if from.modifiers.alt {
-            to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })));
-            to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })));
-        }
-        if from.modifiers.shift {
-            to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })));
-            to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })));
-        }
-        if from.modifiers.meta {
-            to.statements.insert(0, Stmt::Expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })));
-            to.statements.insert(1, Stmt::Expr(Expr::EatKeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })));
-        }
-    }
 
     pub(crate) fn map_key_click_block(from: KeyClickActionWithMods, mut to: Block) -> Self {
-        Expr::_map_block(&from.clone().to_key_action(TYPE_DOWN), &mut to);
+        to.statements.insert(0, Stmt::Expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP)));
         Expr::KeyMapping(vec![
             KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_DOWN, from.modifiers), to },
             KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_REPEAT, from.modifiers), to: Block::new() }, // stub
@@ -38,19 +19,15 @@ impl Expr {
     }
 
     pub(crate) fn map_key_block(from: KeyActionWithMods, mut to: Block) -> Self {
-        Expr::_map_block(&from, &mut to);
+        to.statements.insert(0, Stmt::Expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP)));
 
         Expr::KeyMapping(vec![KeyMapping { from, to }])
     }
 
-    // PROTO
     pub(crate) fn map_key_action_action(from: KeyActionWithMods, to: KeyActionWithMods) -> Self {
         let mut block = Block::new();
 
-        if from.modifiers.ctrl && !to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
-        if from.modifiers.alt && !to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
-        if from.modifiers.shift && !to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
-        if from.modifiers.meta && !to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+        block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
         if !from.modifiers.ctrl && to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
         if !from.modifiers.alt && to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
@@ -65,10 +42,7 @@ impl Expr {
         if !from.modifiers.shift && to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
         if !from.modifiers.meta && to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
 
-        if from.modifiers.ctrl && !to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
-        if from.modifiers.alt && !to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
-        if from.modifiers.shift && !to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
-        if from.modifiers.meta && !to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+        block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
 
         Expr::KeyMapping(vec![KeyMapping { from, to: block }])
     }
@@ -77,10 +51,7 @@ impl Expr {
     pub(crate) fn map_key_click_action(from: KeyClickActionWithMods, to: KeyActionWithMods) -> Self {
         let mut block = Block::new();
 
-        if from.modifiers.ctrl && !to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
-        if from.modifiers.alt && !to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
-        if from.modifiers.shift && !to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
-        if from.modifiers.meta && !to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+        block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
         if !from.modifiers.ctrl && to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
         if !from.modifiers.alt && to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
@@ -95,10 +66,7 @@ impl Expr {
         if !from.modifiers.shift && to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
         if !from.modifiers.meta && to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
 
-        if from.modifiers.ctrl && !to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
-        if from.modifiers.alt && !to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
-        if from.modifiers.shift && !to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
-        if from.modifiers.meta && !to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+        block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
 
         Expr::KeyMapping(vec![
             KeyMapping { from: KeyActionWithMods::new(from.key, TYPE_DOWN, KeyModifierFlags::new()), to: block },
@@ -110,10 +78,7 @@ impl Expr {
     pub(crate) fn map_key_action_click(from: KeyActionWithMods, to: KeyClickActionWithMods) -> Self {
         let mut block = Block::new();
 
-        if from.modifiers.ctrl && !to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
-        if from.modifiers.alt && !to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
-        if from.modifiers.shift && !to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
-        if from.modifiers.meta && !to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+        block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
         if !from.modifiers.ctrl && to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
         if !from.modifiers.alt && to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
@@ -129,10 +94,7 @@ impl Expr {
         if !from.modifiers.shift && to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
         if !from.modifiers.meta && to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
 
-        if from.modifiers.ctrl && !to.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
-        if from.modifiers.alt && !to.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
-        if from.modifiers.shift && !to.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
-        if from.modifiers.meta && !to.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+        block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
 
         Expr::KeyMapping(vec![KeyMapping { from, to: block }])
     }
@@ -141,23 +103,7 @@ impl Expr {
         let mut mappings = vec![];
         {
             let mut block = Block::new();
-
-            if from.modifiers.ctrl && !to.modifiers.ctrl {
-                block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP }));
-                block.push_expr(Expr::EatKeyAction(KeyAction::new(*KEY_LEFT_CTRL, TYPE_UP)));
-            }
-            if from.modifiers.alt && !to.modifiers.alt {
-                block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP }));
-                block.push_expr(Expr::EatKeyAction(KeyAction::new(*KEY_LEFT_ALT, TYPE_UP)));
-            }
-            if from.modifiers.shift && !to.modifiers.shift {
-                block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP }));
-                block.push_expr(Expr::EatKeyAction(KeyAction::new(*KEY_LEFT_SHIFT, TYPE_UP)));
-            }
-            if from.modifiers.meta && !to.modifiers.meta {
-                block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP }));
-                block.push_expr(Expr::EatKeyAction(KeyAction::new(*KEY_LEFT_META, TYPE_UP)));
-            }
+            block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
             if to.modifiers.ctrl && !from.modifiers.ctrl { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
             if to.modifiers.alt && !from.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
@@ -177,6 +123,8 @@ impl Expr {
             if to.modifiers.alt && !from.modifiers.alt { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
             if to.modifiers.shift && !from.modifiers.shift { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
             if to.modifiers.meta && !from.modifiers.meta { block.push_expr(Expr::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+
+            block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
 
             mappings.push(KeyMapping { from: KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() }, to: block });
         }
