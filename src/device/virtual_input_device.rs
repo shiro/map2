@@ -82,6 +82,7 @@ async fn runner_it(fd_path: &Path,
         .read(true)
         .open(&fd_path)
         .expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
+
     let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
     let mut device = Device::new_from_file(fd_file_nb).expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
     device.grab(GrabMode::Grab)

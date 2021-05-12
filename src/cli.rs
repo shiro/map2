@@ -1,9 +1,10 @@
+use std::os::unix::fs::FileTypeExt;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
-use clap::{App, Arg, };
+use clap::{App, Arg};
 use xdg::BaseDirectories;
 
 pub struct Configuration {
@@ -42,12 +43,17 @@ pub fn parse_cli() -> Result<Configuration> {
     let script_file = fs::File::open(&script_path)
         .map_err(|err| anyhow!("failed to read script file '{}': {}", &script_path, &err))?;
 
+
     let device_list_path = matches.value_of("devices")
         .map(|path| Some(PathBuf::from(path)))
         .unwrap_or_else(|| {
             xdg_dirs.find_config_file(&device_list_config_name)
         })
         .map(|path| {
+            let file_type = fs::metadata(&path).map_err(|err| anyhow!("failed to get file metadata: {}", err))?.file_type();
+            if file_type.is_char_device() { return Err(anyhow!("the device list file can't be a character device")); }
+            if file_type.is_block_device() { return Err(anyhow!("the device list file can't be a block device")); }
+
             fs::File::open(PathBuf::from(&path))
                 .map_err(|err| anyhow!("failed to open device list '{}': {}", &path.display(), err))
         });
