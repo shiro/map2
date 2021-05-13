@@ -2,7 +2,7 @@
 extern crate lazy_static;
 extern crate regex;
 
-pub use std::{io, time};
+pub use std::{io, time, fs};
 pub use std::borrow::BorrowMut;
 pub use std::io::Write;
 pub use std::ops::DerefMut;
@@ -32,7 +32,7 @@ pub mod x11;
 pub mod key_defs;
 pub mod state;
 pub mod runtime;
-pub mod mappings;
+pub mod script;
 pub mod block_ext;
 pub mod key_primitives;
 pub mod parsing;
