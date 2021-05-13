@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
                 ev_writer_tx: ev_reader_tx,
                 window_cycle_token,
                 message_tx: Some(&mut message_tx),
-                modifier_state: KeyModifierState::new(),
+                modifier_state: &KeyModifierState::new(),
             };
 
             eval_block(&global_scope, &mut GuardedVarMap::new(Mutex::new(VarMap::new(None))), &mut amb).await;
@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
                                ev_writer_tx,
                                message_tx: Some(&mut message_tx),
                                window_cycle_token,
-                               modifier_state: KeyModifierState::new(),
+                               modifier_state: &KeyModifierState::new(),
                            },
                 ).await;
             });
@@ -130,29 +130,38 @@ async fn main() -> Result<()> {
 
 
 fn update_modifiers(state: &mut State, ev: &InputEvent) {
-    let ignore_list = &mut state.ignore_list;
-    vec![
-        (*KEY_LEFT_CTRL, &mut state.modifiers.left_ctrl),
-        (*KEY_RIGHT_CTRL, &mut state.modifiers.right_ctrl),
-        (*KEY_LEFT_ALT, &mut state.modifiers.left_alt),
-        (*KEY_RIGHT_ALT, &mut state.modifiers.right_alt),
-        (*KEY_LEFT_SHIFT, &mut state.modifiers.left_shift),
-        (*KEY_RIGHT_SHIFT, &mut state.modifiers.right_shift),
-        (*KEY_LEFT_META, &mut state.modifiers.left_meta),
-        (*KEY_RIGHT_META, &mut state.modifiers.right_meta),
-    ]
-        .iter_mut()
-        .for_each(|(a, b)| {
-            if ev.value == TYPE_DOWN && ev.event_code == a.event_code {
-                **b = true;
-            } else if ev.value == TYPE_UP && ev.event_code == a.event_code {
-                **b = false;
-                if ignore_list.is_ignored(&KeyAction::new(*a, TYPE_UP)) {
-                    ignore_list.unignore(&KeyAction::new(*a, TYPE_UP));
-                    return;
-                }
-            }
-        });
+    // let ignore_list = &mut state.ignore_list;
+
+    // TODO find a way to do this with a single accessor function
+    let foo: [(Key, fn(&KeyModifierState) -> bool, fn(&mut KeyModifierState) -> &mut bool); 8] = [
+        (*KEY_LEFT_CTRL, |s| s.left_ctrl, |s: &mut KeyModifierState| &mut s.left_ctrl),
+        (*KEY_RIGHT_CTRL, |s| s.right_ctrl, |s: &mut KeyModifierState| &mut s.right_ctrl),
+        (*KEY_LEFT_ALT, |s| s.left_alt, |s: &mut KeyModifierState| &mut s.left_alt),
+        (*KEY_RIGHT_ALT, |s| s.right_alt, |s: &mut KeyModifierState| &mut s.right_alt),
+        (*KEY_LEFT_SHIFT, |s| s.left_shift, |s: &mut KeyModifierState| &mut s.left_shift),
+        (*KEY_RIGHT_SHIFT, |s| s.right_shift, |s: &mut KeyModifierState| &mut s.right_shift),
+        (*KEY_LEFT_META, |s| s.left_meta, |s: &mut KeyModifierState| &mut s.left_meta),
+        (*KEY_RIGHT_META, |s| s.right_meta, |s: &mut KeyModifierState| &mut s.right_meta),
+    ];
+
+    for (key, is_modifier_down, modifier_mut) in foo.iter() {
+        if ev.event_code == key.event_code && ev.value == TYPE_DOWN && !is_modifier_down(&*state.modifiers) {
+            let mut new_modifiers = state.modifiers.deref().clone();
+            *modifier_mut(&mut new_modifiers) = true;
+            state.modifiers = Arc::new(new_modifiers);
+            return;
+        } else if ev.event_code == key.event_code && ev.value == TYPE_UP {
+            let mut new_modifiers = state.modifiers.deref().clone();
+            *modifier_mut(&mut new_modifiers) = false;
+            state.modifiers = Arc::new(new_modifiers);
+            return;
+            // TODO re-implement eating or throw it out completely
+            // if ignore_list.is_ignored(&KeyAction::new(*key, TYPE_UP)) {
+            //     ignore_list.unignore(&KeyAction::new(*key, TYPE_UP));
+            //     return;
+            // }
+        }
+    };
 }
 
 async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
@@ -187,7 +196,7 @@ async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
         let modifier_state = state.modifiers.clone();
         task::spawn(async move {
             let (block, var_map) = block.deref();
-            let mut amb = Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token, modifier_state };
+            let mut amb = Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token, modifier_state: &modifier_state };
 
             eval_block(&block, &var_map, &mut amb).await;
         });

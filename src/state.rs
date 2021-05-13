@@ -8,7 +8,7 @@ pub struct CompiledKeyMappings(pub HashMap<KeyActionWithMods, Arc<(Block, Guarde
 impl CompiledKeyMappings { pub fn new() -> Self { CompiledKeyMappings(Default::default()) } }
 
 pub struct State {
-    pub modifiers: KeyModifierState,
+    pub modifiers: Arc<KeyModifierState>,
 
     pub ignore_list: IgnoreList,
     pub active_window: Option<ActiveWindowInfo>,
@@ -18,7 +18,7 @@ pub struct State {
 impl State {
     pub fn new() -> Self {
         State {
-            modifiers: KeyModifierState::new(),
+            modifiers: Arc::new(KeyModifierState::new()),
             ignore_list: IgnoreList::new(),
             active_window: None,
         }

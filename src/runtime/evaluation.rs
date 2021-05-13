@@ -304,7 +304,7 @@ pub struct Ambient<'a> {
     pub ev_writer_tx: mpsc::Sender<InputEvent>,
     pub message_tx: Option<&'a mut ExecutionMessageSender>,
     pub window_cycle_token: usize,
-    pub modifier_state: KeyModifierState,
+    pub modifier_state: &'a KeyModifierState,
 }
 
 pub enum BlockRet {
