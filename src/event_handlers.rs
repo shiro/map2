@@ -80,12 +80,18 @@ pub async fn handle_stdin_ev(mut state: &mut State, ev: InputEvent,
 }
 
 
-pub async fn handle_execution_message(current_token: usize, msg: ExecutionMessage, state: &mut State, mappings: &mut CompiledKeyMappings,
-                                      window_change_handlers: &mut Vec<(Block, GuardedVarMap)>) {
+pub async fn handle_execution_message(
+    out: &mut impl Write,
+    current_token: usize,
+    msg: ExecutionMessage,
+    state: &mut State,
+    mappings: &mut CompiledKeyMappings,
+    window_change_handlers: &mut Vec<(Block, GuardedVarMap)>,
+) {
     match msg {
-        ExecutionMessage::EatEv(action) => {
-            state.ignore_list.ignore(&action);
-        }
+        // ExecutionMessage::EatEv(action) => {
+        //     state.ignore_list.ignore(&action);
+        // }
         ExecutionMessage::AddMapping(token, from, to, var_map) => {
             if token == current_token {
                 mappings.0.insert(from, Arc::new((to, var_map)));
@@ -96,6 +102,9 @@ pub async fn handle_execution_message(current_token: usize, msg: ExecutionMessag
         }
         ExecutionMessage::RegisterWindowChangeCallback(block, var_map) => {
             window_change_handlers.push((block, var_map));
+        }
+        ExecutionMessage::Write(message) => {
+            out.write(message.as_ref()).unwrap();
         }
         ExecutionMessage::Exit(exit_code) => { std::process::exit(exit_code) }
         ExecutionMessage::FatalError(err, exit_code) => {

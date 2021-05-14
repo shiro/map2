@@ -234,13 +234,13 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
 
             return ValueType::Void;
         }
-        Expr::EatKeyAction(action) => {
-            match &amb.message_tx {
-                Some(tx) => { tx.send(ExecutionMessage::EatEv(action.clone())).await.unwrap(); }
-                None => panic!("need message tx"),
-            }
-            return ValueType::Void;
-        }
+        // Expr::EatKeyAction(action) => {
+        //     match &amb.message_tx {
+        //         Some(tx) => { tx.send(ExecutionMessage::EatEv(action.clone())).await.unwrap(); }
+        //         None => panic!("need message tx"),
+        //     }
+        //     return ValueType::Void;
+        // }
         Expr::SleepAction(duration) => {
             tokio::time::sleep(*duration).await;
             return ValueType::Void;
@@ -418,8 +418,9 @@ pub enum Expr {
     FunctionCall(String, Vec<Expr>),
 
     KeyAction(KeyAction),
-    EatKeyAction(KeyAction),
     SleepAction(time::Duration),
+
+    // EatKeyAction(KeyAction),
 
     // internal
     ReleaseRestoreModifiers(KeyModifierFlags, KeyModifierFlags, i32),

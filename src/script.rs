@@ -24,20 +24,18 @@ pub fn parse_script(script_file: &mut fs::File) -> Block {
 }
 
 
-pub fn evaluate_script(
+pub async fn evaluate_script(
     script_ast: Block,
     mut execution_message_tx: mpsc::Sender<ExecutionMessage>,
     ev_reader_tx: mpsc::Sender<InputEvent>,
     window_cycle_token: usize,
 ) {
-    task::spawn(async move {
-        let mut amb = Ambient {
-            ev_writer_tx: ev_reader_tx,
-            window_cycle_token,
-            message_tx: Some(&mut execution_message_tx),
-            modifier_state: &KeyModifierState::new(),
-        };
+    let mut amb = Ambient {
+        ev_writer_tx: ev_reader_tx,
+        window_cycle_token,
+        message_tx: Some(&mut execution_message_tx),
+        modifier_state: &KeyModifierState::new(),
+    };
 
-        eval_block(&script_ast, &mut GuardedVarMap::new(Mutex::new(VarMap::new(None))), &mut amb).await;
-    });
+    eval_block(&script_ast, &mut GuardedVarMap::new(Mutex::new(VarMap::new(None))), &mut amb).await;
 }

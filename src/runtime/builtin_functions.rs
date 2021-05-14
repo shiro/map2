@@ -81,8 +81,11 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
         }
         "print" => {
             let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
-            // TODO write to abstract interface
-            println!("{}", val);
+            let val = format!("{}\n", val);
+
+            amb.message_tx.borrow_mut().as_ref().unwrap()
+                .send(ExecutionMessage::Write(val)).await
+                .unwrap();
         }
         "number_to_key" => {
             let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;

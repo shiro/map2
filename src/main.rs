@@ -30,6 +30,7 @@ async fn main() -> Result<()> {
     });
 
     // initialize global state
+    let mut stdout = io::stdout();
     let mut state = State::new();
     let mut window_cycle_token: usize = 0;
     let mut mappings = CompiledKeyMappings::new();
@@ -51,7 +52,13 @@ async fn main() -> Result<()> {
     let mut ev_reader_tx = ev_reader_init_rx.await?;
 
     // initial evaluation pass on global scope
-    script::evaluate_script(script_ast, execution_message_tx.clone(), ev_reader_tx.clone(), window_cycle_token);
+    {
+        let execution_message_tx = execution_message_tx.clone();
+        let ev_reader_tx = ev_reader_tx.clone();
+        task::spawn(async move {
+            script::evaluate_script(script_ast, execution_message_tx, ev_reader_tx, window_cycle_token).await;
+        });
+    }
 
     loop {
         tokio::select! {
@@ -66,7 +73,7 @@ async fn main() -> Result<()> {
                     &mut ev_reader_tx, &mut execution_message_tx, window_cycle_token).await.unwrap();
             }
             Some(msg) = message_rx.recv() => {
-                event_handlers::handle_execution_message(window_cycle_token, msg, &mut state,
+                event_handlers::handle_execution_message(&mut stdout, window_cycle_token, msg, &mut state,
                     &mut mappings, &mut window_change_handlers).await;
             }
         }

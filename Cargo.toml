@@ -28,6 +28,7 @@ walkdir = "2.3.2"
 x11rb = "0.7.0"
 xdg = "2.2.0"
 atty = "0.2"
+indoc = "1.0"
 
 [[bin]]
 name = "map2"

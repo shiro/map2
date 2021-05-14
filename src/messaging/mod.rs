@@ -4,10 +4,11 @@ use crate::*;
 
 #[derive(Debug)]
 pub enum ExecutionMessage {
-    EatEv(KeyAction),
+    // EatEv(KeyAction),
     AddMapping(usize, KeyActionWithMods, Block, GuardedVarMap),
     GetFocusedWindowInfo(mpsc::Sender<Option<ActiveWindowInfo>>),
     RegisterWindowChangeCallback(Block, GuardedVarMap),
+    Write(String),
     Exit(i32),
     FatalError(Error, i32),
 }

@@ -103,10 +103,10 @@ async fn runner
  writer: mpsc::Sender<InputEvent>,
 ) -> Result<()> {
     task::spawn(async move {
-        let (reader_tx, reader_rx) = mpsc::channel(128);
+        let (fs_reader_tx, reader_rx) = mpsc::channel(128);
 
         // send the reader to the client
-        reader_init.send(reader_tx.clone()).unwrap();
+        reader_init.send(fs_reader_tx.clone()).unwrap();
 
         virtual_output_device::init_virtual_output_device(reader_rx).await
             .map_err(|err| anyhow!("uinput error: {}", err))
