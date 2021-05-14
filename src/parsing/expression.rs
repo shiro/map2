@@ -21,11 +21,11 @@ pub(super) fn expr_4(input: &str) -> ResNew<&str, Expr> {
 pub(super) fn expr_3(input: &str) -> ResNew<&str, Expr> {
     // TODO fold this
     let (input, expr) = alt((
+        expr_4,
         map(
             tuple((tag_custom("!"), not(tag("{")), expr_3)),
             |(_, _, (expr, last_err))| (Expr::Neg(Box::new(expr)), last_err),
         ),
-        expr_4,
     ))(input)?;
 
     Ok((input, expr))

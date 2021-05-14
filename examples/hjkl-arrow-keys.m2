@@ -6,7 +6,7 @@
 
 // the '!' in the front represents the 'alt' modifier
 
-!{h}::left;
-!{j}::down;
-!{k}::up;
-!{l}::right;
+!h::left;
+!j::down;
+!k::up;
+!l::right;
