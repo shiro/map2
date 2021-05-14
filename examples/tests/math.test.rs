@@ -29,7 +29,7 @@ mod test {
         2 times 4 is: 8
         4 divided by 2 is: 2
         result of complicated calculation: 3.8
-    "};
+        "};
         assert_eq!(&*output, expected);
 
         Ok(())
