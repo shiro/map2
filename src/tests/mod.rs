@@ -5,7 +5,5 @@ use script_testing::*;
 #[path = "../event_handlers.rs"]
 mod event_handlers;
 
-#[path = "../../examples/tests/math.test.rs"]
-mod math_test;
-#[path = "../../examples/tests/hjkl_arrow_keys.test.rs"]
-mod hjkl_arrow_keys_test;
+#[path = "../../examples/tests/mod.rs"]
+mod examples_integration_tests;
