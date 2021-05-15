@@ -5,7 +5,7 @@ extern crate regex;
 pub use std::{io, time, fs};
 pub use std::borrow::BorrowMut;
 pub use std::io::Write;
-pub use std::ops::DerefMut;
+pub use std::ops::{Deref, DerefMut};
 pub use std::sync::Arc;
 pub use std::sync::Mutex;
 

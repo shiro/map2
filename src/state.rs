@@ -2,7 +2,7 @@ use ignore_list::*;
 
 use crate::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CompiledKeyMappings(pub HashMap<KeyActionWithMods, Arc<(Block, GuardedVarMap)>>);
 
 impl CompiledKeyMappings { pub fn new() -> Self { CompiledKeyMappings(Default::default()) } }
