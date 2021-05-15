@@ -38,6 +38,9 @@ pub mod key_primitives;
 pub mod parsing;
 pub mod device;
 pub mod cli;
-pub mod test;
 pub mod ignore_list;
 pub mod messaging;
+pub mod event_handlers;
+
+#[cfg(test)]
+pub mod tests;

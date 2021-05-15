@@ -1,6 +1,5 @@
 use crate::*;
-use crate::test::*;
-
+use messaging::*;
 
 #[derive(Default)]
 pub struct ScriptTestingParameters<'a> {
@@ -22,7 +21,7 @@ impl ScriptTestingAPI {
             sleep(delay);
         }
 
-        self.stop_tx.send(()).await.unwrap()
+        let _ = self.stop_tx.send(()).await;
     }
 
     pub async fn write_event(&mut self, ev: InputEvent) -> Result<()> {
@@ -86,6 +85,9 @@ pub async fn test_script(
                                 &mut ev_writer_tx, &mut execution_message_tx, window_cycle_token).await.unwrap();
                         }
                         Some(msg) = execution_message_rx.recv() => {
+                            // don't terminate during testing
+                            if let ExecutionMessage::Exit(_) = msg{ return; }
+
                             event_handlers::handle_execution_message(&mut *stdout.lock().await, window_cycle_token, msg, &mut state,
                                 &mut mappings, &mut window_change_handlers).await;
                         }

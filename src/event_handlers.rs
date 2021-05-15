@@ -1,6 +1,4 @@
 use crate::*;
-
-#[cfg(test)]
 use messaging::*;
 
 fn update_modifiers(state: &mut State, ev: &InputEvent) {

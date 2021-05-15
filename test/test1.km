@@ -1,6 +1,0 @@
-print("wow");
-a::b;
-b::{
-  print("wow");
-};
-

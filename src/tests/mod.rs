@@ -1,5 +1,4 @@
 mod script_testing;
-#[cfg(test)]
 use script_testing::*;
 
 #[allow(unused)]
