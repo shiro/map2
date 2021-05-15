@@ -12,9 +12,9 @@ if(a == 3){
 }
 
 // for loop
-for(let i=0; i<20; i=i+1){
+for(let i=0; i<5; i=i+1){
   // we can skip to the next iteration early using the continue statement
-  if (i == 15){
+  if (i == 3){
     continue;
   }
 
