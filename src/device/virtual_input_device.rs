@@ -32,7 +32,7 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 pub fn read_from_device_input_fd_thread_handler_new(
     device: Device,
     // reader_tx: mpsc::Sender<InputEvent>,
-    handler: impl Fn(InputEvent),
+    mut handler: impl FnMut(InputEvent),
     mut abort_rx: oneshot::Receiver<()>,
 ) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
