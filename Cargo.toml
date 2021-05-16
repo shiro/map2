@@ -30,10 +30,15 @@ xdg = "2.2.0"
 atty = "0.2"
 indoc = "1.0"
 futures-intrusive = "0.4.0"
+ncurses = "5.101.0"
 
 [[bin]]
 name = "map2"
 path = "src/main.rs"
+
+[[bin]]
+name = "map2devices"
+path = "src/map2devices/map2devices.rs"
 
 [[bin]]
 name = "man-gen"

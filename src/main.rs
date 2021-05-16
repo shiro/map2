@@ -1,5 +1,4 @@
 use map2::*;
-use map2::messaging::*;
 use std::ops::Deref;
 use std::thread;
 
