@@ -68,8 +68,14 @@ async fn main() -> Result<()> {
                     &mut execution_message_tx, window_cycle_token, &mut window_change_handlers);
             }
             Some(ev) = ev_writer_rx.recv() => {
-                event_handlers::handle_stdin_ev(&mut state, ev, &mut mappings,
-                    &mut ev_reader_tx, &mut execution_message_tx, window_cycle_token).await.unwrap();
+                event_handlers::handle_stdin_ev(
+                    &mut state, ev,
+                    &mut mappings,
+                    &mut ev_reader_tx,
+                    &mut execution_message_tx,
+                    window_cycle_token,
+                    &configuration,
+                ).await.unwrap();
             }
             Some(msg) = message_rx.recv() => {
                 event_handlers::handle_execution_message(&mut stdout, window_cycle_token, msg, &mut state,

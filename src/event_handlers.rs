@@ -1,5 +1,6 @@
 use crate::*;
 use messaging::*;
+use crate::cli::Configuration;
 
 fn update_modifiers(state: &mut State, ev: &InputEvent) {
     // let ignore_list = &mut state.ignore_list;
@@ -36,13 +37,19 @@ fn update_modifiers(state: &mut State, ev: &InputEvent) {
     };
 }
 
-pub async fn handle_stdin_ev(mut state: &mut State,
-                             ev: InputEvent,
-                             mappings: &mut CompiledKeyMappings,
-                             ev_writer: &mut mpsc::Sender<InputEvent>,
-                             message_tx: &mut ExecutionMessageSender,
-                             window_cycle_token: usize,
+pub async fn handle_stdin_ev(
+    mut state: &mut State,
+    ev: InputEvent,
+    mappings: &mut CompiledKeyMappings,
+    ev_writer: &mut mpsc::Sender<InputEvent>,
+    message_tx: &mut ExecutionMessageSender,
+    window_cycle_token: usize,
+    configuration: &Configuration,
 ) -> Result<()> {
+    if configuration.verbosity >= 3 {
+        logging::print_debug(format!("input event: {}", logging::print_input_event(&ev)));
+    }
+
     match ev.event_code {
         EventCode::EV_KEY(_) => {}
         _ => {

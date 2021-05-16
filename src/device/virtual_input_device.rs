@@ -29,9 +29,8 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 }
 
 
-pub fn read_from_device_input_fd_thread_handler_new(
+pub fn read_from_device_input_fd_thread_handler(
     device: Device,
-    // reader_tx: mpsc::Sender<InputEvent>,
     mut handler: impl FnMut(InputEvent),
     mut abort_rx: oneshot::Receiver<()>,
 ) {
@@ -80,52 +79,6 @@ pub fn read_from_device_input_fd_thread_handler_new(
 }
 
 
-pub fn read_from_device_input_fd_thread_handler(device: Device, reader_tx: mpsc::Sender<InputEvent>,
-                                                mut abort_rx: oneshot::Receiver<()>,
-) {
-    let mut a: io::Result<(ReadStatus, InputEvent)>;
-    loop {
-        if abort_rx.try_recv().is_ok() { return; }
-
-        a = device.next_event(ReadFlag::NORMAL);
-        if a.is_ok() {
-            let mut result = a.ok().unwrap();
-            match result.0 {
-                ReadStatus::Sync => { // dropped, need to sync
-                    while result.0 == ReadStatus::Sync {
-                        a = device.next_event(ReadFlag::SYNC);
-                        if a.is_ok() {
-                            result = a.ok().unwrap();
-                        } else { // something failed, abort sync and carry on
-                            break;
-                        }
-                    }
-                }
-                ReadStatus::Success => {
-                    futures::executor::block_on(
-                        reader_tx.send(result.1)
-                    ).unwrap();
-                }
-            }
-        } else {
-            let err = a.err().unwrap();
-            match err.raw_os_error() {
-                Some(libc::ENODEV) => { return; }
-                Some(libc::EWOULDBLOCK) => {
-                    // thread::yield_now();
-                    thread::sleep(time::Duration::from_millis(2));
-                    continue;
-                }
-                _ => {
-                    println!("{:?}", err);
-                    println!("reader loop err: {}", err);
-                    return;
-                }
-            }
-        }
-    }
-}
-
 async fn runner_it(fd_path: &Path,
                    writer: mpsc::Sender<InputEvent>)
                    -> Result<oneshot::Sender<()>> {
@@ -142,7 +95,15 @@ async fn runner_it(fd_path: &Path,
     // spawn tasks for reading devices
     let (abort_tx, abort_rx) = oneshot::channel();
     thread::spawn(move || {
-        read_from_device_input_fd_thread_handler(device, writer, abort_rx);
+        read_from_device_input_fd_thread_handler(
+            device,
+            |ev| {
+                let _ = futures::executor::block_on(
+                    writer.send(ev)
+                );
+            },
+            abort_rx,
+        );
     });
 
     Ok(abort_tx)

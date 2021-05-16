@@ -9,7 +9,7 @@ use xdg::BaseDirectories;
 
 pub struct Configuration {
     pub script_file: fs::File,
-    pub verbose: bool,
+    pub verbosity: i32,
     pub devices: Vec<String>,
 }
 
@@ -18,10 +18,11 @@ pub fn parse_cli() -> Result<Configuration> {
         .version("1.0")
         .author("shiro <shiro@usagi.io>")
         .about("A scripting language that allows complex key remapping on Linux.")
-        .arg(Arg::with_name("verbose")
+        .arg(Arg::with_name("verbosity")
             .short("-v")
             .long("--verbose")
-            .help("Prints verbose information"))
+            .multiple(true)
+            .help("Sets the verbosity level"))
         .arg(Arg::with_name("devices")
             .help("Selects the input devices")
             .short("-d")
@@ -66,9 +67,11 @@ pub fn parse_cli() -> Result<Configuration> {
         None => { vec![] }
     };
 
+    let verbosity = matches.occurrences_of("verbosity") as i32;
+
     let config = Configuration {
         script_file,
-        verbose: matches.is_present("verbose"),
+        verbosity,
         devices: device_list,
     };
 

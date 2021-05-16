@@ -1,5 +1,5 @@
 use map2::*;
-use map2::device::virtual_input_device::read_from_device_input_fd_thread_handler_new;
+use map2::device::virtual_input_device::read_from_device_input_fd_thread_handler;
 use std::collections::hash_map::Entry;
 use std::collections::HashSet;
 use std::fs::OpenOptions;
@@ -70,7 +70,7 @@ fn get_props(fd: PathBuf, reader_tx: mpsc::UnboundedSender<PathBuf>) -> Result<D
 
     // open listen thread
     std::thread::spawn(move || {
-        read_from_device_input_fd_thread_handler_new(
+        read_from_device_input_fd_thread_handler(
             device,
             |_| {
                 if start.elapsed() < time::Duration::from_millis(100) { return; }

@@ -41,6 +41,7 @@ pub mod cli;
 pub mod ignore_list;
 pub mod messaging;
 pub mod event_handlers;
+pub mod logging;
 
 #[cfg(test)]
 pub mod tests;
