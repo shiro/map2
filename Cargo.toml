@@ -37,8 +37,8 @@ name = "map2"
 path = "src/main.rs"
 
 [[bin]]
-name = "map2devices"
-path = "src/map2devices/map2devices.rs"
+name = "evsearch"
+path = "src/evsearch/evsearch.rs"
 
 [[bin]]
 name = "man-gen"
