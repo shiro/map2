@@ -10,6 +10,9 @@ use regex::Regex;
 use evdev_rs::{Device, DeviceWrapper};
 use std::fs::OpenOptions;
 use std::collections::hash_map::Entry;
+use map2::device::virtual_input_device::{read_from_device_input_fd_thread_handler, read_from_device_input_fd_thread_handler_new};
+use futures::{FutureExt};
+use tokio::stream::StreamExt;
 
 fn open_file() -> fs::File {
     let args: Vec<_> = env::args().collect();
@@ -81,19 +84,52 @@ struct DeviceInfo {
     uniq: String,
 }
 
-fn get_props(fd: PathBuf) -> Result<DeviceInfo> {
+fn get_props(fd: PathBuf, reader_tx: mpsc::Sender<PathBuf>) -> Result<DeviceInfo> {
     let file = OpenOptions::new()
         .read(true)
         .open(&fd)?;
 
     let device = Device::new_from_file(file)?;
 
-    Ok(DeviceInfo {
-        fd,
+    let device_info = DeviceInfo {
+        fd: fd.clone(),
         name: device.name().unwrap_or("None").to_string(),
         phys: device.phys().unwrap_or("None").to_string(),
         uniq: device.uniq().unwrap_or("None").to_string(),
-    })
+    };
+    // let (a, b) = mpsc::channel(128);
+
+    // b.forward(reader_tx);
+    // b.(reader_tx);
+
+
+    // open listen thread
+    std::thread::spawn(move || {
+        // device.
+        read_from_device_input_fd_thread_handler_new(
+            device,
+            |ev| {
+                futures::executor::block_on(
+                    reader_tx.send(fd.clone())
+                );
+            },
+            // reader_tx.,
+            // a.forward(reader_tx),
+            oneshot::channel().1,
+        );
+    });
+
+    Ok(device_info)
+}
+
+fn process_input(ch: i32, filter: &mut String) {
+    match ch {
+        // backspace
+        127 => { filter.pop(); }
+        // ctrl+w
+        23 => { filter.clear(); }
+        _ => { filter.push(ch as u8 as char); }
+    }
 }
 
 fn main() {
@@ -111,9 +147,11 @@ fn main() {
 
     let mut filter = String::new();
     let prompt_height = 1;
-    let entry_height = 2;
 
     let mut device_map = HashMap::new();
+
+    // all device input event updates are received through the channel
+    let (mut fd_ev_tx, fd_ev_rx) = mpsc::channel(128);
 
     let mut fd_list;
     loop {
@@ -121,11 +159,6 @@ fn main() {
 
         fd_list = get_fd_list();
         if let Ok(filtered_fd_list) = filter_fd_list(&fd_list, &device_map, &filter) {
-            // let mut visible_len = i32::min(filtered_fd_list.len() as i32, max_y);
-            //
-            // let mut skip = list.len() as i32 - visible_len + prompt_height;
-            // skip = skip + visible_len / entry_height;
-
             let mut remaining_lines = max_y - prompt_height;
 
             for (idx, &fd_path) in filtered_fd_list.iter().rev().enumerate() {
@@ -134,42 +167,29 @@ fn main() {
 
                 let device_info = match device_map.entry(fd_path.clone()) {
                     Entry::Occupied(o) => o.into_mut(),
-                    Entry::Vacant(v) => v.insert(get_props(fd_path.clone()).ok())
+                    Entry::Vacant(v) => v.insert(get_props(fd_path.clone(), fd_ev_tx.clone()).ok())
                 };
+
+                if idx == 2 { attron(A_REVERSE()); }
 
                 if let Some(device_info) = device_info {
                     if remaining_lines < 2 { break; }
                     remaining_lines = remaining_lines - 2;
-
                     addstr(&*format!("  {{name: '{}', phys: '{}', uniq: '{}'}}\n", device_info.name, device_info.phys, device_info.uniq));
                 } else {
                     if remaining_lines < 1 { break; }
                     remaining_lines = remaining_lines - 1;
-
                     // TODO show errors in verbose mode
                 }
 
-                // if idx == 2 { attron(A_BOLD() | A_BLINK()); }
-                // if idx == 2 { attroff(A_BOLD() | A_BLINK()); }
+                if idx == 2 { attroff(A_REVERSE()); }
             }
         } else {
-            // failed creating pattern, show nothing
+            addstr("no results, invalid search pattern");
         }
-
 
         addch('\n' as chtype);
         addstr(&*format!("search: {}", filter));
-
-        fn process_input(ch: i32, filter: &mut String) {
-            match ch {
-                // backspace
-                127 => { filter.pop(); }
-                // ctrl+w
-                23 => { filter.clear(); }
-                _ => { filter.push(ch as u8 as char); }
-            }
-        }
-
         process_input(getch(), &mut filter);
     }
 
