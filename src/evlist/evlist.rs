@@ -96,33 +96,45 @@ enum ProcessInputRet {
     Quit,
 }
 
-fn process_input(ch: i32, mode: &mut Mode, filter: &mut String) -> ProcessInputRet {
+fn process_input(ch: i32, mode: &mut Mode, filter: &mut String, scroll_offset: &mut usize) -> ProcessInputRet {
     use Mode::*;
     match mode {
         Normal => {
             match ch {
+                // ctrl + d
+                4 => { *scroll_offset = *scroll_offset + 5; }
+                // ctrl + u
+                21 => {
+                    if *scroll_offset >= 5 {
+                        *scroll_offset = *scroll_offset - 5;
+                    } else {
+                        *scroll_offset = 0
+                    }
+                }
                 // j
-                // 106
+                106 => { *scroll_offset = *scroll_offset + 1; }
                 // k
-                // 107
-                // slash
+                107 => { if *scroll_offset != 0 { *scroll_offset = *scroll_offset - 1; } }
                 // q
                 113 => { return ProcessInputRet::Quit; }
+                // slash
                 47 => { *mode = Search; }
                 _ => {}
             }
         }
         Search => {
             match ch {
-                // backspace
-                127 => { let _ = filter.pop(); }
-                // ctrl+w
-                23 => { filter.clear(); }
+                // enter
+                10 => { *mode = Normal; }
                 // esc
                 27 => {
                     filter.clear();
                     *mode = Normal;
                 }
+                // backspace
+                127 => { let _ = filter.pop(); }
+                // ctrl+w
+                23 => { filter.clear(); }
                 _ => { filter.push(ch as u8 as char); }
             }
         }
@@ -175,14 +187,17 @@ async fn main() {
     });
 
 
-    let mut update = move |mode: &Mode, filter: &str, highlight_set: &HashSet<PathBuf>| {
+    let mut update = move |mode: &Mode, filter: &str, highlight_set: &HashSet<PathBuf>, scroll_offset: &mut usize| {
         clear();
 
         let fd_list = get_fd_list();
         if let Ok(filtered_fd_list) = filter_fd_list(&fd_list, &device_map, &filter) {
             let mut remaining_lines = max_y - prompt_height;
+            // make sure we can't overscroll
+            let max_scroll_offset = i32::max(0, filtered_fd_list.len() as i32 - remaining_lines) as usize;
+            *scroll_offset = usize::min(*scroll_offset, max_scroll_offset);
 
-            for &fd_path in filtered_fd_list.iter().rev() {
+            for &fd_path in filtered_fd_list.iter().skip(*scroll_offset).take(remaining_lines as usize) {
                 let device_info = match device_map.entry(fd_path.clone()) {
                     Entry::Occupied(o) => o.into_mut(),
                     Entry::Vacant(v) => v.insert(get_props(fd_path.clone(), fd_ev_tx.clone()).ok())
@@ -223,13 +238,14 @@ async fn main() {
 
     let mut mode = Mode::Normal;
     let mut highlight_set = HashSet::new();
-    update(&mode, "", &highlight_set);
+    let mut scroll_offset = 0;
+    update(&mode, "", &highlight_set, &mut scroll_offset);
 
     loop {
         refresh();
         tokio::select! {
             Some(ch) = ch_rx.recv() => {
-                let ret = process_input(ch, &mut mode, &mut filter);
+                let ret = process_input(ch, &mut mode, &mut filter, &mut scroll_offset);
                 match ret{
                     ProcessInputRet::Quit => {
                         mv(max_y - 1, 0);
@@ -244,6 +260,6 @@ async fn main() {
             }
         }
 
-        update(&mode, &filter, &highlight_set);
+        update(&mode, &filter, &highlight_set, &mut scroll_offset);
     }
 }
