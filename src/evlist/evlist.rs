@@ -54,6 +54,12 @@ struct DeviceInfo {
     uniq: String,
 }
 
+#[derive(Clone)]
+enum Mode {
+    Normal,
+    Search,
+}
+
 fn get_props(fd: PathBuf, reader_tx: mpsc::UnboundedSender<PathBuf>) -> Result<DeviceInfo> {
     let file = OpenOptions::new()
         .read(true)
@@ -85,14 +91,43 @@ fn get_props(fd: PathBuf, reader_tx: mpsc::UnboundedSender<PathBuf>) -> Result<D
     Ok(device_info)
 }
 
-fn process_input(ch: i32, filter: &mut String) {
-    match ch {
-        // backspace
-        127 => { let _ = filter.pop(); }
-        // ctrl+w
-        23 => { filter.clear(); }
-        _ => { filter.push(ch as u8 as char); }
+enum ProcessInputRet {
+    None,
+    Quit,
+}
+
+fn process_input(ch: i32, mode: &mut Mode, filter: &mut String) -> ProcessInputRet {
+    use Mode::*;
+    match mode {
+        Normal => {
+            match ch {
+                // j
+                // 106
+                // k
+                // 107
+                // slash
+                // q
+                113 => { return ProcessInputRet::Quit; }
+                47 => { *mode = Search; }
+                _ => {}
+            }
+        }
+        Search => {
+            match ch {
+                // backspace
+                127 => { let _ = filter.pop(); }
+                // ctrl+w
+                23 => { filter.clear(); }
+                // esc
+                27 => {
+                    filter.clear();
+                    *mode = Normal;
+                }
+                _ => { filter.push(ch as u8 as char); }
+            }
+        }
     }
+    ProcessInputRet::None
 }
 
 #[tokio::main]
@@ -100,6 +135,8 @@ async fn main() {
     initscr();
     keypad(stdscr(), true);
     noecho();
+
+    // loop { println!("{}", getch()); }
 
     /* Get the screen bounds. */
     let mut max_x = 0;
@@ -138,7 +175,7 @@ async fn main() {
     });
 
 
-    let mut update = move |filter: &str, highlight_set: &HashSet<PathBuf>| {
+    let mut update = move |mode: &Mode, filter: &str, highlight_set: &HashSet<PathBuf>| {
         clear();
 
         let fd_list = get_fd_list();
@@ -175,24 +212,38 @@ async fn main() {
             addstr("no results, invalid search pattern");
         }
 
-        addch('\n' as chtype);
-        addstr(&*format!("search: {}", &filter));
+        match mode {
+            Mode::Normal => {}
+            Mode::Search => {
+                addch('\n' as chtype);
+                addstr(&*format!("search: {}", &filter));
+            }
+        }
     };
 
+    let mut mode = Mode::Normal;
     let mut highlight_set = HashSet::new();
-    update("", &highlight_set);
+    update(&mode, "", &highlight_set);
 
     loop {
         refresh();
         tokio::select! {
             Some(ch) = ch_rx.recv() => {
-                process_input(ch, &mut filter);
+                let ret = process_input(ch, &mut mode, &mut filter);
+                match ret{
+                    ProcessInputRet::Quit => {
+                        mv(max_y - 1, 0);
+                        endwin();
+                        std::process::exit(0);
+                    }
+                    _ => {}
+                }
             }
             Some(fd_set) = fd_ev_combined_rx.recv() => {
                 highlight_set = fd_set;
             }
         }
 
-        update(&filter, &highlight_set);
+        update(&mode, &filter, &highlight_set);
     }
 }
