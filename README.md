@@ -297,6 +297,38 @@ print("hello");
 print(||{});
 ```
 
+#### send(key_sequence)
+
+Outputs the key sequence to the virtual keyboard. This is especially useful
+for sending dynamic values that are computed at runtime.
+
+```
+let name = "bob";
+send("hello " + name);
+```
+
+#### send_modifier(key_sequence)
+
+Outputs a single modifier to the virtual keyboard and treats the key as being
+pysically pressed down.
+This allows binding modifiers to other keys and use them to trigger other
+mappings in the same way as with the original modifier key.
+Using [send](####send) instead will result in the key not triggering other
+mappings that use the modifier.
+
+```
+// map 'a' to 'shift' and add custom behaviour
+{a down}::{
+  send_modifier("{shift down}");
+  // some custom logic
+};
+{a up}::{ send_modifier("{shift up}"); };
+
+// pressing 'a' (now became 'shift') and 'b' will trigger this
++b::c;
+```
+
+
 #### map_key(trigger, callback)
 
 Maps a key to a callback at runtime, meaning expressions can be used as
