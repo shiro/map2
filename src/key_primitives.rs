@@ -81,10 +81,10 @@ impl KeyModifierState {
             right_meta: false,
         }
     }
-    pub fn is_ctrl(&self) -> bool{ self.left_ctrl || self.right_ctrl}
-    pub fn is_alt(&self) -> bool{ self.left_alt || self.right_alt}
-    pub fn is_shift(&self) -> bool{ self.left_shift || self.right_shift}
-    pub fn is_meta(&self) -> bool{ self.left_meta || self.right_meta}
+    pub fn is_ctrl(&self) -> bool { self.left_ctrl || self.right_ctrl }
+    pub fn is_alt(&self) -> bool { self.left_alt || self.right_alt }
+    pub fn is_shift(&self) -> bool { self.left_shift || self.right_shift }
+    pub fn is_meta(&self) -> bool { self.left_meta || self.right_meta }
 }
 
 
@@ -96,6 +96,7 @@ pub struct KeyAction {
 
 impl KeyAction {
     pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value } }
+    pub fn from_input_ev(ev: &InputEvent) -> Self { KeyAction { key: Key { event_code: ev.event_code }, value: ev.value } }
     pub fn to_input_ev(&self) -> InputEvent {
         InputEvent { event_code: self.key.event_code, value: self.value, time: INPUT_EV_DUMMY_TIME }
     }

@@ -9,6 +9,7 @@ pub enum ExecutionMessage {
     GetFocusedWindowInfo(mpsc::Sender<Option<ActiveWindowInfo>>),
     RegisterWindowChangeCallback(Block, GuardedVarMap),
     Write(String),
+    UpdateModifiers(KeyAction),
     Exit(i32),
     FatalError(Error, i32),
 }

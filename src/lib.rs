@@ -25,7 +25,7 @@ pub use crate::key_primitives::*;
 pub use crate::runtime::*;
 pub use crate::runtime::evaluation::*;
 pub use crate::state::*;
-pub use crate::x11::{x11_initialize, x11_test};
+pub use crate::x11::{x11_initialize, get_window_info_x11};
 pub use crate::x11::ActiveWindowInfo;
 
 pub mod x11;

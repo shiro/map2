@@ -48,7 +48,31 @@ pub async fn evaluate_builtin<'a>(name: &String, args: &Vec<Expr>, var_map: &Gua
                 amb.ev_writer_tx.send(SYN_REPORT.clone()).await.unwrap();
             }
         }
+        "send_modifier" => {
+            let val = eval_expr(args.get(0).unwrap(), var_map, amb).await;
+            let val = match val {
+                ValueType::String(val) => val,
+                _ => return Err(anyhow!("invalid parameter passed to function 'send'")),
+            };
 
+            let actions = parse_key_sequence(&*val).unwrap();
+
+            if actions.len() != 1 {
+                return Err(anyhow!("expected a single key action, got {}", actions.len()));
+            }
+
+            let action = actions.get(0).unwrap();
+
+            if [*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
+                .contains(&action.key) {
+                amb.message_tx.as_ref().unwrap().send(ExecutionMessage::UpdateModifiers(*action)).await.unwrap();
+            } else {
+                return Err(anyhow!("key action needs to be a modifier event"));
+            }
+
+            amb.ev_writer_tx.send(action.to_input_ev()).await.unwrap();
+            amb.ev_writer_tx.send(SYN_REPORT.clone()).await.unwrap();
+        }
         "active_window_class" => {
             let (tx, mut rx) = mpsc::channel(1);
             amb.message_tx.as_ref().unwrap().send(ExecutionMessage::GetFocusedWindowInfo(tx)).await.unwrap();

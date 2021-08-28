@@ -2,7 +2,7 @@ use crate::*;
 use messaging::*;
 use crate::cli::Configuration;
 
-fn update_modifiers(state: &mut State, ev: &InputEvent) {
+pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     // let ignore_list = &mut state.ignore_list;
 
     // TODO find a way to do this with a single accessor function
@@ -18,12 +18,12 @@ fn update_modifiers(state: &mut State, ev: &InputEvent) {
     ];
 
     for (key, is_modifier_down, modifier_mut) in pairs.iter() {
-        if ev.event_code == key.event_code && ev.value == TYPE_DOWN && !is_modifier_down(&*state.modifiers) {
+        if action.key.event_code == key.event_code && action.value == TYPE_DOWN && !is_modifier_down(&*state.modifiers) {
             let mut new_modifiers = state.modifiers.deref().clone();
             *modifier_mut(&mut new_modifiers) = true;
             state.modifiers = Arc::new(new_modifiers);
             return;
-        } else if ev.event_code == key.event_code && ev.value == TYPE_UP {
+        } else if action.key.event_code == key.event_code && action.value == TYPE_UP {
             let mut new_modifiers = state.modifiers.deref().clone();
             *modifier_mut(&mut new_modifiers) = false;
             state.modifiers = Arc::new(new_modifiers);
@@ -70,8 +70,6 @@ pub async fn handle_stdin_ev(
         modifiers: from_modifiers,
     };
 
-    update_modifiers(&mut state, &ev);
-
     if let Some(block) = mappings.0.get(&from_key_action) {
         let block = block.clone();
         let mut message_tx = message_tx.clone();
@@ -85,6 +83,8 @@ pub async fn handle_stdin_ev(
         });
         return Ok(());
     }
+
+    update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
 
     ev_writer.send(ev).await.unwrap();
 
@@ -117,6 +117,9 @@ pub async fn handle_execution_message(
         }
         ExecutionMessage::Write(message) => {
             out.write(message.as_ref()).unwrap();
+        }
+        ExecutionMessage::UpdateModifiers(action) => {
+            event_handlers::update_modifiers(state, &action);
         }
         ExecutionMessage::Exit(exit_code) => { std::process::exit(exit_code) }
         ExecutionMessage::FatalError(err, exit_code) => {

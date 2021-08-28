@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
         loop {
             let x11_state_clone = x11_state.clone();
             let res = task::spawn_blocking(move || {
-                x11_test(&x11_state_clone)
+                get_window_info_x11(&x11_state_clone)
             }).await.unwrap();
 
             if let Ok(Some(val)) = res {
@@ -59,6 +59,7 @@ async fn main() -> Result<()> {
         });
     }
 
+    // main processing loop
     loop {
         tokio::select! {
             Some(window) = window_ev_rx.recv() => {

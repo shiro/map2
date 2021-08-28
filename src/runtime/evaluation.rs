@@ -257,7 +257,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
         Expr::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
             let actual_state = &amb.modifier_state;
 
-            // takes into account the actual state of a modifier and decides weather to release/restore it or not
+            // takes into account the actual state of a modifier and decides whether to release/restore it or not
             let release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
                 if *to_type == 1 { // restore mods if actual mod is still pressed
                     if *is_actual_down {
@@ -266,7 +266,7 @@ pub(crate) async fn eval_expr<'a>(expr: &Expr, var_map: &GuardedVarMap, amb: &mu
                         )).unwrap();
                     }
                 } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
-                    if *is_actual_down != false {
+                    if *is_actual_down {
                         futures::executor::block_on(amb.ev_writer_tx.send(
                             KeyAction { key: *key, value: *to_type }.to_input_ev()
                         )).unwrap();

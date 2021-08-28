@@ -34,7 +34,7 @@ pub fn x11_initialize() -> Result<X11State<impl Connection + Send + Sync>> {
     })
 }
 
-pub fn x11_test<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Option<ActiveWindowInfo>> {
+pub fn get_window_info_x11<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Option<ActiveWindowInfo>> {
     loop {
         let event = state.con.wait_for_event()?;
 
