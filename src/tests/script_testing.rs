@@ -1,5 +1,6 @@
 use crate::*;
 use messaging::*;
+use crate::cli::Configuration;
 
 #[derive(Default)]
 pub struct ScriptTestingParameters<'a> {
@@ -59,9 +60,13 @@ impl ScriptTestingAPI {
 pub async fn test_script(
     parameters: ScriptTestingParameters<'_>,
 ) -> Result<ScriptTestingAPI> {
-    let mut script_file = fs::File::open(parameters.script_path)?;
+    let mut config = Configuration {
+        script_file: fs::File::open(parameters.script_path)?,
+        verbosity: 0,
+        devices: vec![],
+    };
 
-    let script_ast = script::parse_script(&mut script_file);
+    let script_ast = script::parse_script(&mut config.script_file);
 
     let mut state = State::new();
     let window_cycle_token: usize = 0;
@@ -82,7 +87,7 @@ pub async fn test_script(
                 tokio::select! {
                         Some(ev) = ev_reader_rx.recv() => {
                             event_handlers::handle_stdin_ev(&mut state, ev, &mut mappings,
-                                &mut ev_writer_tx, &mut execution_message_tx, window_cycle_token).await.unwrap();
+                                &mut ev_writer_tx, &mut execution_message_tx, window_cycle_token, &config).await.unwrap();
                         }
                         Some(msg) = execution_message_rx.recv() => {
                             // don't terminate during testing
