@@ -48,12 +48,12 @@ let caps_down = false;
 
 
 let lalt = false;
-{leftalt down}::{lalt = true; send("{leftalt down}");};
-!{leftalt up}::{lalt = false; send("{leftalt up}");};
+{leftalt down}::{lalt = true; send_modifier("{leftalt down}");};
+!{leftalt up}::{lalt = false; send_modifier("{leftalt up}");};
 
 let ralt = false;
-{rightalt down}::{ralt = true; send("{rightalt down}");};
-!{rightalt up}::{ralt = false; send("{rightalt up}");};
+{rightalt down}::{ralt = true; send_modifier("{rightalt down}");};
+!{rightalt up}::{ralt = false; send_modifier("{rightalt up}");};
 
 
 let directional_mod = |key, direction|{
@@ -107,6 +107,8 @@ for(let i=char_to_number("0"); i<char_to_number("9"); i=i+1){ handle_key(number_
 handle_key("space");
 handle_key("/");
 handle_key(";");
+handle_key("]");
+handle_key("[");
 
 
 let setup_mouse = ||{
@@ -131,6 +133,11 @@ let map_figma_shortcut = |key, command|{
     send(command+"{enter}");
   });
 };
+
+BTN_EAST::^z;
+BTN_SOUTH::shift;
+BTN_WEST::p;
+BTN_NORTH::b;
 
 on_window_change(||{
   setup_mouse();
