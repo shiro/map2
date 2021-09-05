@@ -3,5 +3,6 @@
 /local
 /target
 /pkg
+.env
 *.zst
 *.tar.gz
