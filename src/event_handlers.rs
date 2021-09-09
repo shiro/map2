@@ -46,9 +46,9 @@ pub async fn handle_stdin_ev(
     window_cycle_token: usize,
     configuration: &Configuration,
 ) -> Result<()> {
-    if configuration.verbosity >= 3 {
-        logging::print_debug(format!("input event: {}", logging::print_input_event(&ev)));
-    }
+    // if configuration.verbosity >= 3 {
+    //     logging::print_debug(format!("input event: {}", logging::print_input_event(&ev)));
+    // }
 
     match ev.event_code {
         EventCode::EV_KEY(_) => {}

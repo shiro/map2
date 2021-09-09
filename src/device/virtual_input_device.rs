@@ -12,6 +12,7 @@ use tokio::task;
 use walkdir::WalkDir;
 
 use super::*;
+use crate::device::device_logging::print_event_debug;
 
 fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     let mut list = vec![];
