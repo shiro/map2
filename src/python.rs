@@ -23,18 +23,29 @@ struct PyKey {
 struct InstanceHandle {
     exit_tx: oneshot::Sender<()>,
     join_handle: std::thread::JoinHandle<()>,
+    message_tx: mpsc::UnboundedSender<ControlMessage>,
+}
+
+struct InstanceHandleSharedState {
+    mappings: HashMap<KeyActionWithMods, Vec<KeyAction>>,
 }
 
 impl InstanceHandle {
-    pub fn new(exit_tx: oneshot::Sender<()>, join_handle: std::thread::JoinHandle<()>) -> Self {
-        InstanceHandle { exit_tx, join_handle }
+    pub fn new(exit_tx: oneshot::Sender<()>, join_handle: std::thread::JoinHandle<()>, message_tx: mpsc::UnboundedSender<ControlMessage>) -> Self {
+        InstanceHandle {
+            exit_tx,
+            join_handle,
+            message_tx,
+        }
     }
 }
 
 #[pymethods]
 impl InstanceHandle {
-    pub fn map(&self) -> PyResult<()> {
-        println!("wow, map");
+    pub fn map(&mut self) -> PyResult<()> {
+        let from = KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 0, KeyModifierFlags::new());
+        self.message_tx.send(ControlMessage::AddMapping(from, vec![]));
+
         Ok(())
     }
 }
@@ -73,19 +84,14 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-struct Instance {
-    exit_tx: oneshot::Sender<()>,
-    join_handle: std::thread::JoinHandle<()>,
-}
-
-lazy_static! {
-    static ref INSTANCE_MAP: Mutex<HashMap<u32, Instance>> = {
-        let mut m = HashMap::new();
-        Mutex::new(m)
-    };
+#[derive(Debug)]
+enum ControlMessage {
+    AddMapping(KeyActionWithMods, Vec<KeyAction>),
 }
 
 fn _setup(callback: PyObject) -> Result<InstanceHandle> {
+    let (mut control_tx, mut control_rx) = mpsc::unbounded_channel();
+
     let (exit_tx, exit_rx) = oneshot::channel();
     let join_handle = thread::spawn(move || {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -113,44 +119,44 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
             let mut ev_reader_tx = ev_reader_init_rx.await?;
 
             loop {
-                let ev = ev_writer_rx.recv().await.unwrap();
-                // print_event_debug(&ev);
-
-                let code = match ev.event_code {
-                    EventCode::EV_KEY(code) => code,
-                    _ => continue,
-                };
-
-                let key = PyKey { code: code as u32, value: ev.value };
-                {
-                    use std::time::Instant;
-                    let now = Instant::now();
-                    let gil = Python::acquire_gil();
-                    let py = gil.python();
-
-                    callback.call(py, (key, ), None);
-
-                    let elapsed = now.elapsed();
-                    println!("Elapsed: {:.2?}", elapsed);
+                tokio::select! {
+                    Some(ev) = ev_writer_rx.recv() => {
+                        println!("got event: {:?}", ev);
+                    }
+                    Some(msg) = control_rx.recv() => {
+                        println!("got message: {:?}", msg);
+                    }
                 }
+
+                // let code = match ev.event_code {
+                //     EventCode::EV_KEY(code) => code,
+                //     _ => continue,
+                // };
+                //
+                //
+                // let key = PyKey { code: code as u32, value: ev.value };
+                // {
+                //     use std::time::Instant;
+                //     let now = Instant::now();
+                //     let gil = Python::acquire_gil();
+                //
+                //
+                //     let py = gil.python();
+                //
+                //     callback.call(py, (key, ), None);
+                //
+                //     let elapsed = now.elapsed();
+                //     println!("Elapsed: {:.2?}", elapsed);
+                // }
             }
 
-            exit_rx.await?;
-            Ok::<(), anyhow::Error>(())
+            // exit_rx.await?;
+            #[allow(unreachable_code)]
+                Ok::<(), anyhow::Error>(())
         }).unwrap();
     });
 
-    // let instance = Instance {
-    //     exit_tx,
-    //     join_handle,
-    // };
+    let handle = InstanceHandle::new(exit_tx, join_handle, control_tx);
 
-    // let handle = 0;
-    let handle = InstanceHandle::new(exit_tx, join_handle);
-
-    // let mut map = INSTANCE_MAP.lock().unwrap();
-    // map.insert(handle, instance);
-
-    // println!("done!");
     Ok(handle)
 }
