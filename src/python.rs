@@ -42,7 +42,9 @@ impl InstanceHandle {
 
 #[pymethods]
 impl InstanceHandle {
-    pub fn map(&mut self) -> PyResult<()> {
+    pub fn map(&mut self, from: String) -> PyResult<()> {
+
+
         let from = KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 0, KeyModifierFlags::new());
         self.message_tx.send(ControlMessage::AddMapping(from, vec![]));
 

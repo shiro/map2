@@ -1,7 +1,6 @@
-
 use super::*;
 
-pub(crate) fn parse_script<>(raw_script: &str) -> Result<Block> {
+pub(crate) fn parse_script(raw_script: &str) -> Result<Block> {
     match global_block(raw_script) {
         Ok((v, (block, last_err))) => {
             if v.is_empty() {
