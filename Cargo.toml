@@ -6,7 +6,7 @@ edition = "2018"
 
 [lib]
 name = "map2"
-crate-type = ["cdylib"]
+crate-type = ["lib","cdylib"]
 
 [dependencies]
 anyhow = "1.0"

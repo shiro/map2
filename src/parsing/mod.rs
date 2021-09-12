@@ -41,7 +41,7 @@ mod function;
 mod identifier;
 mod if_statement;
 mod key;
-mod key_action;
+pub mod key_action;
 mod key_mapping;
 mod key_sequence;
 mod lambda;
@@ -49,8 +49,7 @@ mod primitives;
 mod variable;
 mod for_loop;
 mod error;
-mod python;
-
+pub(crate) mod python;
 
 
 fn stmt(input: &str) -> ResNew<&str, Stmt> {

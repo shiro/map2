@@ -1,4 +1,5 @@
 use std::thread;
+use std::array::IntoIter;
 
 use evdev_rs::enums::{EV_KEY, EventType};
 use evdev_rs::TimeVal;
@@ -9,6 +10,9 @@ use crate::*;
 use crate::task::JoinHandle;
 use anyhow::Error;
 use crate::device::device_logging::print_event_debug;
+use crate::parsing::python::{parse_key_action_with_mods_py, parse_key_sequence_py};
+use crate::parsing::parser::parse_key_sequence;
+use crate::parsing::key_action::*;
 
 #[pyclass]
 struct PyKey {
@@ -26,8 +30,10 @@ struct InstanceHandle {
     message_tx: mpsc::UnboundedSender<ControlMessage>,
 }
 
+type Mapping = (KeyActionWithMods, RuntimeAction);
+
 struct InstanceHandleSharedState {
-    mappings: HashMap<KeyActionWithMods, Vec<KeyAction>>,
+    mappings: HashMap<KeyActionWithMods, RuntimeAction>,
 }
 
 impl InstanceHandle {
@@ -40,34 +46,86 @@ impl InstanceHandle {
     }
 }
 
-#[pymethods]
-impl InstanceHandle {
-    pub fn map(&mut self, from: String) -> PyResult<()> {
+#[derive(Debug)]
+enum RuntimeKeyAction {
+    KeyAction(KeyAction),
+    // ReleaseRestoreModifiers,
+}
 
-
-        let from = KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 0, KeyModifierFlags::new());
-        self.message_tx.send(ControlMessage::AddMapping(from, vec![]));
-
-        Ok(())
-    }
+#[derive(Debug)]
+enum RuntimeAction {
+    ActionSequence(Vec<RuntimeKeyAction>),
+    // PythonBlock(),
 }
 
 
-#[pyfunction]
-fn sum_as_string(py: Python, a: usize, b: usize, callback: PyObject) {
-    //Ok((a + b).to_string())
-    // println!("Hello from Rust!");
+fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods) -> [Mapping; 3] {
+    let mut down_mapping;
+    {
+        let mut seq = vec![];
+        // seq.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
+        if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
+        if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+        if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
+        if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+        seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_DOWN }));
+        down_mapping = (KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
+    }
+    let mut up_mapping;
+    {
+        let mut seq = vec![];
+        seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_UP }));
+        if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
+        if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+        if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
+        if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+        // block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
+        up_mapping = (KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
+    }
+    let mut repeat_mapping;
+    {
+        let mut seq = vec![];
+        seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_REPEAT }));
+        repeat_mapping = (KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
+    }
+    [down_mapping, up_mapping, repeat_mapping]
+}
 
-    let ev = PyKey { code: EV_KEY::KEY_L as u32, value: 1 };
+#[pymethods]
+impl InstanceHandle {
+    pub fn map(&mut self, from: String, to: String) -> PyResult<()> {
+        let from = parse_key_action_with_mods_py(&from).unwrap();
+        let mut to = parse_key_sequence_py(&to).unwrap();
 
-    // let ev = PyInputEvent { 0: InputEvent::new(&INPUT_EV_DUMMY_TIME, &EventCode::EV_KEY(EV_KEY::BTN_0)), 1 };
-    // let ev = PyInputEvent { 0: EventCode::EV_KEY(EV_KEY::BTN_0) };
-    // let ev = &KEY_K;
-    // let k = Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap()
+        match from {
+            ParsedKeyAction::KeyAction(action) => {
+                unimplemented!();
+            }
+            ParsedKeyAction::KeyClickAction(from) => {
+                if to.len() == 1 {
+                    let to = to.remove(0);
+                    // click to click
+                    if let ParsedKeyAction::KeyClickAction(to) = to {
+                        let mappings = map_click_to_click(&from, &to);
+                        IntoIter::new(mappings).for_each(|(from, to)| {
+                            self.message_tx.send(ControlMessage::AddMapping(from, to));
+                        });
+                        return Ok(());
+                    }
+                    // click to action
+                    // if let ParsedKeyAction::KeyAction(to) = to.remove(0) {
+                    //     unimplemented!();
+                    //     // return Ok((next, (Expr::map_key_click_action(from, to), None)));
+                    // }
+                }
+                unimplemented!();
+            }
+        }
 
-    callback.call(py, (ev, ), None);
-    // callback.call(py, (), None)
-    // None
+        // let from = KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 0, KeyModifierFlags::new());
+        // self.message_tx.send(ControlMessage::AddMapping(from, vec![]));
+        Ok(())
+    }
 }
 
 
@@ -79,8 +137,6 @@ fn setup(py: Python, callback: PyObject) -> PyResult<InstanceHandle> {
 
 #[pymodule]
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
-
     m.add_function(wrap_pyfunction!(setup, m)?)?;
 
     Ok(())
@@ -88,7 +144,7 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
 
 #[derive(Debug)]
 enum ControlMessage {
-    AddMapping(KeyActionWithMods, Vec<KeyAction>),
+    AddMapping(KeyActionWithMods, RuntimeAction),
 }
 
 fn _setup(callback: PyObject) -> Result<InstanceHandle> {

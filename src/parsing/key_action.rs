@@ -2,12 +2,12 @@
 use super::*;
 
 #[derive(PartialEq, Debug, Clone)]
-pub(super) enum ParsedKeyAction {
+pub enum ParsedKeyAction {
     KeyAction(KeyActionWithMods),
     KeyClickAction(KeyClickActionWithMods),
 }
 
-pub(super) trait ParsedKeyActionVecExt {
+pub trait ParsedKeyActionVecExt {
     fn to_key_actions(self) -> Vec<KeyAction>;
 }
 

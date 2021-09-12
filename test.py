@@ -13,6 +13,6 @@ handle = map2.setup(hi)
 
 print("handle obtained: {}".format(handle))
 
-handle.map()
+handle.map("a","b")
 
 time.sleep(5)
