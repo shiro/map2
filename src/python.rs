@@ -51,7 +51,7 @@ impl InstanceHandle {
 #[derive(Debug)]
 pub enum RuntimeKeyAction {
     KeyAction(KeyAction),
-    // ReleaseRestoreModifiers,
+    ReleaseRestoreModifiers(KeyModifierFlags, KeyModifierFlags, i32),
 }
 
 #[derive(Debug)]
@@ -66,6 +66,7 @@ fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods
     {
         let mut seq = vec![];
         // seq.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
+        seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
@@ -81,7 +82,7 @@ fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
-        // block.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
+        seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
         up_mapping = (KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
     }
     let mut repeat_mapping;
@@ -178,7 +179,7 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
             loop {
                 tokio::select! {
                     Some(ev) = ev_writer_rx.recv() => {
-                        event_handlers::handle_stdin_ev(&mut state, ev, &mappings, &mut ev_reader_tx, &window_cycle_token).await.unwrap();
+                        event_handlers::handle_stdin_ev(&mut state, ev, &mappings, &mut ev_reader_tx).await.unwrap();
                     }
                     Some(msg) = control_rx.recv() => {
                         // println!("{:?}", &msg);

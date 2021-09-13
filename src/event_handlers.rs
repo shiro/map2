@@ -42,9 +42,10 @@ pub async fn handle_stdin_ev(
     mut state: &mut State,
     ev: InputEvent,
     mappings: &Mappings,
-    ev_writer: &mut mpsc::Sender<InputEvent>,
+    ev_writer_tx: &mut mpsc::Sender<InputEvent>,
+    // modifier_state: &KeyModifierState,
     // message_tx: &mut ExecutionMessageSender,
-    window_cycle_token: &usize,
+    // window_cycle_token: &usize,
     // configuration: &Configuration,
 ) -> Result<()> {
     // if configuration.verbosity >= 3 {
@@ -54,7 +55,7 @@ pub async fn handle_stdin_ev(
     match ev.event_code {
         EventCode::EV_KEY(_) => {}
         _ => {
-            ev_writer.send(ev).await.unwrap();
+            ev_writer_tx.send(ev).await.unwrap();
             return Ok(());
         }
     }
@@ -78,8 +79,48 @@ pub async fn handle_stdin_ev(
                     match action {
                         RuntimeKeyAction::KeyAction(key_action) => {
                             let ev = key_action.to_input_ev();
-                            ev_writer.send(ev).await.unwrap();
-                            ev_writer.send(SYN_REPORT.clone()).await.unwrap();
+                            ev_writer_tx.send(ev).await.unwrap();
+                            ev_writer_tx.send(SYN_REPORT.clone()).await.unwrap();
+                        }
+                        RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                            let actual_state = &state.modifiers;
+
+                            // takes into account the actual state of a modifier and decides whether to release/restore it or not
+                            let release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
+                                if *to_type == 1 { // restore mods if actual mod is still pressed
+                                    if *is_actual_down {
+                                        // TODO await this once async closures are stable
+                                        futures::executor::block_on(ev_writer_tx.send(
+                                            KeyAction { key: *key, value: *to_type }.to_input_ev()
+                                        )).unwrap();
+                                    }
+                                } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
+                                    if *is_actual_down {
+                                        futures::executor::block_on(ev_writer_tx.send(
+                                            KeyAction { key: *key, value: *to_type }.to_input_ev()
+                                        )).unwrap();
+                                    }
+                                }
+                            };
+
+                            if from_flags.ctrl && !to_flags.ctrl {
+                                release_or_restore_modifier(&actual_state.left_ctrl, &*KEY_LEFT_CTRL);
+                                release_or_restore_modifier(&actual_state.right_ctrl, &*KEY_RIGHT_CTRL);
+                            }
+                            if from_flags.shift && !to_flags.shift {
+                                release_or_restore_modifier(&actual_state.left_shift, &*KEY_LEFT_SHIFT);
+                                release_or_restore_modifier(&actual_state.right_shift, &*KEY_RIGHT_SHIFT);
+                            }
+                            if from_flags.alt && !to_flags.alt {
+                                release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFT_ALT);
+                                release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHT_ALT);
+                            }
+                            if from_flags.meta && !to_flags.meta {
+                                release_or_restore_modifier(&actual_state.left_meta, &*KEY_LEFT_META);
+                                release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHT_META);
+                            }
+
+                            // TODO eat keys we just released, un-eat keys we just restored
                         }
                     }
                 }
@@ -91,7 +132,7 @@ pub async fn handle_stdin_ev(
 
     update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
 
-    ev_writer.send(ev).await.unwrap();
+    ev_writer_tx.send(ev).await.unwrap();
 
     Ok(())
 }
