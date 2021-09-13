@@ -1,6 +1,7 @@
 use crate::*;
 use messaging::*;
 use crate::cli::Configuration;
+use crate::python::*;
 
 pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     // let ignore_list = &mut state.ignore_list;
@@ -40,11 +41,11 @@ pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
 pub async fn handle_stdin_ev(
     mut state: &mut State,
     ev: InputEvent,
-    mappings: &mut CompiledKeyMappings,
+    mappings: &Mappings,
     ev_writer: &mut mpsc::Sender<InputEvent>,
-    message_tx: &mut ExecutionMessageSender,
-    window_cycle_token: usize,
-    configuration: &Configuration,
+    // message_tx: &mut ExecutionMessageSender,
+    window_cycle_token: &usize,
+    // configuration: &Configuration,
 ) -> Result<()> {
     // if configuration.verbosity >= 3 {
     //     logging::print_debug(format!("input event: {}", logging::print_input_event(&ev)));
@@ -70,17 +71,21 @@ pub async fn handle_stdin_ev(
         modifiers: from_modifiers,
     };
 
-    if let Some(block) = mappings.0.get(&from_key_action) {
-        let block = block.clone();
-        let mut message_tx = message_tx.clone();
-        let ev_writer = ev_writer.clone();
-        let modifier_state = state.modifiers.clone();
-        task::spawn(async move {
-            let (block, var_map) = block.deref();
-            let mut amb = Ambient { ev_writer_tx: ev_writer, message_tx: Some(&mut message_tx), window_cycle_token, modifier_state: &modifier_state };
+    if let Some(runtime_action) = mappings.get(&from_key_action) {
+        match runtime_action {
+            RuntimeAction::ActionSequence(seq) => {
+                for action in seq {
+                    match action {
+                        RuntimeKeyAction::KeyAction(key_action) => {
+                            let ev = key_action.to_input_ev();
+                            ev_writer.send(ev).await.unwrap();
+                            ev_writer.send(SYN_REPORT.clone()).await.unwrap();
+                        }
+                    }
+                }
+            }
+        }
 
-            eval_block(&block, &var_map, &mut amb).await;
-        });
         return Ok(());
     }
 
@@ -92,40 +97,40 @@ pub async fn handle_stdin_ev(
 }
 
 
-pub async fn handle_execution_message(
-    out: &mut impl Write,
+pub async fn handle_control_message(
+    // out: &mut impl Write,
     current_token: usize,
-    msg: ExecutionMessage,
+    msg: ControlMessage,
     state: &mut State,
-    mappings: &mut CompiledKeyMappings,
-    window_change_handlers: &mut Vec<(Block, GuardedVarMap)>,
+    mappings: &mut Mappings,
+    // window_change_handlers: &mut Vec<(Block, GuardedVarMap)>,
 ) {
     match msg {
         // ExecutionMessage::EatEv(action) => {
         //     state.ignore_list.ignore(&action);
         // }
-        ExecutionMessage::AddMapping(token, from, to, var_map) => {
-            if token == current_token {
-                mappings.0.insert(from, Arc::new((to, var_map)));
-            }
+        ControlMessage::AddMapping(from, to) => {
+            // if token == current_token {
+            mappings.insert(from, to);
+            // }
         }
-        ExecutionMessage::GetFocusedWindowInfo(tx) => {
-            tx.send(state.active_window.clone()).await.unwrap();
-        }
-        ExecutionMessage::RegisterWindowChangeCallback(block, var_map) => {
-            window_change_handlers.push((block, var_map));
-        }
-        ExecutionMessage::Write(message) => {
-            out.write(message.as_ref()).unwrap();
-        }
-        ExecutionMessage::UpdateModifiers(action) => {
-            event_handlers::update_modifiers(state, &action);
-        }
-        ExecutionMessage::Exit(exit_code) => { std::process::exit(exit_code) }
-        ExecutionMessage::FatalError(err, exit_code) => {
-            eprintln!("error: {}", err);
-            std::process::exit(exit_code)
-        }
+        // ExecutionMessage::GetFocusedWindowInfo(tx) => {
+        //     tx.send(state.active_window.clone()).await.unwrap();
+        // }
+        // ExecutionMessage::RegisterWindowChangeCallback(block, var_map) => {
+        //     window_change_handlers.push((block, var_map));
+        // }
+        // ExecutionMessage::Write(message) => {
+        //     out.write(message.as_ref()).unwrap();
+        // }
+        // ExecutionMessage::UpdateModifiers(action) => {
+        //     event_handlers::update_modifiers(state, &action);
+        // }
+        // ExecutionMessage::Exit(exit_code) => { std::process::exit(exit_code) }
+        // ExecutionMessage::FatalError(err, exit_code) => {
+        //     eprintln!("error: {}", err);
+        //     std::process::exit(exit_code)
+        // }
     }
 }
 

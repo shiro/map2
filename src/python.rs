@@ -13,6 +13,7 @@ use crate::device::device_logging::print_event_debug;
 use crate::parsing::python::{parse_key_action_with_mods_py, parse_key_sequence_py};
 use crate::parsing::parser::parse_key_sequence;
 use crate::parsing::key_action::*;
+use crate::ignore_list::IgnoreList;
 
 #[pyclass]
 struct PyKey {
@@ -30,7 +31,8 @@ struct InstanceHandle {
     message_tx: mpsc::UnboundedSender<ControlMessage>,
 }
 
-type Mapping = (KeyActionWithMods, RuntimeAction);
+pub type Mapping = (KeyActionWithMods, RuntimeAction);
+pub type Mappings = HashMap<KeyActionWithMods, RuntimeAction>;
 
 struct InstanceHandleSharedState {
     mappings: HashMap<KeyActionWithMods, RuntimeAction>,
@@ -47,13 +49,13 @@ impl InstanceHandle {
 }
 
 #[derive(Debug)]
-enum RuntimeKeyAction {
+pub enum RuntimeKeyAction {
     KeyAction(KeyAction),
     // ReleaseRestoreModifiers,
 }
 
 #[derive(Debug)]
-enum RuntimeAction {
+pub enum RuntimeAction {
     ActionSequence(Vec<RuntimeKeyAction>),
     // PythonBlock(),
 }
@@ -143,7 +145,7 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 #[derive(Debug)]
-enum ControlMessage {
+pub enum ControlMessage {
     AddMapping(KeyActionWithMods, RuntimeAction),
 }
 
@@ -159,15 +161,9 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
 
             // initialize global state
             // let mut stdout = io::stdout();
-            // let mut state = State::new();
-            // let mut window_cycle_token: usize = 0;
+            let mut window_cycle_token: usize = 0;
             // let mut mappings = CompiledKeyMappings::new();
             // let mut window_change_handlers = vec![];
-
-            // add a small delay if run from TTY so we don't miss 'enter up' which is often released when the device is grabbed
-            if atty::is(atty::Stream::Stdout) {
-                thread::sleep(time::Duration::from_millis(300));
-            }
 
             // initialize device communication channels
             let (ev_reader_init_tx, ev_reader_init_rx) = oneshot::channel();
@@ -176,13 +172,17 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
             bind_udev_inputs(&configuration.devices, ev_reader_init_tx, ev_writer_tx).await?;
             let mut ev_reader_tx = ev_reader_init_rx.await?;
 
+            let mut state = State::new();
+            let mut mappings = Mappings::new();
+
             loop {
                 tokio::select! {
                     Some(ev) = ev_writer_rx.recv() => {
-                        println!("got event: {:?}", ev);
+                        event_handlers::handle_stdin_ev(&mut state, ev, &mappings, &mut ev_reader_tx, &window_cycle_token).await.unwrap();
                     }
                     Some(msg) = control_rx.recv() => {
-                        println!("got message: {:?}", msg);
+                        // println!("{:?}", &msg);
+                        event_handlers::handle_control_message(window_cycle_token, msg, &mut state, &mut mappings ).await;
                     }
                 }
 
