@@ -2,6 +2,7 @@ use crate::*;
 use messaging::*;
 use crate::cli::Configuration;
 use crate::python::*;
+use pyo3::Python;
 
 pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     // let ignore_list = &mut state.ignore_list;
@@ -124,6 +125,15 @@ pub async fn handle_stdin_ev(
                         }
                     }
                 }
+            }
+            RuntimeAction::PythonCallback(callback_object) => {
+                // use std::time::Instant;
+                // let now = Instant::now();
+                let gil = Python::acquire_gil();
+                let py = gil.python();
+                callback_object.call(py, (), None);
+                // let elapsed = now.elapsed();
+                // println!("Elapsed: {:.2?}", elapsed);
             }
             RuntimeAction::NOP => {}
         }

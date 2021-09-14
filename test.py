@@ -13,8 +13,18 @@ handle = map2.setup(hi)
 
 print("handle obtained: {}".format(handle))
 
-handle.map("a","c")
-handle.map("+a","b")
-handle.map("d","{a down}")
+handle.map("a", "c")
+handle.map("+a", "b")
+handle.map("d", "{a down}")
+
+counter = 0
+
+def hello():
+    global counter
+    print("counter: {}".format(counter))
+    counter = counter + 1
+
+
+handle.map("m", hello)
 
 time.sleep(5)

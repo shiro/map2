@@ -14,6 +14,8 @@ use crate::parsing::python::{parse_key_action_with_mods_py, parse_key_sequence_p
 use crate::parsing::parser::parse_key_sequence;
 use crate::parsing::key_action::*;
 use crate::ignore_list::IgnoreList;
+use pyo3::exceptions;
+use pyo3::exceptions::PyTypeError;
 
 #[pyclass]
 struct PyKey {
@@ -57,7 +59,7 @@ pub enum RuntimeKeyAction {
 #[derive(Debug)]
 pub enum RuntimeAction {
     ActionSequence(Vec<RuntimeKeyAction>),
-    // PythonBlock(),
+    PythonCallback(PyObject),
     NOP,
 }
 
@@ -124,7 +126,41 @@ fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods) ->
 
 #[pymethods]
 impl InstanceHandle {
-    pub fn map(&mut self, from: String, to: String) -> PyResult<()> {
+    pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
+        if let Ok(to) = to.extract::<String>(py) {
+            self._map_internal(from, to);
+            return Ok(());
+        }
+
+        let is_callable = to.cast_as::<PyAny>(py)
+            .map_or(false, |obj| obj.is_callable());
+
+        if is_callable {
+            self._map_callback(from, to);
+            return Ok(());
+        }
+
+        return Err(PyTypeError::new_err("unknown type"));
+    }
+
+    fn _map_callback(&mut self, from: String, to: PyObject) -> PyResult<()> {
+        let from = parse_key_action_with_mods_py(&from).unwrap();
+
+        match from {
+            ParsedKeyAction::KeyAction(action) => {
+                unimplemented!();
+            }
+            ParsedKeyAction::KeyClickAction(from) => {
+                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(1), RuntimeAction::PythonCallback(to)));
+                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(0), RuntimeAction::NOP));
+                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(2), RuntimeAction::NOP));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn _map_internal(&mut self, from: String, to: String) -> PyResult<()> {
         let from = parse_key_action_with_mods_py(&from).unwrap();
         let mut to = parse_key_sequence_py(&to).unwrap();
 
@@ -151,7 +187,7 @@ impl InstanceHandle {
                             });
                             Ok(())
                         }
-                    }
+                    };
                 }
 
                 // click to seq
