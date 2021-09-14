@@ -13,7 +13,7 @@ pub(super) fn key_sequence(input: &str) -> ResNew<&str, Vec<ParsedKeyAction>> {
                                     terminated(take_until("}"), tag_custom("}"))),
                 )),
                 |input| {
-                    let (input, action) = key_action(input)?;
+                    let (input, action) = alt((key_action_with_flags, key_action))(input)?;
                     // TODO properly propagate child error
                     if !input.is_empty() {
                         return Err(make_generic_nom_err_new(input));

@@ -15,7 +15,6 @@ print("handle obtained: {}".format(handle))
 
 handle.map("a","c")
 handle.map("+a","b")
-handle.map("c","+a")
 handle.map("d","{a down}")
 
 time.sleep(5)
