@@ -125,6 +125,7 @@ pub async fn handle_stdin_ev(
                     }
                 }
             }
+            RuntimeAction::NOP => {}
         }
 
         return Ok(());

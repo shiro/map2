@@ -13,6 +13,9 @@ handle = map2.setup(hi)
 
 print("handle obtained: {}".format(handle))
 
-handle.map("^f13","a")
+handle.map("a","c")
+handle.map("+a","b")
+handle.map("c","+a")
+handle.map("d","{a down}")
 
 time.sleep(5)

@@ -5,31 +5,27 @@ use nom::multi::many1;
 use super::*;
 
 pub(super) fn key_sequence(input: &str) -> ResNew<&str, Vec<ParsedKeyAction>> {
-    tuple((
-        tag_custom("\""),
-        many1(
-            alt((
-                map_res(
-                    recognize(tuple((
-                                        tag_custom("{"),
-                                        terminated(take_until("}"), tag_custom("}"))),
-                    )),
-                    |input| {
-                        let (input, action) = key_action(input)?;
-                        // TODO properly propagate child error
-                        if !input.is_empty() {
-                            return Err(make_generic_nom_err_new(input));
-                        }
+    many1(
+        alt((
+            map_res(
+                recognize(tuple((
+                                    tag_custom("{"),
+                                    terminated(take_until("}"), tag_custom("}"))),
+                )),
+                |input| {
+                    let (input, action) = key_action(input)?;
+                    // TODO properly propagate child error
+                    if !input.is_empty() {
+                        return Err(make_generic_nom_err_new(input));
+                    }
 
-                        Ok((input, action))
-                    },
-                ),
-                map_res(take(1usize), key_action),
-            )),
-        ),
-        tag_custom("\""),
-    ))(input).and_then(|(next, val)| {
-        let seq = val.1.into_iter()
+                    Ok((input, action))
+                },
+            ),
+            map_res(take(1usize), key_action),
+        )),
+    )(input).and_then(|(next, val)| {
+        let seq = val.into_iter()
             .map(|v| {
                 if !v.0.is_empty() { return Err(make_generic_nom_err_new(input)); }
                 Ok(v.1.0)

@@ -58,6 +58,7 @@ pub enum RuntimeKeyAction {
 pub enum RuntimeAction {
     ActionSequence(Vec<RuntimeKeyAction>),
     // PythonBlock(),
+    NOP,
 }
 
 
@@ -94,6 +95,32 @@ fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods
     [down_mapping, up_mapping, repeat_mapping]
 }
 
+fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods) -> [Mapping; 3] {
+    let mut seq = vec![];
+
+    seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
+
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
+    if !from.modifiers.alt && to.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+    if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
+    if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+
+    seq.push(RuntimeKeyAction::KeyAction((KeyAction { key: to.key, value: to.value })));
+
+    // revert to original
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
+    if !from.modifiers.alt && to.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+    if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
+    if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+
+    seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
+
+    let down_mapping = (KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
+    let up_mapping = (KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
+    let repeat_mapping = (KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
+    [down_mapping, up_mapping, repeat_mapping]
+}
+
 #[pymethods]
 impl InstanceHandle {
     pub fn map(&mut self, from: String, to: String) -> PyResult<()> {
@@ -106,21 +133,27 @@ impl InstanceHandle {
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 if to.len() == 1 {
-                    let to = to.remove(0);
-                    // click to click
-                    if let ParsedKeyAction::KeyClickAction(to) = to {
-                        let mappings = map_click_to_click(&from, &to);
-                        IntoIter::new(mappings).for_each(|(from, to)| {
-                            self.message_tx.send(ControlMessage::AddMapping(from, to));
-                        });
-                        return Ok(());
+                    return match to.remove(0) {
+                        // click to click
+                        ParsedKeyAction::KeyClickAction(to) => {
+                            let mappings = map_click_to_click(&from, &to);
+                            IntoIter::new(mappings).for_each(|(from, to)| {
+                                self.message_tx.send(ControlMessage::AddMapping(from, to));
+                            });
+                            Ok(())
+                        }
+                        // click to action
+                        ParsedKeyAction::KeyAction(to) => {
+                            let mappings = map_click_to_action(&from, &to);
+                            IntoIter::new(mappings).for_each(|(from, to)| {
+                                self.message_tx.send(ControlMessage::AddMapping(from, to));
+                            });
+                            Ok(())
+                        }
                     }
-                    // click to action
-                    // if let ParsedKeyAction::KeyAction(to) = to.remove(0) {
-                    //     unimplemented!();
-                    //     // return Ok((next, (Expr::map_key_click_action(from, to), None)));
-                    // }
                 }
+
+                // click to seq
                 unimplemented!();
             }
         }
