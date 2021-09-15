@@ -87,6 +87,27 @@ fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods) ->
     (from.clone(), RuntimeAction::ActionSequence(seq))
 }
 
+fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) -> Mapping {
+    let mut seq = vec![];
+    seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
+
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+
+    seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: to.value }));
+
+    // revert to original
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+
+    seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
+
+    (from.clone(), RuntimeAction::ActionSequence(seq))
+}
 
 fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods) -> [Mapping; 3] {
     let mut down_mapping;
@@ -199,9 +220,9 @@ impl InstanceHandle {
                     }
                     // action to action
                     if let ParsedKeyAction::KeyAction(to) = to {
-                        // return Ok((next, (Expr::map_key_action_action(from, to), None)));
-
-                        unimplemented!();
+                        let mapping = map_action_to_action(&from, &to);
+                        self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
+                        return Ok(());
                     }
                 }
 
