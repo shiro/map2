@@ -64,11 +64,34 @@ pub enum RuntimeAction {
 }
 
 
+fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods) -> Mapping {
+    let mut seq = vec![];
+    seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
+
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
+
+    seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_DOWN }));
+    seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_UP }));
+
+    // revert to original
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
+    if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
+
+    seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
+
+    (from.clone(), RuntimeAction::ActionSequence(seq))
+}
+
+
 fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods) -> [Mapping; 3] {
     let mut down_mapping;
     {
         let mut seq = vec![];
-        // seq.push_expr(Expr::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
         seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
@@ -165,19 +188,36 @@ impl InstanceHandle {
         let mut to = parse_key_sequence_py(&to).unwrap();
 
         match from {
-            ParsedKeyAction::KeyAction(action) => {
+            ParsedKeyAction::KeyAction(from) => {
+                if to.len() == 1 {
+                    let to = to.remove(0);
+                    // action to click
+                    if let ParsedKeyAction::KeyClickAction(to) = to {
+                        let mapping = map_action_to_click(&from, &to);
+                        self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
+                        return Ok(());
+                    }
+                    // action to action
+                    if let ParsedKeyAction::KeyAction(to) = to {
+                        // return Ok((next, (Expr::map_key_action_action(from, to), None)));
+
+                        unimplemented!();
+                    }
+                }
+
+                // action to seq
                 unimplemented!();
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 if to.len() == 1 {
-                    return match to.remove(0) {
+                    match to.remove(0) {
                         // click to click
                         ParsedKeyAction::KeyClickAction(to) => {
                             let mappings = map_click_to_click(&from, &to);
                             IntoIter::new(mappings).for_each(|(from, to)| {
                                 self.message_tx.send(ControlMessage::AddMapping(from, to));
                             });
-                            Ok(())
+                            return Ok(());
                         }
                         // click to action
                         ParsedKeyAction::KeyAction(to) => {
@@ -185,7 +225,7 @@ impl InstanceHandle {
                             IntoIter::new(mappings).for_each(|(from, to)| {
                                 self.message_tx.send(ControlMessage::AddMapping(from, to));
                             });
-                            Ok(())
+                            return Ok(());
                         }
                     };
                 }
