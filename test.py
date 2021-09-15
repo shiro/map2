@@ -28,6 +28,6 @@ def hello():
     counter = counter + 1
 
 
-handle.map("m", hello)
+handle.map("{m down}", hello)
 
 time.sleep(5)

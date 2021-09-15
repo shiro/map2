@@ -170,8 +170,8 @@ impl InstanceHandle {
         let from = parse_key_action_with_mods_py(&from).unwrap();
 
         match from {
-            ParsedKeyAction::KeyAction(action) => {
-                unimplemented!();
+            ParsedKeyAction::KeyAction(from) => {
+                self.message_tx.send(ControlMessage::AddMapping(from, RuntimeAction::PythonCallback(to)));
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(1), RuntimeAction::PythonCallback(to)));
