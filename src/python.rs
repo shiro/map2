@@ -64,6 +64,15 @@ pub enum RuntimeAction {
 }
 
 
+fn map_action_to_seq(from: KeyActionWithMods, to: Vec<ParsedKeyAction>) -> Mapping {
+    let mut seq = to.to_key_actions()
+        .into_iter()
+        .map(|action| RuntimeKeyAction::KeyAction(action))
+        .collect();
+
+    (from, RuntimeAction::ActionSequence(seq))
+}
+
 fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods) -> Mapping {
     let mut seq = vec![];
     seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
@@ -107,6 +116,19 @@ fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) -> Map
     seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
 
     (from.clone(), RuntimeAction::ActionSequence(seq))
+}
+
+fn map_click_to_seq(from: KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> [Mapping; 3] {
+    let mut seq = to.to_key_actions()
+        .into_iter()
+        .map(|action| RuntimeKeyAction::KeyAction(action))
+        .collect();
+
+    let down_mapping = (KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
+    // stub up and repeat, click only triggers sequence on down press
+    let up_mapping = (KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
+    let repeat_mapping = (KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
+    [down_mapping, up_mapping, repeat_mapping]
 }
 
 fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods) -> [Mapping; 3] {
@@ -227,7 +249,8 @@ impl InstanceHandle {
                 }
 
                 // action to seq
-                unimplemented!();
+                let mapping = map_action_to_seq(from, to);
+                self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 if to.len() == 1 {
@@ -252,7 +275,10 @@ impl InstanceHandle {
                 }
 
                 // click to seq
-                unimplemented!();
+                let mappings = map_click_to_seq(from, to);
+                IntoIter::new(mappings).for_each(|(from, to)| {
+                    self.message_tx.send(ControlMessage::AddMapping(from, to));
+                });
             }
         }
 

@@ -20,6 +20,9 @@ handle.map("d", "{a down}")
 handle.map("{l down}", "{a down}")
 handle.map("{l up}", "{a up}")
 
+handle.map("{i down}", "hello world")
+handle.map("{i up}", " bye")
+
 counter = 0
 
 def hello():
