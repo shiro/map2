@@ -175,9 +175,9 @@ pub async fn handle_control_message(
         // ExecutionMessage::Write(message) => {
         //     out.write(message.as_ref()).unwrap();
         // }
-        // ExecutionMessage::UpdateModifiers(action) => {
-        //     event_handlers::update_modifiers(state, &action);
-        // }
+        ControlMessage::UpdateModifiers(action) => {
+            event_handlers::update_modifiers(state, &action);
+        }
         // ExecutionMessage::Exit(exit_code) => { std::process::exit(exit_code) }
         // ExecutionMessage::FatalError(err, exit_code) => {
         //     eprintln!("error: {}", err);

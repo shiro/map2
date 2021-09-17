@@ -25,7 +25,9 @@ handle.map("{j up}", " mab")
 counter = 0
 
 def hello():
+    handle.send_modifier("{shift down}")
     handle.send("hi")
+    handle.send_modifier("{shift up}")
     # global counter
     # print("counter: {}".format(counter))
     # counter = counter + 1

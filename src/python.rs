@@ -15,7 +15,7 @@ use crate::parsing::parser::parse_key_sequence;
 use crate::parsing::key_action::*;
 use crate::ignore_list::IgnoreList;
 use pyo3::exceptions;
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 
 #[pyclass]
 struct PyKey {
@@ -208,6 +208,28 @@ impl InstanceHandle {
             ).unwrap();
         }
     }
+    pub fn send_modifier(&mut self, val: String) -> PyResult<()> {
+        let actions = parse_key_sequence_py(val.as_str())
+            .unwrap()
+            .to_key_actions();
+
+        if actions.len() != 1 {
+            return Err(PyValueError::new_err(format!("expected a single key action, got {}", actions.len())));
+        }
+
+        let action = actions.get(0).unwrap();
+
+        if [*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
+            .contains(&action.key) {
+            self.message_tx.send(ControlMessage::UpdateModifiers(*action));
+        } else {
+            return Err(PyValueError::new_err("key action needs to be a modifier event"));
+        }
+
+        futures::executor::block_on(self.ev_tx.send(action.to_input_ev())).unwrap();
+        futures::executor::block_on(self.ev_tx.send(SYN_REPORT.clone())).unwrap();
+        Ok(())
+    }
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if let Ok(to) = to.extract::<String>(py) {
@@ -320,6 +342,7 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
 #[derive(Debug)]
 pub enum ControlMessage {
     AddMapping(KeyActionWithMods, RuntimeAction),
+    UpdateModifiers(KeyAction),
 }
 
 fn _setup(callback: PyObject) -> Result<InstanceHandle> {
