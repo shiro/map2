@@ -30,6 +30,7 @@ struct PyKey {
 struct InstanceHandle {
     exit_tx: oneshot::Sender<()>,
     join_handle: std::thread::JoinHandle<()>,
+    ev_tx: mpsc::Sender<InputEvent>,
     message_tx: mpsc::UnboundedSender<ControlMessage>,
 }
 
@@ -41,10 +42,13 @@ struct InstanceHandleSharedState {
 }
 
 impl InstanceHandle {
-    pub fn new(exit_tx: oneshot::Sender<()>, join_handle: std::thread::JoinHandle<()>, message_tx: mpsc::UnboundedSender<ControlMessage>) -> Self {
+    pub fn new(exit_tx: oneshot::Sender<()>, join_handle: std::thread::JoinHandle<()>,
+               ev_tx: mpsc::Sender<InputEvent>,
+               message_tx: mpsc::UnboundedSender<ControlMessage>) -> Self {
         InstanceHandle {
             exit_tx,
             join_handle,
+            ev_tx,
             message_tx,
         }
     }
@@ -192,6 +196,19 @@ fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods) ->
 
 #[pymethods]
 impl InstanceHandle {
+    pub fn send(&mut self, val: String) {
+        let actions = parse_key_sequence_py(val.as_str()).unwrap();
+
+        for action in actions.to_key_actions() {
+            futures::executor::block_on(
+                self.ev_tx.send(action.to_input_ev())
+            ).unwrap();
+            futures::executor::block_on(
+                self.ev_tx.send(SYN_REPORT.clone())
+            ).unwrap();
+        }
+    }
+
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if let Ok(to) = to.extract::<String>(py) {
             self._map_internal(from, to);
@@ -282,8 +299,6 @@ impl InstanceHandle {
             }
         }
 
-        // let from = KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 0, KeyModifierFlags::new());
-        // self.message_tx.send(ControlMessage::AddMapping(from, vec![]));
         Ok(())
     }
 }
@@ -311,6 +326,10 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
     let (mut control_tx, mut control_rx) = mpsc::unbounded_channel();
 
     let (exit_tx, exit_rx) = oneshot::channel();
+
+    // TODO move out device initialization (which requires a scheduler to spawn tasks) elsewhere, don't use oneshot for this
+    let (_ev_tx_init_tx, _ev_tx_init_rx) = oneshot::channel();
+
     let join_handle = thread::spawn(move || {
         let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -324,11 +343,13 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
             // let mut window_change_handlers = vec![];
 
             // initialize device communication channels
-            let (ev_reader_init_tx, ev_reader_init_rx) = oneshot::channel();
             let (ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
+            let (ev_reader_init_tx, ev_reader_init_rx) = oneshot::channel();
 
             bind_udev_inputs(&configuration.devices, ev_reader_init_tx, ev_writer_tx).await?;
             let mut ev_reader_tx = ev_reader_init_rx.await?;
+
+            _ev_tx_init_tx.send(ev_reader_tx.clone()).unwrap();
 
             let mut state = State::new();
             let mut mappings = Mappings::new();
@@ -340,30 +361,9 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
                     }
                     Some(msg) = control_rx.recv() => {
                         // println!("{:?}", &msg);
-                        event_handlers::handle_control_message(window_cycle_token, msg, &mut state, &mut mappings ).await;
+                        event_handlers::handle_control_message(window_cycle_token, msg, &mut state, &mut mappings).await;
                     }
                 }
-
-                // let code = match ev.event_code {
-                //     EventCode::EV_KEY(code) => code,
-                //     _ => continue,
-                // };
-                //
-                //
-                // let key = PyKey { code: code as u32, value: ev.value };
-                // {
-                //     use std::time::Instant;
-                //     let now = Instant::now();
-                //     let gil = Python::acquire_gil();
-                //
-                //
-                //     let py = gil.python();
-                //
-                //     callback.call(py, (key, ), None);
-                //
-                //     let elapsed = now.elapsed();
-                //     println!("Elapsed: {:.2?}", elapsed);
-                // }
             }
 
             // exit_rx.await?;
@@ -372,7 +372,10 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
         }).unwrap();
     });
 
-    let handle = InstanceHandle::new(exit_tx, join_handle, control_tx);
+
+    let _ev_tx = futures::executor::block_on(_ev_tx_init_rx).unwrap();
+
+    let handle = InstanceHandle::new(exit_tx, join_handle, _ev_tx, control_tx);
 
     Ok(handle)
 }

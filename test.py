@@ -1,14 +1,10 @@
 import map2
 import time
 
-foo = 33
-
 
 def hi(a):
     print("got key: '{}' with value '{}'".format(a.code, a.value))
 
-
-# map2.sum_as_string(5, 20, hi)
 handle = map2.setup(hi)
 
 print("handle obtained: {}".format(handle))
@@ -20,17 +16,21 @@ handle.map("d", "{a down}")
 handle.map("{l down}", "{a down}")
 handle.map("{l up}", "{a up}")
 
-handle.map("{i down}", "hello world")
+handle.map("{i down}", "i am here now")
 handle.map("{i up}", " bye")
+
+handle.map("{j down}", "mib")
+handle.map("{j up}", " mab")
 
 counter = 0
 
 def hello():
-    global counter
-    print("counter: {}".format(counter))
-    counter = counter + 1
+    handle.send("hi")
+    # global counter
+    # print("counter: {}".format(counter))
+    # counter = counter + 1
 
 
-handle.map("{m down}", hello)
+handle.map("m", hello)
 
 time.sleep(5)
