@@ -402,3 +402,52 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
 
     Ok(handle)
 }
+
+
+#[pyclass]
+struct Window {
+    exit_tx: oneshot::Sender<()>,
+    join_handle: std::thread::JoinHandle<()>,
+    ev_tx: mpsc::Sender<InputEvent>,
+    message_tx: mpsc::UnboundedSender<ControlMessage>,
+}
+
+impl Window{
+
+}
+
+#[pymethods]
+impl Window{
+    fn on_window_change() -> WindowOnWindowChangeSubscription{
+
+    }
+
+}
+
+#[pyclass]
+struct WindowOnWindowChangeSubscription {
+
+}
+
+#[pymethods]
+impl WindowOnWindowChangeSubscription{
+    pub fn unsubscribe(self){
+
+    }
+}
+
+// // spawn X11 thread
+// // tokio::spawn(async move {
+// //     let x11_state = Arc::new(x11_initialize().unwrap());
+// //
+// //     loop {
+// //         let x11_state_clone = x11_state.clone();
+// //         let res = task::spawn_blocking(move || {
+// //             get_window_info_x11(&x11_state_clone)
+// //         }).await.unwrap();
+// //
+// //         if let Ok(Some(val)) = res {
+// //             window_ev_tx.send(val).await.unwrap_or_else(|_| panic!());
+// //         }
+// //     }
+// // });
