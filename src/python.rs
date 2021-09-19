@@ -16,6 +16,8 @@ use crate::parsing::key_action::*;
 use crate::ignore_list::IgnoreList;
 use pyo3::exceptions;
 use pyo3::exceptions::{PyTypeError, PyValueError};
+use std::collections::HashSet;
+use std::time::Duration;
 
 #[pyclass]
 struct PyKey {
@@ -335,6 +337,7 @@ fn setup(py: Python, callback: PyObject) -> PyResult<InstanceHandle> {
 #[pymodule]
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(setup, m)?)?;
+    m.add_class::<Window>()?;
 
     Ok(())
 }
@@ -403,51 +406,74 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
     Ok(handle)
 }
 
+enum X11ControlMessage {
+    Subscribe(u32, PyObject),
+    Unsubscribe(u32),
+}
+
+fn spawn_x11_thread() -> (mpsc::UnboundedSender<X11ControlMessage>, thread::JoinHandle<()>) {
+    let (subscription_tx, mut subscription_rx) = mpsc::unbounded_channel();
+    let handle = thread::spawn(move || {
+        let x11_state = Arc::new(x11_initialize().unwrap());
+        let mut subscriptions = HashMap::new();
+
+        loop {
+            loop {
+                if let Ok(msg) = subscription_rx.try_recv() {
+                    match msg {
+                        X11ControlMessage::Subscribe(id, callback) => { subscriptions.insert(id, callback); }
+                        X11ControlMessage::Unsubscribe(id) => { subscriptions.remove(&id); }
+                    }
+                } else { break; }
+            }
+
+            let res = get_window_info_x11(&x11_state);
+
+            if let Ok(Some(val)) = res {
+                let gil = Python::acquire_gil();
+                let py = gil.python();
+                for callback in subscriptions.values() {
+                    let is_callable = callback.cast_as::<PyAny>(py).map_or(false, |obj| obj.is_callable());
+
+                    if !is_callable { continue; }
+
+                    callback.call(py, (val.class.clone(), ), None);
+                }
+            }
+
+            thread::sleep(Duration::from_millis(100));
+        }
+    });
+    (subscription_tx, handle)
+}
 
 #[pyclass]
 struct Window {
-    exit_tx: oneshot::Sender<()>,
-    join_handle: std::thread::JoinHandle<()>,
-    ev_tx: mpsc::Sender<InputEvent>,
-    message_tx: mpsc::UnboundedSender<ControlMessage>,
-}
-
-impl Window{
-
+    x11_thread_handle: std::thread::JoinHandle<()>,
+    subscription_id_cnt: u32,
+    subscriptions_tx: mpsc::UnboundedSender<X11ControlMessage>,
 }
 
 #[pymethods]
-impl Window{
-    fn on_window_change() -> WindowOnWindowChangeSubscription{
-
+impl Window {
+    #[new]
+    pub fn new() -> Self {
+        let (subscriptions_tx, x11_thread_handle) = spawn_x11_thread();
+        Window { x11_thread_handle, subscription_id_cnt: 0, subscriptions_tx }
     }
 
+    fn on_window_change(&mut self, callback: PyObject) -> WindowOnWindowChangeSubscription {
+        self.subscriptions_tx.send(X11ControlMessage::Subscribe(self.subscription_id_cnt, callback));
+        let subscription = WindowOnWindowChangeSubscription { id: self.subscription_id_cnt };
+        self.subscription_id_cnt += 1;
+        subscription
+    }
+    fn remove_on_window_change(&self, subscription: &WindowOnWindowChangeSubscription) {
+        self.subscriptions_tx.send(X11ControlMessage::Unsubscribe(subscription.id));
+    }
 }
 
 #[pyclass]
 struct WindowOnWindowChangeSubscription {
-
+    id: u32,
 }
-
-#[pymethods]
-impl WindowOnWindowChangeSubscription{
-    pub fn unsubscribe(self){
-
-    }
-}
-
-// // spawn X11 thread
-// // tokio::spawn(async move {
-// //     let x11_state = Arc::new(x11_initialize().unwrap());
-// //
-// //     loop {
-// //         let x11_state_clone = x11_state.clone();
-// //         let res = task::spawn_blocking(move || {
-// //             get_window_info_x11(&x11_state_clone)
-// //         }).await.unwrap();
-// //
-// //         if let Ok(Some(val)) = res {
-// //             window_ev_tx.send(val).await.unwrap_or_else(|_| panic!());
-// //         }
-// //     }
-// // });
