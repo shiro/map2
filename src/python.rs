@@ -18,6 +18,7 @@ use pyo3::exceptions;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use std::collections::HashSet;
 use std::time::Duration;
+use crate::python_window::Window;
 
 #[pyclass]
 struct PyKey {
@@ -39,9 +40,6 @@ struct InstanceHandle {
 pub type Mapping = (KeyActionWithMods, RuntimeAction);
 pub type Mappings = HashMap<KeyActionWithMods, RuntimeAction>;
 
-struct InstanceHandleSharedState {
-    mappings: HashMap<KeyActionWithMods, RuntimeAction>,
-}
 
 impl InstanceHandle {
     pub fn new(exit_tx: oneshot::Sender<()>, join_handle: std::thread::JoinHandle<()>,
@@ -70,7 +68,7 @@ pub enum RuntimeAction {
 }
 
 
-fn map_action_to_seq(from: KeyActionWithMods, to: Vec<ParsedKeyAction>) -> Mapping {
+pub fn map_action_to_seq(from: KeyActionWithMods, to: Vec<ParsedKeyAction>) -> Mapping {
     let mut seq = to.to_key_actions()
         .into_iter()
         .map(|action| RuntimeKeyAction::KeyAction(action))
@@ -79,7 +77,7 @@ fn map_action_to_seq(from: KeyActionWithMods, to: Vec<ParsedKeyAction>) -> Mappi
     (from, RuntimeAction::ActionSequence(seq))
 }
 
-fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods) -> Mapping {
+pub fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods) -> Mapping {
     let mut seq = vec![];
     seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
@@ -102,7 +100,7 @@ fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods) ->
     (from.clone(), RuntimeAction::ActionSequence(seq))
 }
 
-fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) -> Mapping {
+pub fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) -> Mapping {
     let mut seq = vec![];
     seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
@@ -124,7 +122,7 @@ fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) -> Map
     (from.clone(), RuntimeAction::ActionSequence(seq))
 }
 
-fn map_click_to_seq(from: KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> [Mapping; 3] {
+pub fn map_click_to_seq(from: KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> [Mapping; 3] {
     let mut seq = to.to_key_actions()
         .into_iter()
         .map(|action| RuntimeKeyAction::KeyAction(action))
@@ -137,7 +135,7 @@ fn map_click_to_seq(from: KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> [
     [down_mapping, up_mapping, repeat_mapping]
 }
 
-fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods) -> [Mapping; 3] {
+pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods) -> [Mapping; 3] {
     let mut down_mapping;
     {
         let mut seq = vec![];
@@ -169,7 +167,7 @@ fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods
     [down_mapping, up_mapping, repeat_mapping]
 }
 
-fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods) -> [Mapping; 3] {
+pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods) -> [Mapping; 3] {
     let mut seq = vec![];
 
     seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
@@ -195,138 +193,6 @@ fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods) ->
     let repeat_mapping = (KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
     [down_mapping, up_mapping, repeat_mapping]
 }
-
-#[pymethods]
-impl InstanceHandle {
-    pub fn send(&mut self, val: String) {
-        let actions = parse_key_sequence_py(val.as_str()).unwrap();
-
-        for action in actions.to_key_actions() {
-            futures::executor::block_on(
-                self.ev_tx.send(action.to_input_ev())
-            ).unwrap();
-            futures::executor::block_on(
-                self.ev_tx.send(SYN_REPORT.clone())
-            ).unwrap();
-        }
-    }
-    pub fn send_modifier(&mut self, val: String) -> PyResult<()> {
-        let actions = parse_key_sequence_py(val.as_str())
-            .unwrap()
-            .to_key_actions();
-
-        if actions.len() != 1 {
-            return Err(PyValueError::new_err(format!("expected a single key action, got {}", actions.len())));
-        }
-
-        let action = actions.get(0).unwrap();
-
-        if [*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
-            .contains(&action.key) {
-            self.message_tx.send(ControlMessage::UpdateModifiers(*action));
-        } else {
-            return Err(PyValueError::new_err("key action needs to be a modifier event"));
-        }
-
-        futures::executor::block_on(self.ev_tx.send(action.to_input_ev())).unwrap();
-        futures::executor::block_on(self.ev_tx.send(SYN_REPORT.clone())).unwrap();
-        Ok(())
-    }
-
-    pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
-        if let Ok(to) = to.extract::<String>(py) {
-            self._map_internal(from, to);
-            return Ok(());
-        }
-
-        let is_callable = to.cast_as::<PyAny>(py)
-            .map_or(false, |obj| obj.is_callable());
-
-        if is_callable {
-            self._map_callback(from, to);
-            return Ok(());
-        }
-
-        return Err(PyTypeError::new_err("unknown type"));
-    }
-
-    fn _map_callback(&mut self, from: String, to: PyObject) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from).unwrap();
-
-        match from {
-            ParsedKeyAction::KeyAction(from) => {
-                self.message_tx.send(ControlMessage::AddMapping(from, RuntimeAction::PythonCallback(to)));
-            }
-            ParsedKeyAction::KeyClickAction(from) => {
-                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(1), RuntimeAction::PythonCallback(to)));
-                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(0), RuntimeAction::NOP));
-                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(2), RuntimeAction::NOP));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn _map_internal(&mut self, from: String, to: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from).unwrap();
-        let mut to = parse_key_sequence_py(&to).unwrap();
-
-        match from {
-            ParsedKeyAction::KeyAction(from) => {
-                if to.len() == 1 {
-                    let to = to.remove(0);
-                    // action to click
-                    if let ParsedKeyAction::KeyClickAction(to) = to {
-                        let mapping = map_action_to_click(&from, &to);
-                        self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
-                        return Ok(());
-                    }
-                    // action to action
-                    if let ParsedKeyAction::KeyAction(to) = to {
-                        let mapping = map_action_to_action(&from, &to);
-                        self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
-                        return Ok(());
-                    }
-                }
-
-                // action to seq
-                let mapping = map_action_to_seq(from, to);
-                self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
-            }
-            ParsedKeyAction::KeyClickAction(from) => {
-                if to.len() == 1 {
-                    match to.remove(0) {
-                        // click to click
-                        ParsedKeyAction::KeyClickAction(to) => {
-                            let mappings = map_click_to_click(&from, &to);
-                            IntoIter::new(mappings).for_each(|(from, to)| {
-                                self.message_tx.send(ControlMessage::AddMapping(from, to));
-                            });
-                            return Ok(());
-                        }
-                        // click to action
-                        ParsedKeyAction::KeyAction(to) => {
-                            let mappings = map_click_to_action(&from, &to);
-                            IntoIter::new(mappings).for_each(|(from, to)| {
-                                self.message_tx.send(ControlMessage::AddMapping(from, to));
-                            });
-                            return Ok(());
-                        }
-                    };
-                }
-
-                // click to seq
-                let mappings = map_click_to_seq(from, to);
-                IntoIter::new(mappings).for_each(|(from, to)| {
-                    self.message_tx.send(ControlMessage::AddMapping(from, to));
-                });
-            }
-        }
-
-        Ok(())
-    }
-}
-
 
 #[pyfunction]
 fn setup(py: Python, callback: PyObject) -> PyResult<InstanceHandle> {
@@ -406,74 +272,3 @@ fn _setup(callback: PyObject) -> Result<InstanceHandle> {
     Ok(handle)
 }
 
-enum X11ControlMessage {
-    Subscribe(u32, PyObject),
-    Unsubscribe(u32),
-}
-
-fn spawn_x11_thread() -> (mpsc::UnboundedSender<X11ControlMessage>, thread::JoinHandle<()>) {
-    let (subscription_tx, mut subscription_rx) = mpsc::unbounded_channel();
-    let handle = thread::spawn(move || {
-        let x11_state = Arc::new(x11_initialize().unwrap());
-        let mut subscriptions = HashMap::new();
-
-        loop {
-            loop {
-                if let Ok(msg) = subscription_rx.try_recv() {
-                    match msg {
-                        X11ControlMessage::Subscribe(id, callback) => { subscriptions.insert(id, callback); }
-                        X11ControlMessage::Unsubscribe(id) => { subscriptions.remove(&id); }
-                    }
-                } else { break; }
-            }
-
-            let res = get_window_info_x11(&x11_state);
-
-            if let Ok(Some(val)) = res {
-                let gil = Python::acquire_gil();
-                let py = gil.python();
-                for callback in subscriptions.values() {
-                    let is_callable = callback.cast_as::<PyAny>(py).map_or(false, |obj| obj.is_callable());
-
-                    if !is_callable { continue; }
-
-                    callback.call(py, (val.class.clone(), ), None);
-                }
-            }
-
-            thread::sleep(Duration::from_millis(100));
-        }
-    });
-    (subscription_tx, handle)
-}
-
-#[pyclass]
-struct Window {
-    x11_thread_handle: std::thread::JoinHandle<()>,
-    subscription_id_cnt: u32,
-    subscriptions_tx: mpsc::UnboundedSender<X11ControlMessage>,
-}
-
-#[pymethods]
-impl Window {
-    #[new]
-    pub fn new() -> Self {
-        let (subscriptions_tx, x11_thread_handle) = spawn_x11_thread();
-        Window { x11_thread_handle, subscription_id_cnt: 0, subscriptions_tx }
-    }
-
-    fn on_window_change(&mut self, callback: PyObject) -> WindowOnWindowChangeSubscription {
-        self.subscriptions_tx.send(X11ControlMessage::Subscribe(self.subscription_id_cnt, callback));
-        let subscription = WindowOnWindowChangeSubscription { id: self.subscription_id_cnt };
-        self.subscription_id_cnt += 1;
-        subscription
-    }
-    fn remove_on_window_change(&self, subscription: &WindowOnWindowChangeSubscription) {
-        self.subscriptions_tx.send(X11ControlMessage::Unsubscribe(subscription.id));
-    }
-}
-
-#[pyclass]
-struct WindowOnWindowChangeSubscription {
-    id: u32,
-}
