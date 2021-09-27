@@ -3,6 +3,7 @@ use python::*;
 use pyo3::*;
 use std::thread;
 use crate::time::Duration;
+use pyo3::prelude::*;
 
 #[pyclass]
 pub struct Window {

@@ -19,6 +19,8 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use std::collections::HashSet;
 use std::time::Duration;
 use crate::python_window::Window;
+use crate::python_writer::*;
+use crate::python_reader::*;
 
 #[pyclass]
 struct PyKey {
@@ -194,15 +196,17 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     [down_mapping, up_mapping, repeat_mapping]
 }
 
-#[pyfunction]
-fn setup(py: Python, callback: PyObject) -> PyResult<InstanceHandle> {
-    let handle = _setup(callback).unwrap();
-    Ok(handle)
-}
+// #[pyfunction]
+// fn setup(py: Python, callback: PyObject) -> PyResult<InstanceHandle> {
+//     let handle = _setup(callback).unwrap();
+//     Ok(handle)
+// }
 
 #[pymodule]
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(setup, m)?)?;
+    // m.add_function(wrap_pyfunction!(setup, m)?)?;
+    m.add_class::<EventReader>()?;
+    m.add_class::<EventWriter>()?;
     m.add_class::<Window>()?;
 
     Ok(())
@@ -212,63 +216,5 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
 pub enum ControlMessage {
     AddMapping(KeyActionWithMods, RuntimeAction),
     UpdateModifiers(KeyAction),
-}
-
-fn _setup(callback: PyObject) -> Result<InstanceHandle> {
-    let (mut control_tx, mut control_rx) = mpsc::unbounded_channel();
-
-    let (exit_tx, exit_rx) = oneshot::channel();
-
-    // TODO move out device initialization (which requires a scheduler to spawn tasks) elsewhere, don't use oneshot for this
-    let (_ev_tx_init_tx, _ev_tx_init_rx) = oneshot::channel();
-
-    let join_handle = thread::spawn(move || {
-        let mut rt = tokio::runtime::Runtime::new().unwrap();
-
-        rt.block_on(async {
-            let mut configuration = parse_cli().unwrap();
-
-            // initialize global state
-            // let mut stdout = io::stdout();
-            let mut window_cycle_token: usize = 0;
-            // let mut mappings = CompiledKeyMappings::new();
-            // let mut window_change_handlers = vec![];
-
-            // initialize device communication channels
-            let (ev_writer_tx, mut ev_writer_rx) = mpsc::channel(128);
-            let (ev_reader_init_tx, ev_reader_init_rx) = oneshot::channel();
-
-            bind_udev_inputs(&configuration.devices, ev_reader_init_tx, ev_writer_tx).await?;
-            let mut ev_reader_tx = ev_reader_init_rx.await?;
-
-            _ev_tx_init_tx.send(ev_reader_tx.clone()).unwrap();
-
-            let mut state = State::new();
-            let mut mappings = Mappings::new();
-
-            loop {
-                tokio::select! {
-                    Some(ev) = ev_writer_rx.recv() => {
-                        event_handlers::handle_stdin_ev(&mut state, ev, &mappings, &mut ev_reader_tx).await.unwrap();
-                    }
-                    Some(msg) = control_rx.recv() => {
-                        // println!("{:?}", &msg);
-                        event_handlers::handle_control_message(window_cycle_token, msg, &mut state, &mut mappings).await;
-                    }
-                }
-            }
-
-            // exit_rx.await?;
-            #[allow(unreachable_code)]
-                Ok::<(), anyhow::Error>(())
-        }).unwrap();
-    });
-
-
-    let _ev_tx = futures::executor::block_on(_ev_tx_init_rx).unwrap();
-
-    let handle = InstanceHandle::new(exit_tx, join_handle, _ev_tx, control_tx);
-
-    Ok(handle)
 }
 

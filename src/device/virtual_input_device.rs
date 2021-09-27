@@ -2,13 +2,12 @@ use std::{fs, io, thread, time};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::mpsc;
 
 use anyhow::{anyhow, Result};
 use evdev_rs::*;
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
-use tokio::sync::{mpsc, oneshot};
-use tokio::task;
 use walkdir::WalkDir;
 
 use super::*;
@@ -53,12 +52,7 @@ pub fn read_from_device_input_fd_thread_handler(
                         }
                     }
                 }
-                ReadStatus::Success => {
-                    handler(result.1);
-                    // futures::executor::block_on(
-                    //     reader_tx.send(result.1)
-                    // ).unwrap();
-                }
+                ReadStatus::Success => { handler(result.1); }
             }
         } else {
             let err = a.err().unwrap();
@@ -80,9 +74,9 @@ pub fn read_from_device_input_fd_thread_handler(
 }
 
 
-async fn runner_it(fd_path: &Path,
-                   writer: mpsc::Sender<InputEvent>)
-                   -> Result<oneshot::Sender<()>> {
+fn grab_device(fd_path: &Path,
+               writer: mpsc::Sender<InputEvent>)
+               -> Result<oneshot::Sender<()>> {
     let fd_file = fs::OpenOptions::new()
         .read(true)
         .open(&fd_path)
@@ -99,9 +93,7 @@ async fn runner_it(fd_path: &Path,
         read_from_device_input_fd_thread_handler(
             device,
             |ev| {
-                let _ = futures::executor::block_on(
-                    writer.send(ev)
-                );
+                let _ = writer.send(ev);
             },
             abort_rx,
         );
@@ -110,56 +102,37 @@ async fn runner_it(fd_path: &Path,
     Ok(abort_tx)
 }
 
-async fn runner
-(device_fd_path_pattens: Vec<Regex>,
- reader_init: oneshot::Sender<mpsc::Sender<InputEvent>>,
- writer: mpsc::Sender<InputEvent>,
-) -> Result<()> {
-    task::spawn(async move {
-        let (fs_reader_tx, reader_rx) = mpsc::channel(128);
 
-        // send the reader to the client
-        reader_init.send(fs_reader_tx.clone()).unwrap();
+pub fn grab_udev_inputs
+(fd_patterns: &[impl AsRef<str>],
+ writer_tx: mpsc::Sender<InputEvent>,
+ exit_rx: oneshot::Receiver<()>,
+) -> Result<thread::JoinHandle<Result<()>>> {
+    let device_fd_path_pattens = fd_patterns.into_iter()
+        .map(|v| Regex::new(v.as_ref()))
+        .collect::<std::result::Result<_, _>>()
+        .map_err(|err| anyhow!("failed to parse regex: {}", err))?;
 
-        virtual_output_device::init_virtual_output_device(reader_rx).await
-            .map_err(|err| anyhow!("uinput error: {}", err))
-            .unwrap();
-
+    // devices are monitored and hooked up when added/removed, so we need another thread
+    let join_handle = thread::spawn(move || {
         #[derive(Debug)]
         enum FsWatchEvent {
             ADD(PathBuf),
             REMOVE(PathBuf),
         }
 
-        let (fs_event_tx, mut fs_event_rx) = mpsc::channel(128);
-        thread::spawn(move || -> Result<()> {
-            let (watch_tx, watch_rx) = std::sync::mpsc::channel();
-            let mut watcher: notify::RecommendedWatcher = notify::Watcher::new(watch_tx, time::Duration::from_secs(2))?;
-            watcher.watch("/dev/input", notify::RecursiveMode::Recursive)?;
+        let (fs_event_tx, mut fs_event_rx) = mpsc::channel();
 
-            loop {
-                match watch_rx.recv() {
-                    Ok(event) => {
-                        use FsWatchEvent::*;
-                        let fs_event = match event {
-                            DebouncedEvent::Create(path_buf) => { ADD(path_buf) }
-                            DebouncedEvent::Remove(path_buf) => { REMOVE(path_buf) }
-                            _ => { continue; }
-                        };
+        let (fs_ev_tx, fs_ev_rx) = mpsc::channel();
 
-                        futures::executor::block_on(
-                            fs_event_tx.send(fs_event)
-                        ).unwrap();
-                    }
-                    Err(e) => return Err(anyhow!("watch error: {:?}", e)),
-                }
-            }
-        });
+        let mut watcher: notify::RecommendedWatcher = notify::Watcher::new(fs_ev_tx, time::Duration::from_secs(2))?;
+        watcher.watch("/dev/input", notify::RecursiveMode::Recursive)?;
 
         let mut device_map = HashMap::new();
 
+        // grab all devices
         for device_fd_path in get_fd_list(&device_fd_path_pattens) {
-            let res = runner_it(&device_fd_path, writer.clone()).await;
+            let res = grab_device(&device_fd_path, writer_tx.clone());
             let abort_tx = match res {
                 Ok(v) => v,
                 Err(err) => {
@@ -171,43 +144,42 @@ async fn runner
             device_map.insert(device_fd_path, abort_tx);
         }
 
+        // continuously check if devices are added/removed and handle it
         loop {
-            let fs_event = fs_event_rx.recv().await.unwrap();
-            match fs_event {
-                FsWatchEvent::ADD(path) => {
-                    if !device_fd_path_pattens.iter().any(|regex| regex.is_match(path.to_str().unwrap())) {
-                        continue;
-                    }
+            if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
 
-                    let abort_tx = runner_it(&path, writer.clone()).await?;
-                    device_map.insert(path, abort_tx);
+            match fs_ev_rx.try_recv() {
+                Ok(event) => {
+                    use FsWatchEvent::*;
+                    let fs_event = match event {
+                        DebouncedEvent::Create(path) => {
+                            // if the device doesn't match any pattern, skip it
+                            if !device_fd_path_pattens.iter().any(|regex| regex.is_match(path.to_str().unwrap())) {
+                                continue;
+                            }
+
+                            let abort_tx = grab_device(&path, writer_tx.clone())?;
+                            device_map.insert(path, abort_tx);
+                        }
+                        DebouncedEvent::Remove(path) => {
+                            if let Some(abort_tx) = device_map.remove(&path) {
+                                // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
+                                let _ = abort_tx.send(());
+                            }
+                        }
+                        _ => { continue; }
+                    };
+
+                    let _ = fs_event_tx.send(fs_event);
                 }
-                FsWatchEvent::REMOVE(path) => {
-                    if let Some(abort_tx) = device_map.remove(&path) {
-                        // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
-                        let _ = abort_tx.send(());
-                    }
-                }
+                Err(e) => return Err(anyhow!("watch error: {:?}", e)),
             }
+
+            thread::sleep(time::Duration::from_millis(100));
+            thread::yield_now();
         }
-        #[allow(unreachable_code)]
-            Ok::<(), anyhow::Error>(())
     });
 
-    Ok(())
+    Ok(join_handle)
 }
 
-
-pub async fn bind_udev_inputs(fd_patterns: &[impl AsRef<str>], reader_init_tx: oneshot::Sender<mpsc::Sender<InputEvent>>, writer_tx: mpsc::Sender<InputEvent>) -> Result<()> {
-    let fd_patterns_regex = fd_patterns.into_iter()
-        .map(|v| Regex::new(v.as_ref()))
-        .collect::<std::result::Result<_, _>>()
-        .map_err(|err| anyhow!("failed to parse regex: {}", err))?;
-
-    task::spawn(async move {
-        runner(fd_patterns_regex, reader_init_tx, writer_tx).await.unwrap();
-        Ok::<(), anyhow::Error>(())
-    });
-
-    Ok(())
-}

@@ -19,7 +19,7 @@ pub use tokio::sync::{mpsc, oneshot};
 pub use tokio::task;
 
 pub use crate::cli::parse_cli;
-pub use crate::device::virtual_input_device::bind_udev_inputs;
+pub use crate::device::virtual_input_device::grab_udev_inputs;
 pub use crate::key_defs::*;
 pub use crate::key_primitives::*;
 pub use crate::runtime::*;

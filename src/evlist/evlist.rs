@@ -84,7 +84,7 @@ fn get_props(fd: PathBuf, reader_tx: mpsc::UnboundedSender<PathBuf>) -> Result<D
 
                 let _ = reader_tx.send(fd.clone());
             },
-            oneshot::channel().1,
+            ::oneshot::channel().1,
         );
     });
 
