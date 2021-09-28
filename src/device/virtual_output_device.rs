@@ -1,10 +1,20 @@
 use evdev_rs::{UInputDevice, UninitDevice};
 use crate::*;
 use super::*;
+use std::sync::mpsc;
 
-pub async fn init_virtual_output_device(
-    mut reader_rx: mpsc::Receiver<InputEvent>,
-) -> Result<()> {
+pub struct VirtualOutputDevice {
+    output_device: UInputDevice,
+}
+
+impl VirtualOutputDevice {
+    pub fn send(&mut self, ev: &InputEvent) -> Result<()> {
+        self.output_device.write_event(&ev)
+            .map_err(|err| anyhow!("failed to write event into uinput device: {}", err))
+    }
+}
+
+pub fn init_virtual_output_device() -> Result<VirtualOutputDevice> {
     let mut new_device = UninitDevice::new()
         .ok_or(anyhow!("failed to instantiate udev device: libevdev didn't return a device"))?
         .unstable_force_init();
@@ -20,20 +30,9 @@ pub async fn init_virtual_output_device(
         }
     };
 
-    let input_device = input_device.map_err(|err| anyhow!("failed to initialize uinput device: {}", err))?;
+    let output_device = input_device.map_err(|err| anyhow!("failed to initialize uinput device: {}", err))?;
 
-    task::spawn(async move {
-        loop {
-            let msg = reader_rx.recv().await;
-            let ev: InputEvent = match msg {
-                Some(v) => v,
-                None => return Err(anyhow!("message channel closed unexpectedly")),
-            };
-            input_device.write_event(&ev)
-                .map_err(|err| anyhow!("failed to write event into uinput device: {}", err))?;
-        }
-        #[allow(unreachable_code)]
-            Ok(())
-    });
-    Ok(())
+    Ok(VirtualOutputDevice{
+        output_device
+    })
 }

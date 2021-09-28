@@ -3,6 +3,7 @@ use messaging::*;
 use crate::cli::Configuration;
 use crate::python::*;
 use pyo3::Python;
+use crate::device::virtual_output_device::VirtualOutputDevice;
 
 pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     // let ignore_list = &mut state.ignore_list;
@@ -39,11 +40,11 @@ pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     };
 }
 
-pub async fn handle_stdin_ev(
+pub fn handle_stdin_ev(
     mut state: &mut State,
     ev: InputEvent,
     mappings: &Mappings,
-    ev_writer_tx: &mut mpsc::Sender<InputEvent>,
+    output_device: &mut VirtualOutputDevice,
     // modifier_state: &KeyModifierState,
     // message_tx: &mut ExecutionMessageSender,
     // window_cycle_token: &usize,
@@ -56,7 +57,7 @@ pub async fn handle_stdin_ev(
     match ev.event_code {
         EventCode::EV_KEY(_) => {}
         _ => {
-            ev_writer_tx.send(ev).await.unwrap();
+            output_device.send(&ev).unwrap();
             return Ok(());
         }
     }
@@ -80,26 +81,25 @@ pub async fn handle_stdin_ev(
                     match action {
                         RuntimeKeyAction::KeyAction(key_action) => {
                             let ev = key_action.to_input_ev();
-                            ev_writer_tx.send(ev).await.unwrap();
-                            ev_writer_tx.send(SYN_REPORT.clone()).await.unwrap();
+                            output_device.send(&ev).unwrap();
+                            output_device.send(&SYN_REPORT).unwrap();
                         }
                         RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
                             let actual_state = &state.modifiers;
 
                             // takes into account the actual state of a modifier and decides whether to release/restore it or not
-                            let release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
+                            let mut release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
                                 if *to_type == 1 { // restore mods if actual mod is still pressed
                                     if *is_actual_down {
-                                        // TODO await this once async closures are stable
-                                        futures::executor::block_on(ev_writer_tx.send(
-                                            KeyAction { key: *key, value: *to_type }.to_input_ev()
-                                        )).unwrap();
+                                        output_device.send(
+                                            &KeyAction { key: *key, value: *to_type }.to_input_ev()
+                                        ).unwrap();
                                     }
                                 } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
                                     if *is_actual_down {
-                                        futures::executor::block_on(ev_writer_tx.send(
-                                            KeyAction { key: *key, value: *to_type }.to_input_ev()
-                                        )).unwrap();
+                                        output_device.send(
+                                            &KeyAction { key: *key, value: *to_type }.to_input_ev()
+                                        ).unwrap();
                                     }
                                 }
                             };
@@ -143,13 +143,13 @@ pub async fn handle_stdin_ev(
 
     update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
 
-    ev_writer_tx.send(ev).await.unwrap();
+    output_device.send(&ev).unwrap();
 
     Ok(())
 }
 
 
-pub async fn handle_control_message(
+pub fn handle_control_message(
     // out: &mut impl Write,
     current_token: usize,
     msg: ControlMessage,

@@ -1,13 +1,16 @@
-use crate::*;
-use crate::python::*;
-use crate::parsing::python::*;
-use crate::parsing::key_action::*;
-use pyo3::prelude::*;
-use pyo3::exceptions::{PyValueError, PyTypeError};
 use std::array::IntoIter;
+use std::sync::mpsc::channel;
 use std::thread;
+use crate::device::virtual_output_device::init_virtual_output_device;
+use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::prelude::*;
 use pyo3::types::PyType;
+
+use crate::*;
 use crate::device::device_logging::print_event_debug;
+use crate::parsing::key_action::*;
+use crate::parsing::python::*;
+use crate::python::*;
 use crate::python_reader::EventReader;
 
 #[pyclass]
@@ -15,7 +18,7 @@ pub struct EventWriter {
     exit_tx: oneshot::Sender<()>,
     join_handle: std::thread::JoinHandle<Result<()>>,
     // ev_tx: mpsc::Sender<InputEvent>,
-    // message_tx: mpsc::UnboundedSender<ControlMessage>,
+    message_tx: std::sync::mpsc::Sender<ControlMessage>,
 }
 
 #[pymethods]
@@ -25,51 +28,38 @@ impl EventWriter {
         let ev_rx = input.route()
             .map_err(|err| PyTypeError::new_err(err.to_string()))?;
 
-        // let (mut control_tx, mut control_rx) = mpsc::unbounded_channel();
         let (exit_tx, mut exit_rx) = oneshot::channel();
+        let (message_tx, message_rx) = std::sync::mpsc::channel();
+        // let (out_ev_tx, mut out_ev_rx) = std::sync::mpsc::channel();
 
         let join_handle = thread::spawn(move || {
             let mut window_cycle_token: usize = 0;
             let mut state = State::new();
             let mut mappings = Mappings::new();
 
+            // make new dev
+            let mut output_device = init_virtual_output_device().unwrap();
+
             loop {
                 if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
 
                 if let Ok(ev) = ev_rx.try_recv() {
-                    print_event_debug(&ev);
+                    event_handlers::handle_stdin_ev(&mut state, ev, &mappings, &mut output_device).unwrap();
+                }
+
+                if let Ok(msg) = message_rx.try_recv() {
+                    event_handlers::handle_control_message(window_cycle_token, msg, &mut state, &mut mappings);
                 }
 
                 thread::sleep(time::Duration::from_millis(2));
                 thread::yield_now();
             }
-
-
-            // loop {
-            //     tokio::select! {
-            //         Some(ev) = ev_writer_rx.recv() => {
-            //             event_handlers::handle_stdin_ev(&mut state, ev, &mappings, &mut ev_reader_tx).await.unwrap();
-            //         }
-            //         Some(msg) = control_rx.recv() => {
-            //             // println!("{:?}", &msg);
-            //             event_handlers::handle_control_message(window_cycle_token, msg, &mut state, &mut mappings).await;
-            //         }
-            //     }
-            // }
-
-            // exit_rx.await?;
-            // #[allow(unreachable_code)]
-            //     Ok::<(), anyhow::Error>(())
         });
-
-
-        // let _ev_tx = _ev_tx_init_rx.unwrap();
 
         let handle = Self {
             exit_tx,
             join_handle,
-            // _ev_tx,
-            // control_tx,
+            message_tx,
         };
 
         Ok(handle)
