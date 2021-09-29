@@ -10,9 +10,6 @@ use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
 use walkdir::WalkDir;
 
-use super::*;
-use crate::device::device_logging::print_event_debug;
-
 fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     let mut list = vec![];
     for entry in WalkDir::new("/dev/input")
@@ -32,7 +29,7 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 pub fn read_from_device_input_fd_thread_handler(
     device: Device,
     mut handler: impl FnMut(InputEvent),
-    mut abort_rx: oneshot::Receiver<()>,
+    abort_rx: oneshot::Receiver<()>,
 ) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
     loop {
@@ -115,14 +112,6 @@ pub fn grab_udev_inputs
 
     // devices are monitored and hooked up when added/removed, so we need another thread
     let join_handle = thread::spawn(move || {
-        #[derive(Debug)]
-        enum FsWatchEvent {
-            ADD(PathBuf),
-            REMOVE(PathBuf),
-        }
-
-        let (fs_event_tx, mut fs_event_rx) = mpsc::channel();
-
         let (fs_ev_tx, fs_ev_rx) = mpsc::channel();
 
         let mut watcher: notify::RecommendedWatcher = notify::Watcher::new(fs_ev_tx, time::Duration::from_secs(2))?;
@@ -150,7 +139,6 @@ pub fn grab_udev_inputs
 
             match fs_ev_rx.try_recv() {
                 Ok(event) => {
-                    use FsWatchEvent::*;
                     let fs_event = match event {
                         DebouncedEvent::Create(path) => {
                             // if the device doesn't match any pattern, skip it
@@ -169,8 +157,6 @@ pub fn grab_udev_inputs
                         }
                         _ => { continue; }
                     };
-
-                    let _ = fs_event_tx.send(fs_event);
                 }
                 Err(e) => return Err(anyhow!("watch error: {:?}", e)),
             }

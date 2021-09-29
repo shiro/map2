@@ -2,11 +2,6 @@ use ignore_list::*;
 
 use crate::*;
 
-#[derive(Clone, Debug)]
-pub struct CompiledKeyMappings(pub HashMap<KeyActionWithMods, Arc<(Block, GuardedVarMap)>>);
-
-impl CompiledKeyMappings { pub fn new() -> Self { CompiledKeyMappings(Default::default()) } }
-
 pub struct State {
     pub modifiers: Arc<KeyModifierState>,
 

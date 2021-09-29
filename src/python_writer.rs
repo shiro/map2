@@ -1,10 +1,8 @@
 use std::array::IntoIter;
-use std::sync::mpsc::channel;
 use std::thread;
 use crate::device::virtual_output_device::init_virtual_output_device;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyType;
 use std::sync::mpsc;
 
 use crate::*;
@@ -31,10 +29,10 @@ impl EventWriter {
 
         let (exit_tx, mut exit_rx) = oneshot::channel();
         let (message_tx, message_rx) = std::sync::mpsc::channel();
-        let (out_ev_tx, mut out_ev_rx) = std::sync::mpsc::channel();
+        let (out_ev_tx, out_ev_rx) = std::sync::mpsc::channel();
 
         let join_handle = thread::spawn(move || {
-            let mut window_cycle_token: usize = 0;
+            let window_cycle_token: usize = 0;
             let mut state = State::new();
             let mut mappings = Mappings::new();
 
@@ -45,7 +43,7 @@ impl EventWriter {
                 if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
 
                 while let Ok(ev) = out_ev_rx.try_recv() {
-                    output_device.send(&ev);
+                    let _ = output_device.send(&ev);
                 }
 
                 while let Ok(ev) = ev_rx.try_recv() {
@@ -53,7 +51,7 @@ impl EventWriter {
                 }
 
                 while let Ok(msg) = message_rx.try_recv() {
-                    event_handlers::handle_control_message(window_cycle_token, msg, &mut state, &mut mappings);
+                    event_handlers::handle_control_message(msg, &mut state, &mut mappings);
                 }
 
                 thread::sleep(time::Duration::from_millis(2));
@@ -93,7 +91,7 @@ impl EventWriter {
 
         if [*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
             .contains(&action.key) {
-            self.message_tx.send(ControlMessage::UpdateModifiers(*action));
+            let _ = self.message_tx.send(ControlMessage::UpdateModifiers(*action));
         } else {
             return Err(PyValueError::new_err("key action needs to be a modifier event"));
         }
@@ -105,7 +103,7 @@ impl EventWriter {
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if let Ok(to) = to.extract::<String>(py) {
-            self._map_internal(from, to);
+            self._map_internal(from, to)?;
             return Ok(());
         }
 
@@ -113,7 +111,7 @@ impl EventWriter {
             .map_or(false, |obj| obj.is_callable());
 
         if is_callable {
-            self._map_callback(from, to);
+            self._map_callback(from, to)?;
             return Ok(());
         }
 
@@ -125,12 +123,12 @@ impl EventWriter {
 
         match from {
             ParsedKeyAction::KeyAction(from) => {
-                self.message_tx.send(ControlMessage::AddMapping(from, RuntimeAction::PythonCallback(to)));
+                let _ = self.message_tx.send(ControlMessage::AddMapping(from, RuntimeAction::PythonCallback(to)));
             }
             ParsedKeyAction::KeyClickAction(from) => {
-                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(1), RuntimeAction::PythonCallback(to)));
-                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(0), RuntimeAction::NOP));
-                self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(2), RuntimeAction::NOP));
+                let _ = self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(1), RuntimeAction::PythonCallback(to)));
+                let _ = self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(0), RuntimeAction::NOP));
+                let _ = self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(2), RuntimeAction::NOP));
             }
         }
 
@@ -148,20 +146,20 @@ impl EventWriter {
                     // action to click
                     if let ParsedKeyAction::KeyClickAction(to) = to {
                         let mapping = map_action_to_click(&from, &to);
-                        self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
+                        let _ = self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
                         return Ok(());
                     }
                     // action to action
                     if let ParsedKeyAction::KeyAction(to) = to {
                         let mapping = map_action_to_action(&from, &to);
-                        self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
+                        let _ = self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
                         return Ok(());
                     }
                 }
 
                 // action to seq
                 let mapping = map_action_to_seq(from, to);
-                self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
+                let _ = self.message_tx.send(ControlMessage::AddMapping(mapping.0, mapping.1));
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 if to.len() == 1 {
@@ -170,7 +168,7 @@ impl EventWriter {
                         ParsedKeyAction::KeyClickAction(to) => {
                             let mappings = map_click_to_click(&from, &to);
                             IntoIter::new(mappings).for_each(|(from, to)| {
-                                self.message_tx.send(ControlMessage::AddMapping(from, to));
+                                let _ = self.message_tx.send(ControlMessage::AddMapping(from, to));
                             });
                             return Ok(());
                         }
@@ -178,7 +176,7 @@ impl EventWriter {
                         ParsedKeyAction::KeyAction(to) => {
                             let mappings = map_click_to_action(&from, &to);
                             IntoIter::new(mappings).for_each(|(from, to)| {
-                                self.message_tx.send(ControlMessage::AddMapping(from, to));
+                                let _ = self.message_tx.send(ControlMessage::AddMapping(from, to));
                             });
                             return Ok(());
                         }
@@ -188,7 +186,7 @@ impl EventWriter {
                 // click to seq
                 let mappings = map_click_to_seq(from, to);
                 IntoIter::new(mappings).for_each(|(from, to)| {
-                    self.message_tx.send(ControlMessage::AddMapping(from, to));
+                    let _ = self.message_tx.send(ControlMessage::AddMapping(from, to));
                 });
             }
         }

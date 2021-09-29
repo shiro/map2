@@ -1,7 +1,5 @@
 use core::mem;
-use std::thread;
 use crate::*;
-use crate::python::*;
 use std::sync::mpsc;
 use ::oneshot;
 use pyo3::exceptions::PyTypeError;
@@ -20,8 +18,8 @@ impl EventReader {
     #[new]
     pub fn new() -> PyResult<Self> {
         let (exit_tx, exit_rx) = oneshot::channel();
-        let (ev_tx, mut ev_rx) = mpsc::channel();
-        let mut configuration = parse_cli().unwrap();
+        let (ev_tx, ev_rx) = mpsc::channel();
+        let configuration = parse_cli().unwrap();
 
         let join_handle = grab_udev_inputs(&configuration.devices, ev_tx, exit_rx)
             .map_err(|err| PyTypeError::new_err(err.to_string()))?;

@@ -1,7 +1,6 @@
 use evdev_rs::{UInputDevice, UninitDevice};
 use crate::*;
 use super::*;
-use std::sync::mpsc;
 
 pub struct VirtualOutputDevice {
     output_device: UInputDevice,

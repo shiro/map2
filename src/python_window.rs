@@ -1,5 +1,4 @@
 use crate::*;
-use python::*;
 use pyo3::*;
 use std::thread;
 use crate::time::Duration;
@@ -21,13 +20,13 @@ impl Window {
     }
 
     fn on_window_change(&mut self, callback: PyObject) -> WindowOnWindowChangeSubscription {
-        self.subscriptions_tx.send(X11ControlMessage::Subscribe(self.subscription_id_cnt, callback));
+        let _ = self.subscriptions_tx.send(X11ControlMessage::Subscribe(self.subscription_id_cnt, callback));
         let subscription = WindowOnWindowChangeSubscription { id: self.subscription_id_cnt };
         self.subscription_id_cnt += 1;
         subscription
     }
     fn remove_on_window_change(&self, subscription: &WindowOnWindowChangeSubscription) {
-        self.subscriptions_tx.send(X11ControlMessage::Unsubscribe(subscription.id));
+        let _ = self.subscriptions_tx.send(X11ControlMessage::Unsubscribe(subscription.id));
     }
 }
 
@@ -67,7 +66,7 @@ pub fn spawn_x11_thread() -> (mpsc::UnboundedSender<X11ControlMessage>, thread::
 
                     if !is_callable { continue; }
 
-                    callback.call(py, (val.class.clone(), ), None);
+                    let _ = callback.call(py, (val.class.clone(), ), None);
                 }
             }
 

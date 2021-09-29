@@ -1,10 +1,9 @@
-use std::os::unix::fs::FileTypeExt;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
-use clap::{App, Arg};
+use clap::{Arg};
 use xdg::BaseDirectories;
 
 pub struct Configuration {

@@ -125,12 +125,6 @@ impl KeyClickActionWithMods {
     pub fn to_key_action(self, value: i32) -> KeyActionWithMods { KeyActionWithMods::new(self.key, value, self.modifiers) }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct KeyMapping {
-    pub(crate) from: KeyActionWithMods,
-    pub(crate) to: Block,
-}
-
 pub static TYPE_UP: i32 = 0;
 pub static TYPE_DOWN: i32 = 1;
 pub static TYPE_REPEAT: i32 = 2;

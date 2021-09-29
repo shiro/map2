@@ -1,26 +1,15 @@
-use std::thread;
-use std::array::IntoIter;
+use std::time::Duration;
 
 use evdev_rs::enums::{EV_KEY, EventType};
-use evdev_rs::TimeVal;
+use pyo3::exceptions;
 use pyo3::prelude::*;
 
 use crate::{EventCode, INPUT_EV_DUMMY_TIME, InputEvent};
 use crate::*;
-use crate::task::JoinHandle;
-use anyhow::Error;
-use crate::device::device_logging::print_event_debug;
-use crate::parsing::python::{parse_key_action_with_mods_py, parse_key_sequence_py};
-use crate::parsing::parser::parse_key_sequence;
 use crate::parsing::key_action::*;
-use crate::ignore_list::IgnoreList;
-use pyo3::exceptions;
-use pyo3::exceptions::{PyTypeError, PyValueError};
-use std::collections::HashSet;
-use std::time::Duration;
+use crate::python_reader::*;
 use crate::python_window::Window;
 use crate::python_writer::*;
-use crate::python_reader::*;
 
 #[pyclass]
 struct PyKey {
@@ -31,30 +20,10 @@ struct PyKey {
 }
 
 
-#[pyclass]
-struct InstanceHandle {
-    exit_tx: oneshot::Sender<()>,
-    join_handle: std::thread::JoinHandle<()>,
-    ev_tx: mpsc::Sender<InputEvent>,
-    message_tx: mpsc::UnboundedSender<ControlMessage>,
-}
 
 pub type Mapping = (KeyActionWithMods, RuntimeAction);
 pub type Mappings = HashMap<KeyActionWithMods, RuntimeAction>;
 
-
-impl InstanceHandle {
-    pub fn new(exit_tx: oneshot::Sender<()>, join_handle: std::thread::JoinHandle<()>,
-               ev_tx: mpsc::Sender<InputEvent>,
-               message_tx: mpsc::UnboundedSender<ControlMessage>) -> Self {
-        InstanceHandle {
-            exit_tx,
-            join_handle,
-            ev_tx,
-            message_tx,
-        }
-    }
-}
 
 #[derive(Debug)]
 pub enum RuntimeKeyAction {
@@ -71,7 +40,7 @@ pub enum RuntimeAction {
 
 
 pub fn map_action_to_seq(from: KeyActionWithMods, to: Vec<ParsedKeyAction>) -> Mapping {
-    let mut seq = to.to_key_actions()
+    let seq = to.to_key_actions()
         .into_iter()
         .map(|action| RuntimeKeyAction::KeyAction(action))
         .collect();
@@ -125,7 +94,7 @@ pub fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) ->
 }
 
 pub fn map_click_to_seq(from: KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> [Mapping; 3] {
-    let mut seq = to.to_key_actions()
+    let seq = to.to_key_actions()
         .into_iter()
         .map(|action| RuntimeKeyAction::KeyAction(action))
         .collect();
@@ -138,7 +107,7 @@ pub fn map_click_to_seq(from: KeyClickActionWithMods, to: Vec<ParsedKeyAction>) 
 }
 
 pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWithMods) -> [Mapping; 3] {
-    let mut down_mapping;
+    let down_mapping;
     {
         let mut seq = vec![];
         seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
@@ -149,7 +118,7 @@ pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWith
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_DOWN }));
         down_mapping = (KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
     }
-    let mut up_mapping;
+    let up_mapping;
     {
         let mut seq = vec![];
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_UP }));
@@ -160,7 +129,7 @@ pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWith
         seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
         up_mapping = (KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
     }
-    let mut repeat_mapping;
+    let repeat_mapping;
     {
         let mut seq = vec![];
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_REPEAT }));
@@ -195,12 +164,6 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     let repeat_mapping = (KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
     [down_mapping, up_mapping, repeat_mapping]
 }
-
-// #[pyfunction]
-// fn setup(py: Python, callback: PyObject) -> PyResult<InstanceHandle> {
-//     let handle = _setup(callback).unwrap();
-//     Ok(handle)
-// }
 
 #[pymodule]
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {

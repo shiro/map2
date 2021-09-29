@@ -1,6 +1,4 @@
 use crate::*;
-use messaging::*;
-use crate::cli::Configuration;
 use crate::python::*;
 use pyo3::Python;
 use crate::device::virtual_output_device::VirtualOutputDevice;
@@ -150,61 +148,16 @@ pub fn handle_stdin_ev(
 
 
 pub fn handle_control_message(
-    // out: &mut impl Write,
-    current_token: usize,
     msg: ControlMessage,
     state: &mut State,
     mappings: &mut Mappings,
-    // window_change_handlers: &mut Vec<(Block, GuardedVarMap)>,
 ) {
     match msg {
-        // ExecutionMessage::EatEv(action) => {
-        //     state.ignore_list.ignore(&action);
-        // }
         ControlMessage::AddMapping(from, to) => {
-            // if token == current_token {
             mappings.insert(from, to);
-            // }
         }
-        // ExecutionMessage::GetFocusedWindowInfo(tx) => {
-        //     tx.send(state.active_window.clone()).await.unwrap();
-        // }
-        // ExecutionMessage::RegisterWindowChangeCallback(block, var_map) => {
-        //     window_change_handlers.push((block, var_map));
-        // }
-        // ExecutionMessage::Write(message) => {
-        //     out.write(message.as_ref()).unwrap();
-        // }
         ControlMessage::UpdateModifiers(action) => {
             event_handlers::update_modifiers(state, &action);
         }
-        // ExecutionMessage::Exit(exit_code) => { std::process::exit(exit_code) }
-        // ExecutionMessage::FatalError(err, exit_code) => {
-        //     eprintln!("error: {}", err);
-        //     std::process::exit(exit_code)
-        // }
-    }
-}
-
-
-pub fn handle_active_window_change(ev_writer_tx: &mut mpsc::Sender<InputEvent>, message_tx: &mut ExecutionMessageSender,
-                                   window_cycle_token: usize, window_change_handlers: &mut Vec<(Block, GuardedVarMap)>) {
-    for (handler, var_map) in window_change_handlers {
-        let mut message_tx = message_tx.clone();
-        let ev_writer_tx = ev_writer_tx.clone();
-        let handler = handler.clone();
-        let mut var_map = var_map.clone();
-
-        task::spawn(async move {
-            eval_block(&handler,
-                       &mut var_map,
-                       &mut Ambient {
-                           ev_writer_tx,
-                           message_tx: Some(&mut message_tx),
-                           window_cycle_token,
-                           modifier_state: &KeyModifierState::new(),
-                       },
-            ).await;
-        });
     }
 }
