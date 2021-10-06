@@ -1,9 +1,13 @@
 use core::mem;
-use crate::*;
+use std::hash::Hash;
 use std::sync::mpsc;
+
 use ::oneshot;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
+use pyo3::types::{PyDict, PyTuple};
+
+use crate::*;
 
 #[pyclass]
 pub struct EventReader {
@@ -16,12 +20,22 @@ pub struct EventReader {
 #[pymethods]
 impl EventReader {
     #[new]
-    pub fn new() -> PyResult<Self> {
+    #[args(kwargs = "**")]
+    pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
+        let options: HashMap<&str, &PyAny> = kwargs
+            .ok_or_else(|| PyTypeError::new_err("no options provided"))?
+            .extract()
+            .map_err(|_| PyTypeError::new_err("the options object must be a dict"))?;
+
+        let patterns: Vec<&str> = options.get("patterns")
+            .ok_or_else(|| PyTypeError::new_err("'patterns' is required but was not provided"))?
+            .extract()
+            .map_err(|_| PyTypeError::new_err("'patterns' must be a list"))?;
+
         let (exit_tx, exit_rx) = oneshot::channel();
         let (ev_tx, ev_rx) = mpsc::channel();
-        let configuration = parse_cli().unwrap();
 
-        let join_handle = grab_udev_inputs(&configuration.devices, ev_tx, exit_rx)
+        let join_handle = grab_udev_inputs(&patterns, ev_tx, exit_rx)
             .map_err(|err| PyTypeError::new_err(err.to_string()))?;
 
         let handle = Self {

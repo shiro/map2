@@ -6,7 +6,6 @@ use pyo3::prelude::*;
 use std::sync::mpsc;
 
 use crate::*;
-use crate::device::device_logging::print_event_debug;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
