@@ -47,8 +47,8 @@ fn set_bits(dev: &Device) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn init_virtual_device(dev: &Device) -> Result<()> {
-    dev.set_name("Virtual Device");
+pub(crate) fn init_virtual_device(dev: &Device, name: &str) -> Result<()> {
+    dev.set_name(name  );
     set_bits(dev)?;
 
     Ok(())

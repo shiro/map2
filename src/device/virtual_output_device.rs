@@ -13,12 +13,12 @@ impl VirtualOutputDevice {
     }
 }
 
-pub fn init_virtual_output_device() -> Result<VirtualOutputDevice> {
+pub fn init_virtual_output_device(device_name: &str) -> Result<VirtualOutputDevice> {
     let mut new_device = UninitDevice::new()
         .ok_or(anyhow!("failed to instantiate udev device: libevdev didn't return a device"))?
         .unstable_force_init();
 
-    virt_device::init_virtual_device(&mut new_device)
+    virt_device::init_virtual_device(&mut new_device, device_name)
         .map_err(|err| anyhow!("failed to instantiate udev device: {}", err))?;
 
     let input_device = UInputDevice::create_from_device(&new_device);
@@ -31,7 +31,7 @@ pub fn init_virtual_output_device() -> Result<VirtualOutputDevice> {
 
     let output_device = input_device.map_err(|err| anyhow!("failed to initialize uinput device: {}", err))?;
 
-    Ok(VirtualOutputDevice{
+    Ok(VirtualOutputDevice {
         output_device
     })
 }

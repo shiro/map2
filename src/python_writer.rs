@@ -1,9 +1,10 @@
 use std::array::IntoIter;
 use std::thread;
 use crate::device::virtual_output_device::init_virtual_output_device;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use std::sync::mpsc;
+use pyo3::types::PyDict;
 
 use crate::*;
 use crate::parsing::key_action::*;
@@ -22,7 +23,21 @@ pub struct EventWriter {
 #[pymethods]
 impl EventWriter {
     #[new]
-    pub fn new(input: &mut EventReader) -> PyResult<Self> {
+    #[args(kwargs = "**")]
+    pub fn new(input: &mut EventReader, kwargs: Option<&PyDict>) -> PyResult<Self> {
+        let options: HashMap<&str, &PyAny> = match kwargs {
+            Some(py_dict) => py_dict.extract()
+                .map_err(|_| PyTypeError::new_err("the options object must be a dict"))?,
+            None => HashMap::new()
+        };
+
+        let device_name = match options.get("name") {
+            Some(option) => option.extract::<String>()
+                .map_err(|_| PyTypeError::new_err("'name' must be a string"))?,
+            None => "Virtual map2 output".to_string()
+        };
+
+
         let ev_rx = input.route()
             .map_err(|err| PyTypeError::new_err(err.to_string()))?;
 
@@ -36,7 +51,8 @@ impl EventWriter {
             let mut mappings = Mappings::new();
 
             // make new dev
-            let mut output_device = init_virtual_output_device().unwrap();
+            let mut output_device = init_virtual_output_device(&device_name)
+                .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
             loop {
                 if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
