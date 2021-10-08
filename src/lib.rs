@@ -18,7 +18,6 @@ pub use tokio::prelude::*;
 pub use tokio::sync::{mpsc, oneshot};
 pub use tokio::task;
 
-pub use crate::cli::parse_cli;
 pub use crate::device::virtual_input_device::grab_udev_inputs;
 pub use crate::key_defs::*;
 pub use crate::key_primitives::*;
@@ -32,9 +31,6 @@ pub mod state;
 pub mod key_primitives;
 pub mod parsing;
 pub mod device;
-pub mod cli;
-pub mod ignore_list;
-pub mod messaging;
 pub mod event_handlers;
 pub mod logging;
 

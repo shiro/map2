@@ -46,7 +46,6 @@ impl EventWriter {
         let (out_ev_tx, out_ev_rx) = std::sync::mpsc::channel();
 
         let join_handle = thread::spawn(move || {
-            let window_cycle_token: usize = 0;
             let mut state = State::new();
             let mut mappings = Mappings::new();
 

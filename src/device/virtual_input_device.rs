@@ -139,7 +139,7 @@ pub fn grab_udev_inputs
 
             match fs_ev_rx.try_recv() {
                 Ok(event) => {
-                    let fs_event = match event {
+                    match event {
                         DebouncedEvent::Create(path) => {
                             // if the device doesn't match any pattern, skip it
                             if !device_fd_path_pattens.iter().any(|regex| regex.is_match(path.to_str().unwrap())) {

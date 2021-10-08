@@ -1,11 +1,10 @@
 use core::mem;
-use std::hash::Hash;
 use std::sync::mpsc;
 
 use ::oneshot;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyDict};
 
 use crate::*;
 

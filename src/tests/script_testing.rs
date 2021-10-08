@@ -2,6 +2,8 @@ use crate::*;
 use messaging::*;
 use crate::cli::Configuration;
 
+// TODO: none of this is relevant, reimplement testing python
+
 #[derive(Default)]
 pub struct ScriptTestingParameters<'a> {
     pub script_path: &'a str,

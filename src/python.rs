@@ -1,10 +1,5 @@
-use std::time::Duration;
-
-use evdev_rs::enums::{EV_KEY, EventType};
-use pyo3::exceptions;
 use pyo3::prelude::*;
 
-use crate::{EventCode, INPUT_EV_DUMMY_TIME, InputEvent};
 use crate::*;
 use crate::parsing::key_action::*;
 use crate::python_reader::*;
@@ -148,7 +143,7 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
     if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
 
-    seq.push(RuntimeKeyAction::KeyAction((KeyAction { key: to.key, value: to.value })));
+    seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: to.value }));
 
     // revert to original
     if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }

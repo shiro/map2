@@ -4,8 +4,6 @@ use pyo3::Python;
 use crate::device::virtual_output_device::VirtualOutputDevice;
 
 pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
-    // let ignore_list = &mut state.ignore_list;
-
     // TODO find a way to do this with a single accessor function
     let pairs: [(Key, fn(&KeyModifierState) -> bool, fn(&mut KeyModifierState) -> &mut bool); 8] = [
         (*KEY_LEFT_CTRL, |s| s.left_ctrl, |s: &mut KeyModifierState| &mut s.left_ctrl),
@@ -43,15 +41,7 @@ pub fn handle_stdin_ev(
     ev: InputEvent,
     mappings: &Mappings,
     output_device: &mut VirtualOutputDevice,
-    // modifier_state: &KeyModifierState,
-    // message_tx: &mut ExecutionMessageSender,
-    // window_cycle_token: &usize,
-    // configuration: &Configuration,
 ) -> Result<()> {
-    // if configuration.verbosity >= 3 {
-    //     logging::print_debug(format!("input event: {}", logging::print_input_event(&ev)));
-    // }
-
     match ev.event_code {
         EventCode::EV_KEY(_) => {}
         _ => {
