@@ -119,7 +119,7 @@ pub fn handle_stdin_ev(
                 // let now = Instant::now();
                 let gil = Python::acquire_gil();
                 let py = gil.python();
-                callback_object.call(py, (), None);
+                let _ = callback_object.call(py, (), None);
                 // let elapsed = now.elapsed();
                 // println!("Elapsed: {:.2?}", elapsed);
             }

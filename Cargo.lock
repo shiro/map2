@@ -583,6 +583,7 @@ dependencies = [
  "pyo3",
  "regex",
  "tap",
+ "thread_tryjoin",
  "tokio",
  "tokio-file-unix",
  "unicode-xid",
@@ -1114,6 +1115,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
  "unicode-width",
+]
+
+[[package]]
+name = "thread_tryjoin"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff22652fd908448726e796901aca371c4b2137a3633f33bf4ddf7c6e5333906a"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

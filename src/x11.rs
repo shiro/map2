@@ -41,7 +41,6 @@ pub fn get_window_info_x11<S: Connection + Send + Sync>(state: &X11State<S>) -> 
         if let PropertyNotify(ev) = event {
             if ev.atom == state.NET_ACTIVE_WINDOW {
                 let res = x11_get_active_window()?;
-                // println!("class: {}", res.class);
                 return Ok(Some(res));
             }
         }

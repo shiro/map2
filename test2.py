@@ -14,3 +14,4 @@ def hi():
 writer.map("a", "c")
 writer.map("s", hi)
 
+time.sleep(5)

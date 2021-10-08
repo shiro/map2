@@ -6,17 +6,18 @@ use pyo3::prelude::*;
 
 #[pyclass]
 pub struct Window {
-    x11_thread_handle: std::thread::JoinHandle<()>,
+    x11_thread_handle: thread::JoinHandle<()>,
+    x11_thread_exit_tx: Option<oneshot::Sender<()>>,
     subscription_id_cnt: u32,
-    subscriptions_tx: mpsc::UnboundedSender<X11ControlMessage>,
+    subscriptions_tx: mpsc::Sender<X11ControlMessage>,
 }
 
 #[pymethods]
 impl Window {
     #[new]
     pub fn new() -> Self {
-        let (subscriptions_tx, x11_thread_handle) = spawn_x11_thread();
-        Window { x11_thread_handle, subscription_id_cnt: 0, subscriptions_tx }
+        let (subscriptions_tx, x11_thread_handle, x11_thread_exit_tx) = spawn_x11_thread();
+        Window { x11_thread_handle, x11_thread_exit_tx: Some(x11_thread_exit_tx), subscription_id_cnt: 0, subscriptions_tx }
     }
 
     fn on_window_change(&mut self, callback: PyObject) -> WindowOnWindowChangeSubscription {
@@ -30,6 +31,15 @@ impl Window {
     }
 }
 
+impl Drop for Window {
+    fn drop(&mut self) {
+        let mut exit_tx = None;
+        std::mem::swap(&mut exit_tx, &mut self.x11_thread_exit_tx);
+        let _ = exit_tx.unwrap().send(());
+        let _ = self.x11_thread_handle.try_timed_join(Duration::from_millis(100));
+    }
+}
+
 #[pyclass]
 struct WindowOnWindowChangeSubscription {
     id: u32,
@@ -40,20 +50,21 @@ pub enum X11ControlMessage {
     Unsubscribe(u32),
 }
 
-pub fn spawn_x11_thread() -> (mpsc::UnboundedSender<X11ControlMessage>, thread::JoinHandle<()>) {
-    let (subscription_tx, mut subscription_rx) = mpsc::unbounded_channel();
+pub fn spawn_x11_thread() -> (mpsc::Sender<X11ControlMessage>, thread::JoinHandle<()>, oneshot::Sender<()>) {
+    let (subscription_tx, subscription_rx) = mpsc::channel();
+    let (exit_tx, exit_rx) = oneshot::channel();
     let handle = thread::spawn(move || {
         let x11_state = Arc::new(x11_initialize().unwrap());
         let mut subscriptions = HashMap::new();
 
         loop {
-            loop {
-                if let Ok(msg) = subscription_rx.try_recv() {
-                    match msg {
-                        X11ControlMessage::Subscribe(id, callback) => { subscriptions.insert(id, callback); }
-                        X11ControlMessage::Unsubscribe(id) => { subscriptions.remove(&id); }
-                    }
-                } else { break; }
+            if exit_rx.try_recv().is_ok() { break; }
+
+            while let Ok(msg) = subscription_rx.try_recv() {
+                match msg {
+                    X11ControlMessage::Subscribe(id, callback) => { subscriptions.insert(id, callback); }
+                    X11ControlMessage::Unsubscribe(id) => { subscriptions.remove(&id); }
+                }
             }
 
             let res = get_window_info_x11(&x11_state);
@@ -73,5 +84,5 @@ pub fn spawn_x11_thread() -> (mpsc::UnboundedSender<X11ControlMessage>, thread::
             thread::sleep(Duration::from_millis(100));
         }
     });
-    (subscription_tx, handle)
+    (subscription_tx, handle, exit_tx)
 }

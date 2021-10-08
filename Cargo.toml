@@ -35,6 +35,7 @@ futures-intrusive = "0.4.0"
 ncurses = "5.101.0"
 pyo3 = { version = "0.14.4", featuers = ["extension-module"] }
 oneshot = "0.1.2"
+thread_tryjoin = "0.2.1"
 
 [[bin]]
 name = "evlist"

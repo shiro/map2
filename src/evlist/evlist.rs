@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use evdev_rs::{Device, DeviceWrapper};
 use ncurses::*;
 use regex::RegexBuilder;
+use tokio::sync::mpsc;
 use walkdir::WalkDir;
 
 fn get_fd_list() -> Vec<PathBuf> {

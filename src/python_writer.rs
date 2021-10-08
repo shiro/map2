@@ -41,7 +41,7 @@ impl EventWriter {
         let ev_rx = input.route()
             .map_err(|err| PyTypeError::new_err(err.to_string()))?;
 
-        let (exit_tx, mut exit_rx) = oneshot::channel();
+        let (exit_tx, exit_rx) = oneshot::channel();
         let (message_tx, message_rx) = std::sync::mpsc::channel();
         let (out_ev_tx, out_ev_rx) = std::sync::mpsc::channel();
 
