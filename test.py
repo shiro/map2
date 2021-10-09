@@ -37,14 +37,27 @@ import time
 # handle.map("m", hello)
 
 
-def hi(cls):
-    print("window is: {}".format(cls))
+#def hi(cls):
+#    print("window is: {}".format(cls))
+#
+#window = map2.Window()
+#foo = window.on_window_change(hi)
+#window.remove_on_window_change(foo)
+#
+#foo = window.on_window_change(hi)
+#foo = window.on_window_change(hi)
 
-window = map2.Window()
-foo = window.on_window_change(hi)
-window.remove_on_window_change(foo)
+reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
+writer = map2.Writer(reader)
 
-foo = window.on_window_change(hi)
-foo = window.on_window_change(hi)
+lalt = False
+
+# def leftalt_down(): global lalt; lalt = True; writer.send_modifier("{leftalt down}"); #print("down")
+# writer.map("{leftalt down}", leftalt_down)
+# def leftalt_up(): global lalt; lalt = False; writer.send_modifier("{leftalt up}"); #print("up")
+# writer.map("{leftalt up}", leftalt_up)
+
+writer.map("!a", "hi")
+
 
 time.sleep(5)

@@ -71,8 +71,12 @@ writer.map("{capslock up}", capslock_up)
 
 
 lalt = False
+#globals().update(allowMoving=True)
 
-writer.map("{leftalt down}", lambda { global lalt; })
+f = lambda{ globals().update(lalt=not lalt); print(lalt) }
+
+writer.map("{leftalt down}", lambda{ globals().update(lalt=not lalt); print(lalt) })
+writer.map("{leftalt up}", lambda { print(lalt) })
 
 #{leftalt down}{lalt = true; send_modifier("{leftalt down}");};
 #!{leftalt up}{lalt = false; send_modifier("{leftalt up}");};
