@@ -37,10 +37,12 @@ pub enum RuntimeAction {
 
 
 pub fn map_action_to_seq(from: KeyActionWithMods, to: Vec<ParsedKeyAction>) -> Mapping {
-    let seq = to.to_key_actions()
+    let mut seq: Vec<RuntimeKeyAction> = to.to_key_actions()
         .into_iter()
         .map(|action| RuntimeKeyAction::KeyAction(action))
         .collect();
+
+    seq.insert(0, RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP));
 
     (from, RuntimeAction::ActionSequence(seq))
 }
@@ -91,10 +93,12 @@ pub fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) ->
 }
 
 pub fn map_click_to_seq(from: KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> [Mapping; 3] {
-    let seq = to.to_key_actions()
+    let mut seq: Vec<RuntimeKeyAction> = to.to_key_actions()
         .into_iter()
         .map(|action| RuntimeKeyAction::KeyAction(action))
         .collect();
+
+    seq.insert(0, RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP));
 
     let down_mapping = (KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() }, RuntimeAction::ActionSequence(seq));
     // stub up and repeat, click only triggers sequence on down press
