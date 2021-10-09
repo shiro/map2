@@ -137,10 +137,10 @@ impl Writer {
 
         match from {
             ParsedKeyAction::KeyAction(from) => {
-                let _ = self.message_tx.send(ControlMessage::AddMapping(from, RuntimeAction::PythonCallback(to)));
+                let _ = self.message_tx.send(ControlMessage::AddMapping(from, RuntimeAction::PythonCallback(from.modifiers, to)));
             }
             ParsedKeyAction::KeyClickAction(from) => {
-                let _ = self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(1), RuntimeAction::PythonCallback(to)));
+                let _ = self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(1), RuntimeAction::PythonCallback(from.modifiers, to)));
                 let _ = self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(0), RuntimeAction::NOP));
                 let _ = self.message_tx.send(ControlMessage::AddMapping(from.to_key_action(2), RuntimeAction::NOP));
             }

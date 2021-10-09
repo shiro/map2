@@ -31,7 +31,8 @@ pub enum RuntimeKeyAction {
 #[derive(Debug)]
 pub enum RuntimeAction {
     ActionSequence(Vec<RuntimeKeyAction>),
-    PythonCallback(PyObject),
+    // flags are used to release modifiers in the trigger
+    PythonCallback(KeyModifierFlags, PyObject),
     NOP,
 }
 
@@ -170,8 +171,7 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
 fn wait(py: Python) {
     py.allow_threads(|| {
         let mut signals = Signals::new(&[SIGINT]).unwrap();
-        for sig in signals.forever() {
-            println!("Received signal {:?}", sig);
+        for _ in signals.forever() {
             std::process::exit(0);
         }
     });

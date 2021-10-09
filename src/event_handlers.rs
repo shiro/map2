@@ -36,6 +36,47 @@ pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     };
 }
 
+fn release_resotre_modifiers(mut state: &mut State, output_device: &mut VirtualOutputDevice, from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags, to_type: &i32) {
+    let actual_state = &state.modifiers;
+
+    // takes into account the actual state of a modifier and decides whether to release/restore it or not
+    let mut release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
+        if *to_type == 1 { // restore mods if actual mod is still pressed
+            if *is_actual_down {
+                output_device.send(
+                    &KeyAction { key: *key, value: *to_type }.to_input_ev()
+                ).unwrap();
+            }
+        } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
+            if *is_actual_down {
+                output_device.send(
+                    &KeyAction { key: *key, value: *to_type }.to_input_ev()
+                ).unwrap();
+            }
+        }
+    };
+
+    if from_flags.ctrl && !to_flags.ctrl {
+        release_or_restore_modifier(&actual_state.left_ctrl, &*KEY_LEFT_CTRL);
+        release_or_restore_modifier(&actual_state.right_ctrl, &*KEY_RIGHT_CTRL);
+    }
+    if from_flags.shift && !to_flags.shift {
+        release_or_restore_modifier(&actual_state.left_shift, &*KEY_LEFT_SHIFT);
+        release_or_restore_modifier(&actual_state.right_shift, &*KEY_RIGHT_SHIFT);
+    }
+    if from_flags.alt && !to_flags.alt {
+        release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFT_ALT);
+        release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHT_ALT);
+    }
+    if from_flags.meta && !to_flags.meta {
+        release_or_restore_modifier(&actual_state.left_meta, &*KEY_LEFT_META);
+        release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHT_META);
+    }
+
+    // TODO eat keys we just released, un-eat keys we just restored
+}
+
+
 pub fn handle_stdin_ev(
     mut state: &mut State,
     ev: InputEvent,
@@ -73,48 +114,15 @@ pub fn handle_stdin_ev(
                             output_device.send(&SYN_REPORT).unwrap();
                         }
                         RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                            let actual_state = &state.modifiers;
-
-                            // takes into account the actual state of a modifier and decides whether to release/restore it or not
-                            let mut release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
-                                if *to_type == 1 { // restore mods if actual mod is still pressed
-                                    if *is_actual_down {
-                                        output_device.send(
-                                            &KeyAction { key: *key, value: *to_type }.to_input_ev()
-                                        ).unwrap();
-                                    }
-                                } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
-                                    if *is_actual_down {
-                                        output_device.send(
-                                            &KeyAction { key: *key, value: *to_type }.to_input_ev()
-                                        ).unwrap();
-                                    }
-                                }
-                            };
-
-                            if from_flags.ctrl && !to_flags.ctrl {
-                                release_or_restore_modifier(&actual_state.left_ctrl, &*KEY_LEFT_CTRL);
-                                release_or_restore_modifier(&actual_state.right_ctrl, &*KEY_RIGHT_CTRL);
-                            }
-                            if from_flags.shift && !to_flags.shift {
-                                release_or_restore_modifier(&actual_state.left_shift, &*KEY_LEFT_SHIFT);
-                                release_or_restore_modifier(&actual_state.right_shift, &*KEY_RIGHT_SHIFT);
-                            }
-                            if from_flags.alt && !to_flags.alt {
-                                release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFT_ALT);
-                                release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHT_ALT);
-                            }
-                            if from_flags.meta && !to_flags.meta {
-                                release_or_restore_modifier(&actual_state.left_meta, &*KEY_LEFT_META);
-                                release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHT_META);
-                            }
-
-                            // TODO eat keys we just released, un-eat keys we just restored
+                            release_resotre_modifiers(state, output_device, from_flags, to_flags, to_type);
                         }
                     }
                 }
             }
-            RuntimeAction::PythonCallback(callback_object) => {
+            RuntimeAction::PythonCallback(from_modifiers, callback_object) => {
+                // always release all trigger mods before running the callback
+                release_resotre_modifiers(state, output_device, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+
                 // use std::time::Instant;
                 // let now = Instant::now();
                 let gil = Python::acquire_gil();
