@@ -1,6 +1,11 @@
 import map2
+import time
 
-reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
+reader = map2.Reader(patterns=[
+    "/dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-.*",
+    "/dev/input/by-id/usb-Logitech_G700s_Rechargeable_Gaming_Mouse_017DF9570007-.*-event-.*",
+    "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd",
+])
 writer = map2.Writer(reader)
 
 print("start")
@@ -114,5 +119,55 @@ handle_key("/")
 handle_key(";")
 handle_key("]")
 handle_key("[")
+
+
+def setup_mouse():
+    writer.map("f13", "kp1")
+    writer.map("f14", "kp2")
+    writer.map("f15", "kp3")
+    writer.map("f16", "kp4")
+    writer.map("f17", "kp5")
+    writer.map("f18", "kp6")
+    writer.map("f19", "kp7")
+    writer.map("f20", "kp8")
+    writer.map("f21", "kp9")
+
+setup_mouse()
+
+
+def map_figma_shortcut(key, command):
+    def key_fn():
+        writer.send("{ctrl down}/{ctrl up}")
+        time.sleep(0.2)
+        writer.send(command + "{enter}")
+    writer.map(key, key_fn)
+
+# keypad
+writer.map("BTN_EAST", "^z")
+writer.map("BTN_SOUTH", "shift")
+writer.map("BTN_WEST", "p")
+writer.map("BTN_NORTH", "b")
+
+
+def on_window_change(active_window_class):
+    setup_mouse()
+
+    if active_window_class == "firefox":
+        writer.map("f13", "^tab")
+        # writer.map("+f13", "+^tab")
+        writer.map("f14", "^t")
+        writer.map("f16", "f5")
+        writer.map("f21", "^w")
+    elif active_window_class == "figma-linux":
+        map_figma_shortcut("f13", "palette-pick")
+        map_figma_shortcut("f14", "atom-sync")
+        map_figma_shortcut("f15", "batch styler")
+        map_figma_shortcut("f16", "chroma colors")
+        map_figma_shortcut("f17", "scripter")
+        map_figma_shortcut("f20", "theme-flip")
+
+
+window = map2.Window()
+foo = window.on_window_change(on_window_change)
 
 map2.wait()
