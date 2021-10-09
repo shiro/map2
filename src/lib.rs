@@ -39,6 +39,6 @@ pub mod tests;
 
 
 pub mod python;
-pub mod python_reader;
-pub mod python_writer;
+pub mod reader;
+pub mod writer;
 pub mod python_window;

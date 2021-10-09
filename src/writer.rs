@@ -10,7 +10,7 @@ use crate::*;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
-use crate::python_reader::Reader;
+use crate::reader::Reader;
 
 #[pyclass]
 pub struct Writer {

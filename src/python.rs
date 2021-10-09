@@ -5,9 +5,9 @@ use signal_hook::{consts::SIGINT, iterator::Signals};
 
 use crate::*;
 use crate::parsing::key_action::*;
-use crate::python_reader::*;
+use crate::reader::*;
 use crate::python_window::Window;
-use crate::python_writer::*;
+use crate::writer::*;
 
 #[pyclass]
 struct PyKey {
