@@ -1,10 +1,10 @@
 import map2
-import time
 
-reader = map2.EventReader(patterns=[
+reader = map2.Reader(patterns=[
     "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
 ])
-writer = map2.EventWriter(reader, name="foobar")
+
+writer = map2.Writer(reader)
 
 
 def hi():
@@ -14,4 +14,6 @@ def hi():
 writer.map("a", "c")
 writer.map("s", hi)
 
-time.sleep(5)
+writer.map("q", lambda: map2.exit())
+
+map2.wait()

@@ -6,7 +6,7 @@ use pyo3::prelude::*;
 
 #[pyclass]
 pub struct Window {
-    x11_thread_handle: thread::JoinHandle<()>,
+    x11_thread_handle: Option<thread::JoinHandle<()>>,
     x11_thread_exit_tx: Option<oneshot::Sender<()>>,
     subscription_id_cnt: u32,
     subscriptions_tx: mpsc::Sender<X11ControlMessage>,
@@ -17,7 +17,7 @@ impl Window {
     #[new]
     pub fn new() -> Self {
         let (subscriptions_tx, x11_thread_handle, x11_thread_exit_tx) = spawn_x11_thread();
-        Window { x11_thread_handle, x11_thread_exit_tx: Some(x11_thread_exit_tx), subscription_id_cnt: 0, subscriptions_tx }
+        Window { x11_thread_handle: Some(x11_thread_handle), x11_thread_exit_tx: Some(x11_thread_exit_tx), subscription_id_cnt: 0, subscriptions_tx }
     }
 
     fn on_window_change(&mut self, callback: PyObject) -> WindowOnWindowChangeSubscription {
@@ -33,10 +33,12 @@ impl Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
-        let mut exit_tx = None;
-        std::mem::swap(&mut exit_tx, &mut self.x11_thread_exit_tx);
-        let _ = exit_tx.unwrap().send(());
-        let _ = self.x11_thread_handle.try_timed_join(Duration::from_millis(100));
+        // let mut exit_tx = None;
+        // std::mem::swap(&mut exit_tx, &mut self.x11_thread_exit_tx);
+        // let _ = exit_tx.unwrap().send(());
+        // let _ = self.x11_thread_handle.try_timed_join(Duration::from_millis(100));
+        // let foo = drop(self.x11_thread_handle);
+        let _ = self.x11_thread_handle.take().unwrap().join();
     }
 }
 

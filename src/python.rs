@@ -1,4 +1,7 @@
+use std::{error::Error, thread, time::Duration};
+
 use pyo3::prelude::*;
+use signal_hook::{consts::SIGINT, iterator::Signals};
 
 use crate::*;
 use crate::parsing::key_action::*;
@@ -13,7 +16,6 @@ struct PyKey {
     #[pyo3(get, set)]
     value: i32,
 }
-
 
 
 pub type Mapping = (KeyActionWithMods, RuntimeAction);
@@ -160,11 +162,26 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     [down_mapping, up_mapping, repeat_mapping]
 }
 
+#[pyfunction]
+fn wait(py: Python) {
+    py.allow_threads(|| {
+        let mut signals = Signals::new(&[SIGINT]).unwrap();
+        for sig in signals.forever() {
+            println!("Received signal {:?}", sig);
+            std::process::exit(0);
+        }
+    });
+}
+
+#[pyfunction(exit_code = "0")]
+fn exit(exit_code: i32) { std::process::exit(exit_code); }
+
 #[pymodule]
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
-    // m.add_function(wrap_pyfunction!(setup, m)?)?;
-    m.add_class::<EventReader>()?;
-    m.add_class::<EventWriter>()?;
+    m.add_function(wrap_pyfunction!(wait, m)?)?;
+    m.add_function(wrap_pyfunction!(exit, m)?)?;
+    m.add_class::<Reader>()?;
+    m.add_class::<Writer>()?;
     m.add_class::<Window>()?;
 
     Ok(())

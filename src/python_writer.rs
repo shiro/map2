@@ -10,10 +10,10 @@ use crate::*;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
-use crate::python_reader::EventReader;
+use crate::python_reader::Reader;
 
 #[pyclass]
-pub struct EventWriter {
+pub struct Writer {
     exit_tx: oneshot::Sender<()>,
     join_handle: std::thread::JoinHandle<Result<()>>,
     message_tx: std::sync::mpsc::Sender<ControlMessage>,
@@ -21,10 +21,10 @@ pub struct EventWriter {
 }
 
 #[pymethods]
-impl EventWriter {
+impl Writer {
     #[new]
     #[args(kwargs = "**")]
-    pub fn new(input: &mut EventReader, kwargs: Option<&PyDict>) -> PyResult<Self> {
+    pub fn new(input: &mut Reader, kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract()
                 .map_err(|_| PyTypeError::new_err("the options object must be a dict"))?,

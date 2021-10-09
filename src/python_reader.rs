@@ -9,7 +9,7 @@ use pyo3::types::{PyDict};
 use crate::*;
 
 #[pyclass]
-pub struct EventReader {
+pub struct Reader {
     exit_tx: oneshot::Sender<()>,
     join_handle: std::thread::JoinHandle<Result<()>>,
     ev_rx: Option<mpsc::Receiver<InputEvent>>,
@@ -17,7 +17,7 @@ pub struct EventReader {
 
 
 #[pymethods]
-impl EventReader {
+impl Reader {
     #[new]
     #[args(kwargs = "**")]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
@@ -47,7 +47,7 @@ impl EventReader {
     }
 }
 
-impl EventReader {
+impl Reader {
     pub fn route(&mut self) -> Result<mpsc::Receiver<InputEvent>> {
         if self.ev_rx.is_none() {
             return Err(anyhow!("reader is already bound to an output, multiplexing is not allowed."));
