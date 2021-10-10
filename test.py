@@ -50,15 +50,7 @@ import time
 reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
 writer = map2.Writer(reader)
 
-lalt = False
-
-def leftalt_down(): global lalt; lalt = True; writer.send_modifier("{leftalt down}"); #print("down")
-writer.map("{leftalt down}", leftalt_down)
-def leftalt_up(): global lalt; lalt = False; writer.send_modifier("{leftalt up}"); #print("up")
-writer.map("{leftalt up}", leftalt_up)
-
-writer.map("!{a down}", "hi")
-writer.map("!{a up}", "bye")
+writer.map("a", "^{tab}")
 
 
 time.sleep(5)

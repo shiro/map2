@@ -153,9 +153,9 @@ def on_window_change(active_window_class):
     setup_mouse()
 
     if active_window_class == "firefox":
-        writer.map("f13", "^tab")
+        writer.map("f13", "^{tab}")
         # writer.map("+f13", "+^tab")
-        writer.map("f14", "^t")
+        writer.map("f14", "^{t}")
         writer.map("f16", "f5")
         writer.map("f21", "^w")
     elif active_window_class == "figma-linux":

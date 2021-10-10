@@ -181,6 +181,7 @@ impl Writer {
                         // click to click
                         ParsedKeyAction::KeyClickAction(to) => {
                             let mappings = map_click_to_click(&from, &to);
+
                             IntoIter::new(mappings).for_each(|(from, to)| {
                                 let _ = self.message_tx.send(ControlMessage::AddMapping(from, to));
                             });

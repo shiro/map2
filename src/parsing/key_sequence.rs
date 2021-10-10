@@ -9,6 +9,7 @@ pub(super) fn key_sequence(input: &str) -> ResNew<&str, Vec<ParsedKeyAction>> {
         alt((
             map_res(
                 recognize(tuple((
+                                    key_flags,
                                     tag_custom("{"),
                                     terminated(take_until("}"), tag_custom("}"))),
                 )),
