@@ -41,10 +41,10 @@ writer.map("{capslock down}", capslock_down)
 
 def capslock_up():
     global caps_down, key_pressed
-    caps_down = False
-    key_pressed = False
     writer.send("{ctrl up}")
     if not key_pressed: writer.send("{esc}")
+    key_pressed = False
+    caps_down = False
 writer.map("{capslock up}", capslock_up)
 
 lalt = False
@@ -112,13 +112,9 @@ def handle_key(key):
 
     writer.map(key_down, key_down_fn)
 
-for i in range(97, 97 + 26): handle_key(chr(i))
+for i in range(ord("a"), ord("z")): handle_key(chr(i))
 for i in range(ord("0"), ord("9")): handle_key(chr(i))
-handle_key("space")
-handle_key("/")
-handle_key(";")
-handle_key("]")
-handle_key("[")
+for char in ["space", "/", ":", ".", ",", ";", "[", "]"]: handle_key(char)
 
 
 def setup_mouse():
@@ -154,10 +150,10 @@ def on_window_change(active_window_class):
 
     if active_window_class == "firefox":
         writer.map("f13", "^{tab}")
-        # writer.map("+f13", "+^tab")
+        writer.map("+f13", "+^{tab}")
         writer.map("f14", "^{t}")
-        writer.map("f16", "f5")
-        writer.map("f21", "^w")
+        writer.map("f16", "{f5}")
+        writer.map("f21", "^{w}")
     elif active_window_class == "figma-linux":
         map_figma_shortcut("f13", "palette-pick")
         map_figma_shortcut("f14", "atom-sync")
