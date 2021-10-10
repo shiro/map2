@@ -3,6 +3,7 @@ extern crate lazy_static;
 extern crate regex;
 
 pub use std::{fs, io, time};
+pub use std::time::Duration;
 pub use std::borrow::BorrowMut;
 pub use std::io::Write;
 pub use std::ops::{Deref, DerefMut};
@@ -41,4 +42,4 @@ pub mod tests;
 pub mod python;
 pub mod reader;
 pub mod writer;
-pub mod python_window;
+pub mod window;

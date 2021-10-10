@@ -1,12 +1,10 @@
-use std::{error::Error, thread, time::Duration};
-
 use pyo3::prelude::*;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 
 use crate::*;
 use crate::parsing::key_action::*;
 use crate::reader::*;
-use crate::python_window::Window;
+use crate::window::Window;
 use crate::writer::*;
 
 #[pyclass]

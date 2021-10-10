@@ -14,8 +14,8 @@ use crate::reader::Reader;
 
 #[pyclass]
 pub struct Writer {
-    exit_tx: oneshot::Sender<()>,
-    join_handle: std::thread::JoinHandle<Result<()>>,
+    exit_tx: Option<oneshot::Sender<()>>,
+    thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
     message_tx: std::sync::mpsc::Sender<ControlMessage>,
     out_ev_tx: mpsc::Sender<InputEvent>,
 }
@@ -45,7 +45,7 @@ impl Writer {
         let (message_tx, message_rx) = std::sync::mpsc::channel();
         let (out_ev_tx, out_ev_rx) = std::sync::mpsc::channel();
 
-        let join_handle = thread::spawn(move || {
+        let thread_handle = thread::spawn(move || {
             let mut state = State::new();
             let mut mappings = Mappings::new();
 
@@ -74,8 +74,8 @@ impl Writer {
         });
 
         let handle = Self {
-            exit_tx,
-            join_handle,
+            exit_tx: Some(exit_tx),
+            thread_handle: Some(thread_handle),
             message_tx,
             out_ev_tx,
         };
@@ -207,5 +207,12 @@ impl Writer {
         }
 
         Ok(())
+    }
+}
+
+impl Drop for Writer {
+    fn drop(&mut self) {
+        let _ = self.exit_tx.take().unwrap().send(());
+        let _ = self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(100)).unwrap();
     }
 }

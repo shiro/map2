@@ -10,8 +10,8 @@ use crate::*;
 
 #[pyclass]
 pub struct Reader {
-    exit_tx: oneshot::Sender<()>,
-    join_handle: std::thread::JoinHandle<Result<()>>,
+    exit_tx: Option<oneshot::Sender<()>>,
+    thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
     ev_rx: Option<mpsc::Receiver<InputEvent>>,
 }
 
@@ -34,12 +34,12 @@ impl Reader {
         let (exit_tx, exit_rx) = oneshot::channel();
         let (ev_tx, ev_rx) = mpsc::channel();
 
-        let join_handle = grab_udev_inputs(&patterns, ev_tx, exit_rx)
+        let thread_handle = grab_udev_inputs(&patterns, ev_tx, exit_rx)
             .map_err(|err| PyTypeError::new_err(err.to_string()))?;
 
         let handle = Self {
-            exit_tx,
-            join_handle,
+            exit_tx : Some(exit_tx),
+            thread_handle: Some(thread_handle),
             ev_rx: Some(ev_rx),
         };
 
@@ -55,5 +55,12 @@ impl Reader {
         let mut reader = None;
         mem::swap(&mut reader, &mut self.ev_rx);
         Ok(reader.unwrap())
+    }
+}
+
+impl Drop for Reader {
+    fn drop(&mut self) {
+        let _ = self.exit_tx.take().unwrap().send(());
+        let _ = self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(100)).unwrap();
     }
 }

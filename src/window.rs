@@ -33,12 +33,8 @@ impl Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
-        // let mut exit_tx = None;
-        // std::mem::swap(&mut exit_tx, &mut self.x11_thread_exit_tx);
-        // let _ = exit_tx.unwrap().send(());
-        // let _ = self.x11_thread_handle.try_timed_join(Duration::from_millis(100));
-        // let foo = drop(self.x11_thread_handle);
-        let _ = self.x11_thread_handle.take().unwrap().join();
+        let _ = self.x11_thread_exit_tx.take().unwrap().send(());
+        let _ = self.x11_thread_handle.take().unwrap().try_timed_join(Duration::from_millis(100)).unwrap();
     }
 }
 

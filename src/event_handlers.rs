@@ -36,7 +36,7 @@ pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     };
 }
 
-fn release_resotre_modifiers(mut state: &mut State, output_device: &mut VirtualOutputDevice, from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags, to_type: &i32) {
+fn release_resotre_modifiers(state: &mut State, output_device: &mut VirtualOutputDevice, from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags, to_type: &i32) {
     let actual_state = &state.modifiers;
 
     // takes into account the actual state of a modifier and decides whether to release/restore it or not
