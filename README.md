@@ -421,10 +421,11 @@ print(/* this is an in-line comment */ "hello");
 
 # Feature roadmap
 
-- [ ] more built-ins
-- [ ] escaped characters in strings and key sequences
+- [ ] async callbacks
+- [ ] patterns file
 - [ ] update documentation and refactor code
-- [ ] better tests to avoid regressions
+- [ ] add tests
+- [ ] escaped characters in strings and key sequences
 - [ ] pre-packaged binaries for various distros
 - [ ] mouse events
 - [ ] Wayland support (someday)
