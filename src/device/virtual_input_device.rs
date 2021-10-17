@@ -137,28 +137,25 @@ pub fn grab_udev_inputs
         loop {
             if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
 
-            match fs_ev_rx.try_recv() {
-                Ok(event) => {
-                    match event {
-                        DebouncedEvent::Create(path) => {
-                            // if the device doesn't match any pattern, skip it
-                            if !device_fd_path_pattens.iter().any(|regex| regex.is_match(path.to_str().unwrap())) {
-                                continue;
-                            }
+            while let Ok(event) = fs_ev_rx.try_recv() {
+                match event {
+                    DebouncedEvent::Create(path) => {
+                        // if the device doesn't match any pattern, skip it
+                        if !device_fd_path_pattens.iter().any(|regex| regex.is_match(path.to_str().unwrap())) {
+                            continue;
+                        }
 
-                            let abort_tx = grab_device(&path, writer_tx.clone())?;
-                            device_map.insert(path, abort_tx);
+                        let abort_tx = grab_device(&path, writer_tx.clone())?;
+                        device_map.insert(path, abort_tx);
+                    }
+                    DebouncedEvent::Remove(path) => {
+                        if let Some(abort_tx) = device_map.remove(&path) {
+                            // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
+                            let _ = abort_tx.send(());
                         }
-                        DebouncedEvent::Remove(path) => {
-                            if let Some(abort_tx) = device_map.remove(&path) {
-                                // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
-                                let _ = abort_tx.send(());
-                            }
-                        }
-                        _ => { continue; }
-                    };
-                }
-                Err(e) => return Err(anyhow!("watch error: {:?}", e)),
+                    }
+                    _ => { continue; }
+                };
             }
 
             thread::sleep(time::Duration::from_millis(100));
