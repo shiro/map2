@@ -58,7 +58,18 @@ ralt = False
 
 def rightalt_down(): global ralt; ralt = True; writer.send_modifier("{rightalt down}")
 writer.map("{rightalt down}", rightalt_down)
-def rightalt_up(): global ralt; ralt = False; writer.send_modifier("{rightalt up}")
+def rightalt_up():
+    global ralt
+    global tab_pressed
+    global key_pressed
+    writer.send_modifier("{rightalt up}")
+    if ralt:
+        if tab_pressed:
+            key_pressed = True
+            writer.send("{shift down}/{shift up}")
+        else:
+            writer.send("/")
+    ralt = False
 writer.map("!{rightalt up}", rightalt_up)
 
 def directional_mod(key, direction):
