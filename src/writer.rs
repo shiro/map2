@@ -117,6 +117,9 @@ impl Writer {
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if let Ok(to) = to.extract::<String>(py) {
+            let from = parse_key_action_with_mods_py(&from).unwrap();
+            let mut to = parse_key_sequence_py(&to).unwrap();
+
             self._map_internal(from, to)?;
             return Ok(());
         }
@@ -129,9 +132,19 @@ impl Writer {
             return Ok(());
         }
 
-        return Err(PyTypeError::new_err("unknown type"));
+        Err(PyTypeError::new_err("unknown type"))
     }
 
+    pub fn map_key(&mut self, py: Python, from: String, to: String) -> PyResult<()> {
+        let from = parse_key_action_with_mods_py(&from).unwrap();
+        let mut to = parse_key_action_with_mods_py(&to).unwrap();
+        self._map_internal(from, vec![to])?;
+
+        Ok(())
+    }
+}
+
+impl Writer {
     fn _map_callback(&mut self, from: String, to: PyObject) -> PyResult<()> {
         let from = parse_key_action_with_mods_py(&from).unwrap();
 
@@ -149,10 +162,7 @@ impl Writer {
         Ok(())
     }
 
-    fn _map_internal(&mut self, from: String, to: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from).unwrap();
-        let mut to = parse_key_sequence_py(&to).unwrap();
-
+    fn _map_internal(&mut self, from: ParsedKeyAction, mut to: Vec<ParsedKeyAction>) -> PyResult<()> {
         match from {
             ParsedKeyAction::KeyAction(from) => {
                 if to.len() == 1 {

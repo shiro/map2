@@ -118,15 +118,15 @@ for char in ["space", "/", ":", ".", ",", ";", "[", "]"]: handle_key(char)
 
 
 def setup_mouse():
-    writer.map("f13", "{kp1}")
-    writer.map("f14", "{kp2}")
-    writer.map("f15", "{kp3}")
-    writer.map("f16", "{kp4}")
-    writer.map("f17", "{kp5}")
-    writer.map("f18", "{kp6}")
-    writer.map("f19", "{kp7}")
-    writer.map("f20", "{kp8}")
-    writer.map("f21", "{kp9}")
+    writer.map_key("f13", "kp1")
+    writer.map_key("f14", "kp2")
+    writer.map_key("f15", "kp3")
+    writer.map_key("f16", "kp4")
+    writer.map_key("f17", "kp5")
+    writer.map_key("f18", "kp6")
+    writer.map_key("f19", "kp7")
+    writer.map_key("f20", "kp8")
+    writer.map_key("f21", "kp9")
 
 setup_mouse()
 
@@ -138,22 +138,16 @@ def map_figma_shortcut(key, command):
         writer.send(command + "{enter}")
     writer.map(key, key_fn)
 
-# keypad
-writer.map("BTN_EAST", "^z")
-writer.map("BTN_SOUTH", "shift")
-writer.map("BTN_WEST", "p")
-writer.map("BTN_NORTH", "b")
-
 
 def on_window_change(active_window_class):
     setup_mouse()
 
     if active_window_class == "firefox":
-        writer.map("f13", "^{tab}")
-        writer.map("+f13", "+^{tab}")
-        writer.map("f14", "^{t}")
-        writer.map("f16", "{f5}")
-        writer.map("f21", "^{w}")
+        writer.map_key("f13", "^tab")
+        writer.map_key("+f13", "+^tab")
+        writer.map_key("f14", "^t")
+        writer.map_key("f16", "f5")
+        writer.map_key("f21", "^w")
     elif active_window_class == "figma-linux":
         map_figma_shortcut("f13", "palette-pick")
         map_figma_shortcut("f14", "atom-sync")
@@ -164,6 +158,6 @@ def on_window_change(active_window_class):
 
 
 window = map2.Window()
-foo = window.on_window_change(on_window_change)
+window.on_window_change(on_window_change)
 
 map2.wait()
