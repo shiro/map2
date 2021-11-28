@@ -33,6 +33,7 @@ pub mod parsing;
 pub mod device;
 pub mod event_handlers;
 pub mod logging;
+pub mod event_loop;
 
 #[cfg(test)]
 pub mod tests;

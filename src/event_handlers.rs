@@ -1,9 +1,11 @@
 use libc::printf;
-use crate::*;
-use crate::python::*;
-use pyo3::prelude::*;
 use pyo3::{PyNativeType, Python};
+use pyo3::prelude::*;
+
+use crate::*;
 use crate::device::virtual_output_device::VirtualOutputDevice;
+use crate::event_loop::EventLoop;
+use crate::python::*;
 
 pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     // TODO find a way to do this with a single accessor function
@@ -78,6 +80,9 @@ fn release_resotre_modifiers(state: &mut State, output_device: &mut VirtualOutpu
     // TODO eat keys we just released, un-eat keys we just restored
 }
 
+lazy_static! {
+    static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
+}
 
 pub fn handle_stdin_ev(
     mut state: &mut State,
@@ -125,43 +130,7 @@ pub fn handle_stdin_ev(
                 // always release all trigger mods before running the callback
                 release_resotre_modifiers(state, output_device, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
 
-                // pyo3::prepare_freethreaded_python();
-                // let rt = tokio::runtime::Runtime::new().unwrap();
-                // let mut builder = tokio::runtime::Builder::new_multi_thread();
-
-                let callback_object = callback_object.clone();
-                // let callback_object = callback_object.cast_as::<PyAny>(py).unwrap();
-                // rt.block_on(async move {
-                //
-                // let mut builder = tokio::runtime::Builder::new_current_thread();
-                // builder.enable_all();
-                // pyo3_asyncio::tokio::init(builder);
-
-                pyo3_asyncio::tokio::get_runtime().block_on(async move {
-                    let f = Python::with_gil(|py| {
-                        let event_loop = py.import("asyncio")
-                            .unwrap()
-                            .call_method0("new_event_loop")
-                            .unwrap();
-
-                        // use std::time::Instant;
-                        // let now = Instant::now();
-
-                        pyo3_asyncio::tokio::run_until_complete(event_loop, async move {
-                            let f = Python::with_gil(|py| {
-                                let callback_object = callback_object.cast_as::<PyAny>(py).unwrap();
-                                let coroutine = callback_object.call((), None).unwrap();
-                                let future = pyo3_asyncio::tokio::into_future(coroutine).unwrap();
-                                future
-                            });
-
-                            f.await.unwrap();
-                            Ok(())
-                        }).unwrap();
-
-                        // let elapsed = now.elapsed();
-                    });
-                });
+                EVENT_LOOP.lock().unwrap().execute(callback_object.clone());
             }
             RuntimeAction::NOP => {}
         }
