@@ -1,3 +1,5 @@
+import asyncio
+
 import map2
 import time
 
@@ -50,7 +52,15 @@ import time
 reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
 writer = map2.Writer(reader)
 
-writer.map("a", "^{tab}")
+# import asyncio
+# asyncio.new_event_loop()
+
+async def foo():
+    print("start")
+    await asyncio.sleep(1)
+    print("done")
+
+writer.map("a", foo)
 
 
-time.sleep(5)
+time.sleep(8)

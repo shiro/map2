@@ -94,9 +94,9 @@ dependencies = [
 
 [[package]]
 name = "bytes"
-version = "0.6.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0dcbc35f504eb6fc275a6d20e4ebcda18cf50d40ba6fabff8c711fa16cb3b16"
+checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 
 [[package]]
 name = "cc"
@@ -149,6 +149,16 @@ dependencies = [
  "autocfg",
  "cfg-if 0.1.10",
  "lazy_static",
+]
+
+[[package]]
+name = "ctor"
+version = "0.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccc0a48a9b826acdf4028595adc9db92caea352f7af011a3034acd172a52a0aa"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -374,6 +384,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ghost"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a5bcf1bbeab73aa4cf2fde60a846858dc036163c7c33bec309f8d17de785479"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -451,6 +472,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "inventory"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0eb5160c60ba1e809707918ee329adb99d222888155835c6feedba19f6c3fd4"
+dependencies = [
+ "ctor",
+ "ghost",
+ "inventory-impl",
+]
+
+[[package]]
+name = "inventory-impl"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e41b53715c6f0c4be49510bb82dee2c1e51c8586d885abe65396e82ed518548"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -581,6 +624,7 @@ dependencies = [
  "notify",
  "oneshot",
  "pyo3",
+ "pyo3-asyncio",
  "regex",
  "signal-hook",
  "tap",
@@ -909,6 +953,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "pyo3-asyncio"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4c1305dd07022dff29a85b0a9fcf414bee3139d35730acd4d0268b352c02e57"
+dependencies = [
+ "futures 0.3.14",
+ "inventory",
+ "once_cell",
+ "pin-project-lite",
+ "pyo3",
+ "pyo3-asyncio-macros",
+ "tokio",
+]
+
+[[package]]
+name = "pyo3-asyncio-macros"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a93d8c020d68356d2ecb36b3462529f38e7b87ca6c54d2a8cc5479fb731e699"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "pyo3-build-config"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1104,9 +1174,9 @@ checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
 name = "syn"
-version = "1.0.72"
+version = "1.0.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1e8cdbefb79a9a5a65e0db8b47b723ee907b7c7f8496c76a1770b5c310bab82"
+checksum = "d010a1623fbd906d51d650a9916aaefc05ffa0e4053ff7fe601167f3e715d194"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1139,13 +1209,12 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.3.7"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46409491c9375a693ce7032101970a54f8a2010efb77e13f70788f0d84489e39"
+checksum = "588b2d10a336da58d877567cd8fb8a14b463e2104910f8132cd054b4b96e29ee"
 dependencies = [
  "autocfg",
- "bytes 0.6.0",
- "futures-core",
+ "bytes 1.1.0",
  "libc",
  "memchr",
  "mio 0.7.11",
@@ -1154,7 +1223,6 @@ dependencies = [
  "parking_lot 0.11.1",
  "pin-project-lite",
  "signal-hook-registry",
- "slab",
  "tokio-macros",
  "winapi 0.3.9",
 ]
@@ -1195,9 +1263,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "0.3.2"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46dfffa59fc3c8aad216ed61bdc2c263d2b9d87a9c8ac9de0c11a813e51b6db7"
+checksum = "114383b041aa6212c579467afa0075fbbdd0718de036100bc0ba7961d8cb9095"
 dependencies = [
  "proc-macro2",
  "quote",

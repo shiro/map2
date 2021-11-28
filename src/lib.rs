@@ -17,7 +17,6 @@ pub use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent;
 pub use nom::lib::std::collections::HashMap;
 use thread_tryjoin::TryJoinHandle;
-pub use tokio::prelude::*;
 
 pub use crate::device::virtual_input_device::grab_udev_inputs;
 pub use crate::key_defs::*;

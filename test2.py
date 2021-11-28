@@ -118,15 +118,15 @@ for char in ["space", "/", ":", ".", ",", ";", "[", "]"]: handle_key(char)
 
 
 def setup_mouse():
-    writer.map("f13", "kp1")
-    writer.map("f14", "kp2")
-    writer.map("f15", "kp3")
-    writer.map("f16", "kp4")
-    writer.map("f17", "kp5")
-    writer.map("f18", "kp6")
-    writer.map("f19", "kp7")
-    writer.map("f20", "kp8")
-    writer.map("f21", "kp9")
+    writer.map("f13", "{kp1}")
+    writer.map("f14", "{kp2}")
+    writer.map("f15", "{kp3}")
+    writer.map("f16", "{kp4}")
+    writer.map("f17", "{kp5}")
+    writer.map("f18", "{kp6}")
+    writer.map("f19", "{kp7}")
+    writer.map("f20", "{kp8}")
+    writer.map("f21", "{kp9}")
 
 setup_mouse()
 

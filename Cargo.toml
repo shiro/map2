@@ -23,7 +23,7 @@ nom = "6.1.2"
 notify = "4.0.16"
 regex = "1.4.5"
 tap = "1.0.1"
-tokio = { version = "0.3.4", features = ["full"] }
+tokio = { version = "1.9", features = ["full"] }
 tokio-file-unix = "0.5.1"
 unicode-xid = "0.2.1"
 walkdir = "2.3.2"
@@ -34,6 +34,7 @@ indoc = "1.0"
 futures-intrusive = "0.4.0"
 ncurses = "5.101.0"
 pyo3 = { version = "0.14.4", features = ["extension-module"] }
+pyo3-asyncio = { version = "0.14.1", features = ["attributes", "tokio-runtime"] }
 oneshot = "0.1.2"
 thread_tryjoin = "0.2.1"
 signal-hook = "0.3.10"
