@@ -2,6 +2,7 @@ use std::thread;
 use std::thread::Thread;
 
 use pyo3::{Py, PyAny, PyObject, PyResult, Python};
+use pyo3::types::PyBool;
 
 use crate::*;
 
@@ -24,13 +25,25 @@ impl EventLoop {
                             let callback_object = callback_rx.recv().await.unwrap();
                             let f = Python::with_gil(|py| {
                                 let callback_object = callback_object.cast_as::<PyAny>(py).unwrap();
-                                let coroutine = callback_object.call((), None).unwrap();
 
-                                let event_loop = pyo3_asyncio::tokio::get_current_loop(py).unwrap();
-                                let coroutine = event_loop.call_method1("create_task", (coroutine, )).unwrap();
+                                let asyncio = py.import("asyncio").unwrap();
+                                let is_async_callback = asyncio
+                                    .call_method1("iscoroutinefunction", (callback_object, ))
+                                    .unwrap()
+                                    .cast_as::<PyBool>()
+                                    .unwrap();
 
-                                // tasks only actually get run if we convert the coroutine to a rust future, even though we don't use it...
-                                pyo3_asyncio::tokio::into_future(coroutine).unwrap();
+                                if is_async_callback.is_true() {
+                                    let coroutine = callback_object.call((), None).unwrap();
+
+                                    let event_loop = pyo3_asyncio::tokio::get_current_loop(py).unwrap();
+                                    let coroutine = event_loop.call_method1("create_task", (coroutine, )).unwrap();
+
+                                    // tasks only actually get run if we convert the coroutine to a rust future, even though we don't use it...
+                                    pyo3_asyncio::tokio::into_future(coroutine).unwrap();
+                                } else {
+                                    callback_object.call((), None).unwrap();
+                                }
                             });
                         }
                     });
