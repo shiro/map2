@@ -25,11 +25,11 @@ fn set_bits(dev: &Device) -> Result<()> {
                 &EventCode::EV_KEY(EV_KEY::KEY_RESERVED),
                 &EventCode::EV_KEY(EV_KEY::KEY_MAX),
             )?,
-            // EventType::EV_REL => set_code_bits(
-            //     dev,
-            //     &EventCode::EV_REL(EV_REL::REL_X),
-            //     &EventCode::EV_REL(EV_REL::REL_MAX),
-            // )?,
+            EventType::EV_REL => set_code_bits(
+                dev,
+                &EventCode::EV_REL(EV_REL::REL_X),
+                &EventCode::EV_REL(EV_REL::REL_MAX),
+            )?,
             // EventType::EV_ABS => clone_code_bits(
             //     dev,
             //     &EventCode::EV_ABS(EV_ABS::ABS_X),
