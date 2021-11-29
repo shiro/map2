@@ -33,7 +33,7 @@ def key_tab_mod(key):
 
 
 caps_down = False
-writer.map("^capslock", "capslock")
+writer.map_key("^capslock", "capslock")
 
 def capslock_down(): global caps_down, key_pressed; caps_down = True; key_pressed = False; writer.send("{ctrl down}")
 writer.map("{capslock down}", capslock_down)
