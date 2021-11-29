@@ -26,7 +26,7 @@ performance.
 Map2 supports use cases ranging all the way from simple key remappings to
 using complex callbacks and variables.
 
-```.python
+```.py
 import map2
 
 # a reader intercepts all input from device file descriptiors
@@ -114,11 +114,12 @@ Build local package from cloned source:
 
 # Feature roadmap
 
-- [ ] finalize python branch, release it
-- [ ] async callbacks
-- [ ] patterns file
-- [ ] update documentation and refactor code
+- [ ] finalize python branch
+- [ ] documentation (async callbacks, public API, etc.)
+- [ ] deploy python branch to package repos
+- [ ] fd patterns file
 - [ ] add tests
+- [ ] AHK-style hotstrings
 - [ ] escaped characters in strings and key sequences
 - [ ] pre-packaged binaries for various distros
 - [ ] mouse events
