@@ -51,10 +51,11 @@ pub(super) fn key(input: &str) -> ResNew<&str, (Key, KeyModifierFlags)> {
 
 fn key_state(input: &str) -> ResNew<&str, i32> {
     alt((
-        tag("down"), tag("up"),
+        tag("down"), tag("up"), tag("repeat"),
     ))(input).map(|(next, v)| (next, match v.to_uppercase().as_str() {
         "UP" => (0, None),
         "DOWN" => (1, None),
+        "REPEAT" => (2, None),
         _ => unreachable!()
     }))
 }
