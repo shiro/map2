@@ -18,7 +18,7 @@ Description=map2 script
 
 [Service]
 Type=exec
-ExecStart=map2 -d /path/to/device.list /path/to/script.m2
+ExecStart=python /path/to/script.py
 
 [Install]
 WantedBy=multi-user.target
