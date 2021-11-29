@@ -11,6 +11,14 @@ Wayland support is planned but probably won't be added for some time.
 
 For details check the [documentation](#documentation).
 
+<ins>**The next major release of map2 is currently in preview on the [python
+branch](https://github.com/shiro/map2/tree/python)**</ins>.  
+There's almost no documentation yet, the API will likely change and things
+might break, but if you want to test out the future release and provide
+feedback you can check it out. The current version of map2 will continue to
+exist [in another repo](https://github.com/shiro/map2-legacy) but won't receive
+any new features.
+
 # Examples
 
 Map2 is a very flexible scripting language that can utilize logic control
