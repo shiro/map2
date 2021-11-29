@@ -40,7 +40,7 @@ pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
     };
 }
 
-fn release_resotre_modifiers(state: &mut State, output_device: &mut VirtualOutputDevice, from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags, to_type: &i32) {
+fn release_restore_modifiers(state: &mut State, output_device: &mut VirtualOutputDevice, from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags, to_type: &i32) {
     let actual_state = &state.modifiers;
 
     // takes into account the actual state of a modifier and decides whether to release/restore it or not
@@ -121,14 +121,14 @@ pub fn handle_stdin_ev(
                             output_device.send(&SYN_REPORT).unwrap();
                         }
                         RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                            release_resotre_modifiers(state, output_device, from_flags, to_flags, to_type);
+                            release_restore_modifiers(state, output_device, from_flags, to_flags, to_type);
                         }
                     }
                 }
             }
             RuntimeAction::PythonCallback(from_modifiers, callback_object) => {
                 // always release all trigger mods before running the callback
-                release_resotre_modifiers(state, output_device, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                release_restore_modifiers(state, output_device, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
 
                 EVENT_LOOP.lock().unwrap().execute(callback_object.clone());
             }
