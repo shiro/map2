@@ -71,6 +71,9 @@ def on_window_change(active_window_class):
 
 # register the callback
 window.on_window_change(on_window_change)
+
+# keep running until terminated
+map2.wait()
 ```
 
 For more examples check the [examples directory](examples/README.md).
