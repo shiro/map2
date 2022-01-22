@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 
 use crate::*;
+use crate::mapper::Mapper;
 use crate::parsing::key_action::*;
 use crate::reader::*;
 use crate::window::Window;
@@ -20,13 +21,13 @@ pub type Mapping = (KeyActionWithMods, RuntimeAction);
 pub type Mappings = HashMap<KeyActionWithMods, RuntimeAction>;
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RuntimeKeyAction {
     KeyAction(KeyAction),
     ReleaseRestoreModifiers(KeyModifierFlags, KeyModifierFlags, i32),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RuntimeAction {
     ActionSequence(Vec<RuntimeKeyAction>),
     // flags are used to release modifiers in the trigger
@@ -183,7 +184,9 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(wait, m)?)?;
     m.add_function(wrap_pyfunction!(exit, m)?)?;
     m.add_class::<Reader>()?;
+    m.add_class::<Mapper>()?;
     m.add_class::<Writer>()?;
+    m.add_class::<EventRoute>()?;
     m.add_class::<Window>()?;
 
     Ok(())

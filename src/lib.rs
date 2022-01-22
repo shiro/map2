@@ -1,6 +1,9 @@
+#![feature(fn_traits)]
+
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
+extern crate core;
 
 pub use std::{fs, io, time};
 pub use std::time::Duration;
@@ -16,6 +19,8 @@ pub use async_recursion::async_recursion;
 pub use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent;
 pub use nom::lib::std::collections::HashMap;
+
+pub use uuid::Uuid;
 use thread_tryjoin::TryJoinHandle;
 
 pub use crate::device::virtual_input_device::grab_udev_inputs;
@@ -41,5 +46,6 @@ pub mod tests;
 
 pub mod python;
 pub mod reader;
+pub mod mapper;
 pub mod writer;
 pub mod window;

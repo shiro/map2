@@ -1,10 +1,7 @@
 use std::thread;
-use std::thread::Thread;
 
-use pyo3::{Py, PyAny, PyObject, PyResult, Python};
+use pyo3::{Py, PyAny, Python};
 use pyo3::types::PyBool;
-
-use crate::*;
 
 pub struct EventLoop {
     thread_handle: Option<std::thread::JoinHandle<()>>,
@@ -20,7 +17,7 @@ impl EventLoop {
                 // use std::time::Instant;
                 // let now = Instant::now();
                 Python::with_gil(|py| {
-                    pyo3_asyncio::tokio::run(py, async move {
+                    pyo3_asyncio::tokio::run::<_, ()>(py, async move {
                         loop {
                             let callback_object = callback_rx.recv().await.unwrap();
                             let f = Python::with_gil(|py| {
@@ -40,13 +37,13 @@ impl EventLoop {
                                     let coroutine = event_loop.call_method1("create_task", (coroutine, )).unwrap();
 
                                     // tasks only actually get run if we convert the coroutine to a rust future, even though we don't use it...
-                                    pyo3_asyncio::tokio::into_future(coroutine).unwrap();
+                                    let _ = pyo3_asyncio::tokio::into_future(coroutine);
                                 } else {
-                                    callback_object.call((), None).unwrap();
+                                    let _ = callback_object.call((), None);
                                 }
                             });
                         }
-                    });
+                    }).unwrap();
                 });
                 // let elapsed = now.elapsed();
             });

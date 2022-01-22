@@ -1,7 +1,3 @@
-use libc::printf;
-use pyo3::{PyNativeType, Python};
-use pyo3::prelude::*;
-
 use crate::*;
 use crate::device::virtual_output_device::VirtualOutputDevice;
 use crate::event_loop::EventLoop;

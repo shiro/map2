@@ -48,9 +48,24 @@ import time
 #
 #foo = window.on_window_change(hi)
 #foo = window.on_window_change(hi)
+def hi():
+    print("hi")
 
 reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
-writer = map2.Writer(reader)
+# writer = map2.Writer(reader)
+mapper = map2.Mapper(reader)
+mapper.map_key("a", "b")
+mapper.map_key("d", "i")
+mapper2 = map2.Mapper(mapper)
+mapper2.map_key("b", "c")
+mapper2.map_key("e", "f")
+
+
+mapper.map("j", hi)
+mapper2.map("k", hi)
+
+
+writer = map2.Writer(mapper2)
 
 # import asyncio
 # asyncio.new_event_loop()
@@ -60,7 +75,7 @@ async def foo():
     await asyncio.sleep(1)
     print("done")
 
-writer.map("a", foo)
+#writer.map("a", foo)
 
 
 time.sleep(8)

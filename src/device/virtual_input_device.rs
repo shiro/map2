@@ -7,6 +7,7 @@ use std::sync::mpsc;
 use anyhow::{anyhow, Result};
 use evdev_rs::*;
 use notify::{DebouncedEvent, Watcher};
+use regex::internal::Input;
 use regex::Regex;
 use walkdir::WalkDir;
 
@@ -70,10 +71,14 @@ pub fn read_from_device_input_fd_thread_handler(
     }
 }
 
+pub trait Sendable<T> {
+    fn send(&self, t: T);
+}
 
-fn grab_device(fd_path: &Path,
-               writer: mpsc::Sender<InputEvent>)
-               -> Result<oneshot::Sender<()>> {
+
+fn grab_device<Tx: 'static + Sendable<InputEvent> + Send>(fd_path: &Path,
+                                                          writer: Tx)
+                                                          -> Result<oneshot::Sender<()>> {
     let fd_file = fs::OpenOptions::new()
         .read(true)
         .open(&fd_path)
@@ -100,9 +105,9 @@ fn grab_device(fd_path: &Path,
 }
 
 
-pub fn grab_udev_inputs
+pub fn grab_udev_inputs< Tx: 'static + Sendable<InputEvent> + Send + Clone>
 (fd_patterns: &[impl AsRef<str>],
- writer_tx: mpsc::Sender<InputEvent>,
+ writer_tx: Tx,
  exit_rx: oneshot::Receiver<()>,
 ) -> Result<thread::JoinHandle<Result<()>>> {
     let device_fd_path_pattens = fd_patterns.into_iter()

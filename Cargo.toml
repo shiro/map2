@@ -33,11 +33,13 @@ atty = "0.2"
 indoc = "1.0"
 futures-intrusive = "0.4.0"
 ncurses = "5.101.0"
-pyo3 = { version = "0.14.4", features = ["extension-module"] }
-pyo3-asyncio = { version = "0.14.1", features = ["attributes", "tokio-runtime"] }
+pyo3 = { version = "0.16.5", features = ["extension-module"] }
+pyo3-asyncio = { version = "0.16.0", features = ["attributes", "tokio-runtime"] }
 oneshot = "0.1.2"
 thread_tryjoin = "0.2.1"
 signal-hook = "0.3.10"
+async-channel = "1.6.1"
+uuid = { version = "1.1.2", features = ["v4"] }
 
 [[bin]]
 name = "evlist"
