@@ -4,7 +4,7 @@ use std::sync::{mpsc, MutexGuard};
 use std::thread;
 
 use ::oneshot;
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::number::sub;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict};
@@ -28,6 +28,7 @@ pub enum ReaderMessage {
     AddSubscriber(Subscriber),
     AddTransformer(String, TransformerFn),
     SendEvent(InputEvent),
+    UpdateModifiers(KeyAction),
 }
 
 #[pyclass]
@@ -117,6 +118,9 @@ impl Reader {
                         ReaderMessage::SendEvent(ev) => {
                             process_event(ev, &mut state, &mut subscribers, &mut transformers);
                         }
+                        ReaderMessage::UpdateModifiers(action) => {
+                            event_handlers::update_modifiers(&mut state, &action);
+                        }
                     }
                 }
 
@@ -131,8 +135,6 @@ impl Reader {
             reader_thread_handle: Some(reader_thread_handle),
             mapper_exit_tx: Some(mapper_exit_tx),
             mapper_thread_handle: Some(mapper_thread_handle),
-            // ev_rx: Some(ev_rx),
-            // router: Rc::new(EvRouter { ev_rx: Some(ev_rx) }),
             msg_tx,
         };
 
@@ -140,9 +142,18 @@ impl Reader {
     }
 
     pub fn send(&mut self, val: String) {
-        let actions = parse_key_sequence_py(val.as_str()).unwrap();
+        let actions = parse_key_sequence_py(val.as_str()).unwrap().to_key_actions();
 
-        for action in actions.to_key_actions() {
+        if actions.len() == 1 {
+            let action = actions.get(0).unwrap();
+
+            if [*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
+                .contains(&action.key) {
+                self.msg_tx.send(ReaderMessage::UpdateModifiers(*action)).unwrap();
+            }
+        }
+
+        for action in actions {
             self.msg_tx.send(ReaderMessage::SendEvent(action.to_input_ev())).unwrap();
             self.msg_tx.send(ReaderMessage::SendEvent(SYN_REPORT.clone())).unwrap();
         }

@@ -134,29 +134,6 @@ impl Writer {
             self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
         }
     }
-
-    pub fn send_modifier(&mut self, val: String) -> PyResult<()> {
-        let actions = parse_key_sequence_py(val.as_str())
-            .unwrap()
-            .to_key_actions();
-
-        if actions.len() != 1 {
-            return Err(PyValueError::new_err(format!("expected a single key action, got {}", actions.len())));
-        }
-
-        let action = actions.get(0).unwrap();
-
-        if [*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
-            .contains(&action.key) {
-            // let _ = self.message_tx.send(ControlMessage::UpdateModifiers(*action));
-        } else {
-            return Err(PyValueError::new_err("key action needs to be a modifier event"));
-        }
-
-        self.out_ev_tx.send(action.to_input_ev()).unwrap();
-        self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
-        Ok(())
-    }
 }
 
 impl Drop for Writer {

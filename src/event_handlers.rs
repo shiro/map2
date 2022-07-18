@@ -152,7 +152,7 @@ pub fn handle_control_message(
             mappings.insert(from, to);
         }
         ControlMessage::UpdateModifiers(action) => {
-            event_handlers::update_modifiers(state, &action);
+            update_modifiers(state, &action);
         }
     }
 }
