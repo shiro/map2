@@ -16,13 +16,26 @@ impl VirtualOutputDevice {
     }
 }
 
-pub fn init_virtual_output_device(device_name: &str, capabilities: &DeviceCapabilities) -> Result<VirtualOutputDevice> {
+pub enum DeviceInitPolicy {
+    NewDevice(String, DeviceCapabilities),
+    CloneExistingDevice(String),
+}
+
+pub fn init_virtual_output_device(init_policy: &DeviceInitPolicy) -> Result<VirtualOutputDevice> {
     let mut new_device = UninitDevice::new()
         .ok_or(anyhow!("failed to instantiate udev device: libevdev didn't return a device"))?
         .unstable_force_init();
 
-    virt_device::init_virtual_device(&mut new_device, device_name, capabilities)
-        .map_err(|err| anyhow!("failed to instantiate udev device: {}", err))?;
+    match init_policy {
+        DeviceInitPolicy::NewDevice(name, capabilities) => {
+            virt_device::init_virtual_device(&mut new_device, name, capabilities)
+                .map_err(|err| anyhow!("failed to instantiate udev device: {}", err))?;
+        }
+        DeviceInitPolicy::CloneExistingDevice(existing_device_fd_path) => {
+            virt_device::clone_virtual_device(&mut new_device, existing_device_fd_path)
+                .map_err(|err| anyhow!("failed to clone existing udev device: {}", err))?;
+        }
+    }
 
     let input_device = UInputDevice::create_from_device(&new_device);
 

@@ -76,19 +76,19 @@ mapper2 = map2.Mapper(mapper)
 # mapper2.map("k", hi)
 
 
-
 writer = map2.Writer(mapper2, options={
-    "capabilities": {
-        "keyboard": True
-    }
+    # "capabilities": {
+    #     "keyboard": True
+    # }
+    "clone_from": "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
 })
 
-#writer2 = map2.Writer(mapper2, options={
+# writer2 = map2.Writer(mapper2, options={
 #    "capabilities": {
 #        "rel": True,
 #        "buttons": True,
 #    }
-#})
+# })
 
 # import asyncio
 # asyncio.new_event_loop()

@@ -131,11 +131,10 @@ pub(crate) fn init_virtual_device(mut dev: &mut Device, name: &str, capabilities
     Ok(())
 }
 
-pub(crate) fn clone_virtual_device(mut dev: &mut Device) -> Result<()> {
-    let fd_path = "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd";
+pub(crate) fn clone_virtual_device(mut dev: &mut Device, existing_device_fd_path: &str) -> Result<()> {
     let fd_file = fs::OpenOptions::new()
         .read(true)
-        .open(&fd_path)?;
+        .open(existing_device_fd_path)?;
     let mut device = Device::new_from_file(fd_file).unwrap();
 
     clone_device_props(&device, dev);

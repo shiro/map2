@@ -8,7 +8,7 @@ use pyo3::types::PyDict;
 
 use crate::device::virt_device::DeviceCapabilities;
 use crate::*;
-use crate::device::virtual_output_device::init_virtual_output_device;
+use crate::device::*;
 use crate::mapper::Mapper;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
@@ -73,6 +73,19 @@ impl Writer {
             capabilities.enable_rel();
         }
 
+        let device_init_policy = match options.get("clone_from") {
+            Some(_existing_dev_fd) => {
+                let existing_dev_fd = _existing_dev_fd.extract::<&str>()
+                    .map_err(|_| PyTypeError::new_err("the 'clone_from' option must be a string"))?
+                    .to_string();
+
+                virtual_output_device::DeviceInitPolicy::CloneExistingDevice(existing_dev_fd)
+            }
+            None => {
+                virtual_output_device::DeviceInitPolicy::NewDevice(device_name, capabilities)
+            }
+        };
+
         let (exit_tx, exit_rx) = oneshot::channel();
         let (out_ev_tx, out_ev_rx) = mpsc::channel();
 
@@ -87,8 +100,8 @@ impl Writer {
 
 
         let thread_handle = thread::spawn(move || {
-            // make new dev
-            let mut output_device = init_virtual_output_device(&device_name, &capabilities)
+            // grab udev device
+            let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
                 .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
             loop {
