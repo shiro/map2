@@ -1,17 +1,18 @@
 use std::array::IntoIter;
+use std::sync::mpsc;
 use std::thread;
-use crate::device::virtual_output_device::init_virtual_output_device;
+
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use std::sync::mpsc;
 use pyo3::types::PyDict;
 
 use crate::*;
+use crate::device::virtual_output_device::init_virtual_output_device;
 use crate::mapper::Mapper;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
-use crate::reader::{Reader};
+use crate::reader::Reader;
 
 pub trait EventRoutable {
     fn route(&mut self) -> Result<mpsc::Receiver<InputEvent>>;
@@ -33,14 +34,6 @@ pub struct Writer {
     out_ev_tx: mpsc::Sender<InputEvent>,
 }
 
-// #[derive(FromPyObject)]
-// enum Subscribable {
-//     #[pyo3(transparent)]
-//     Reader(Reader),
-//     #[pyo3(transparent)]
-//     Mapper(Mapper),
-// }
-
 #[pymethods]
 impl Writer {
     #[new]
@@ -59,27 +52,10 @@ impl Writer {
             None => "Virtual map2 output".to_string()
         };
 
-        // let r = input.call_method(py, "route", (), None)
-        //     .unwrap()
-        // .extract(py)
-        // .unwrap();
-        // .unwrap();
-        // let router = reader.route();
-        // router.ev_rx;
-
-        // let ev_rx = &input.call_method0("route")
-        //     .map_err(|err| PyTypeError::new_err(err.to_string()))?
-        //     .extract::<RoutableObj>().unwrap().inner.unwrap();
-
         let (exit_tx, exit_rx) = oneshot::channel();
-        // let (message_tx, message_rx) = mpsc::channel();
         let (out_ev_tx, out_ev_rx) = mpsc::channel();
 
 
-        // let reader = match subscribable {
-        //     Subscribable::Reader(reader) => reader
-        //     Subscribable::Mapper(_) => { unimplemented!() }
-        // }
         if let Ok(mut reader) = subscribable.extract::<PyRefMut<Reader>>() {
             reader.subscribe(out_ev_tx.clone());
         } else if let Ok(mut mapper) = subscribable.extract::<PyRefMut<Mapper>>() {
@@ -90,9 +66,6 @@ impl Writer {
 
 
         let thread_handle = thread::spawn(move || {
-            // let mut state = State::new();
-            // let mut mappings = Mappings::new();
-
             // make new dev
             let mut output_device = init_virtual_output_device(&device_name)
                 .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
@@ -103,14 +76,6 @@ impl Writer {
                 while let Ok(ev) = out_ev_rx.try_recv() {
                     let _ = output_device.send(&ev);
                 }
-
-                // while let Ok(ev) = ev_rx.try_recv() {
-                //     event_handlers::handle_stdin_ev(&mut state, ev, &mappings, &mut output_device).unwrap();
-                // }
-
-                // while let Ok(msg) = message_rx.try_recv() {
-                //     event_handlers::handle_control_message(msg, &mut state, &mut mappings);
-                // }
 
                 thread::sleep(time::Duration::from_millis(2));
                 thread::yield_now();
