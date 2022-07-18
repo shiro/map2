@@ -140,19 +140,3 @@ pub fn handle_stdin_ev(
 
     Ok(())
 }
-
-
-pub fn handle_control_message(
-    msg: ControlMessage,
-    state: &mut State,
-    mappings: &mut Mappings,
-) {
-    match msg {
-        ControlMessage::AddMapping(from, to) => {
-            mappings.insert(from, to);
-        }
-        ControlMessage::UpdateModifiers(action) => {
-            update_modifiers(state, &action);
-        }
-    }
-}

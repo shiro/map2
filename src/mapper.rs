@@ -14,7 +14,7 @@ use crate::event_loop::EventLoop;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
-use crate::reader::{Reader, ReaderMessage, Subscriber, TransformerFn};
+use crate::reader::{Reader, ReaderMessage, Subscriber, TransformerFlags, TransformerFn};
 
 lazy_static! {
     static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
@@ -101,6 +101,7 @@ impl Mapper {
 impl Mapper {
     fn init_callback(&mut self, control_rx: mpsc::Receiver<ControlMessage>) {
         let mut mappings = Mappings::new();
+        let mut state = State::new();
 
         fn release_restore_modifiers(state: &mut State, from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags, to_type: &i32) -> Vec<InputEvent> {
             let actual_state = &state.modifiers;
@@ -140,26 +141,22 @@ impl Mapper {
                 release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHT_META);
             }
 
+            if output_events.len() > 0 {
+                output_events.push(SYN_REPORT.clone());
+            }
+
             output_events
 
             // TODO eat keys we just released, un-eat keys we just restored
         }
 
-        self.reader_msg_tx.send(ReaderMessage::AddTransformer(self.id.clone(), Box::new(move |ev, mut state| {
+        self.reader_msg_tx.send(ReaderMessage::AddTransformer(self.id.clone(), Box::new(move |ev, flags| {
             while let Ok(msg) = control_rx.try_recv() {
                 match msg {
                     ControlMessage::AddMapping(from, to) => {
                         mappings.insert(from, to);
                     }
-                    ControlMessage::UpdateModifiers(action) => {
-                        event_handlers::update_modifiers(state, &action);
-                    }
                 }
-            }
-
-            match ev.event_code {
-                EventCode::EV_KEY(_) => {}
-                _ => { return vec![ev]; }
             }
 
             let mut from_modifiers = KeyModifierFlags::new();
@@ -174,36 +171,38 @@ impl Mapper {
                 modifiers: from_modifiers,
             };
 
-            if let Some(runtime_action) = mappings.get(&from_key_action) {
-                let mut events = vec![];
+            if !flags.contains(TransformerFlags::RAW_MODE) {
+                if let Some(runtime_action) = mappings.get(&from_key_action) {
+                    let mut events = vec![];
 
-                match runtime_action {
-                    RuntimeAction::ActionSequence(seq) => {
-                        for action in seq {
-                            match action {
-                                RuntimeKeyAction::KeyAction(key_action) => {
-                                    let ev = key_action.to_input_ev();
-                                    events.push(ev);
-                                    events.push(SYN_REPORT.clone());
-                                }
-                                RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                    let mut new_events = release_restore_modifiers(state, from_flags, to_flags, to_type);
-                                    events.append(&mut new_events);
+                    match runtime_action {
+                        RuntimeAction::ActionSequence(seq) => {
+                            for action in seq {
+                                match action {
+                                    RuntimeKeyAction::KeyAction(key_action) => {
+                                        let ev = key_action.to_input_ev();
+                                        events.push(ev);
+                                        events.push(SYN_REPORT.clone());
+                                    }
+                                    RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                                        let mut new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);
+                                        events.append(&mut new_events);
+                                    }
                                 }
                             }
                         }
-                    }
-                    RuntimeAction::PythonCallback(from_modifiers, callback_object) => {
-                        // always release all trigger mods before running the callback
-                        let mut new_events = release_restore_modifiers(state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
-                        events.append(&mut new_events);
+                        RuntimeAction::PythonCallback(from_modifiers, callback_object) => {
+                            // always release all trigger mods before running the callback
+                            let mut new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                            events.append(&mut new_events);
 
-                        EVENT_LOOP.lock().unwrap().execute(callback_object.clone());
+                            EVENT_LOOP.lock().unwrap().execute(callback_object.clone());
+                        }
+                        RuntimeAction::NOP => {}
                     }
-                    RuntimeAction::NOP => {}
+
+                    return events;
                 }
-
-                return events;
             }
 
             event_handlers::update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));

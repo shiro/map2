@@ -4,6 +4,7 @@ use std::sync::{mpsc, MutexGuard};
 use std::thread;
 
 use ::oneshot;
+use bitflags::bitflags;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::number::sub;
 use pyo3::prelude::*;
@@ -22,13 +23,19 @@ pub struct Subscriber {
     pub route: Vec<String>,
 }
 
-pub type TransformerFn = Box<dyn FnMut(InputEvent, &mut State) -> Vec<InputEvent> + Send>;
+bitflags! {
+    pub struct TransformerFlags: u8 {
+        // do not remap the event, pretend that mappings do not exist
+        const RAW_MODE = 0x01;
+    }
+}
+pub type TransformerFn = Box<dyn FnMut(InputEvent, &TransformerFlags) -> Vec<InputEvent> + Send>;
 
 pub enum ReaderMessage {
     AddSubscriber(Subscriber),
     AddTransformer(String, TransformerFn),
     SendEvent(InputEvent),
-    UpdateModifiers(KeyAction),
+    SendRawEvent(InputEvent),
 }
 
 #[pyclass]
@@ -83,8 +90,17 @@ impl Reader {
             let mut subscribers = vec![];
             let mut transformers = HashMap::new();
 
-            fn process_event(ev: InputEvent, mut state: &mut State, mut subscribers: &mut Vec<Subscriber>, transformers: &mut HashMap<String, TransformerFn>) {
+            fn process_event(ev: InputEvent, mut subscribers: &mut Vec<Subscriber>, transformers: &mut HashMap<String, TransformerFn>, flags: &TransformerFlags) {
                 for s in subscribers.iter_mut() {
+                    // non-key events are currently not supported
+                    match ev.event_code {
+                        EventCode::EV_KEY(_) => {}
+                        _ => {
+                            let _ = s.ev_tx.send(ev.clone());
+                            continue;
+                        }
+                    }
+
                     let mut events = vec![ev.clone()];
 
                     for id in s.route.iter() {
@@ -93,7 +109,7 @@ impl Reader {
                             Some(transformer) => {
                                 let mut next_events = vec![];
                                 for ev in events.into_iter() {
-                                    let mut new_events = transformer.deref_mut().call_mut((ev, &mut state));
+                                    let mut new_events = transformer.deref_mut().call_mut((ev, flags));
                                     next_events.append(&mut new_events);
                                 }
                                 events = next_events;
@@ -116,16 +132,16 @@ impl Reader {
                         ReaderMessage::AddSubscriber(subscriber) => { subscribers.push(subscriber); }
                         ReaderMessage::AddTransformer(id, transformer_fn) => { transformers.insert(id, transformer_fn); }
                         ReaderMessage::SendEvent(ev) => {
-                            process_event(ev, &mut state, &mut subscribers, &mut transformers);
+                            process_event(ev, &mut subscribers, &mut transformers, &TransformerFlags::empty());
                         }
-                        ReaderMessage::UpdateModifiers(action) => {
-                            event_handlers::update_modifiers(&mut state, &action);
+                        ReaderMessage::SendRawEvent(ev) => {
+                            process_event(ev, &mut subscribers, &mut transformers, &TransformerFlags::RAW_MODE);
                         }
                     }
                 }
 
                 while let Ok(ev) = ev_rx.try_recv() {
-                    process_event(ev, &mut state, &mut subscribers, &mut transformers);
+                    process_event(ev, &mut subscribers, &mut transformers, &TransformerFlags::empty());
                 }
             }
         });
@@ -144,21 +160,34 @@ impl Reader {
     pub fn send(&mut self, val: String) {
         let actions = parse_key_sequence_py(val.as_str()).unwrap().to_key_actions();
 
-        if actions.len() == 1 {
-            let action = actions.get(0).unwrap();
-
-            if [*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
-                .contains(&action.key) {
-                self.msg_tx.send(ReaderMessage::UpdateModifiers(*action)).unwrap();
-            }
-        }
-
         for action in actions {
             self.msg_tx.send(ReaderMessage::SendEvent(action.to_input_ev())).unwrap();
             self.msg_tx.send(ReaderMessage::SendEvent(SYN_REPORT.clone())).unwrap();
         }
     }
+
+    pub fn send_raw(&mut self, val: String) -> PyResult<()> {
+        let actions = parse_key_sequence_py(val.as_str())
+            .unwrap()
+            .to_key_actions();
+
+        if actions.len() != 1 {
+            return Err(PyValueError::new_err(format!("expected a single key action, got {}", actions.len())));
+        }
+
+        let action = actions.get(0).unwrap();
+
+        if ![*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
+            .contains(&action.key) {
+            return Err(PyValueError::new_err("key action needs to be a modifier event"));
+        }
+
+        self.msg_tx.send(ReaderMessage::SendRawEvent(action.to_input_ev())).unwrap();
+
+        Ok(())
+    }
 }
+
 
 impl Reader {
     pub fn subscribe(&mut self, ev_tx: mpsc::Sender<InputEvent>) {

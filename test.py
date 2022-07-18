@@ -51,19 +51,25 @@ import time
 reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
 # writer = map2.Writer(reader)
 mapper = map2.Mapper(reader)
-mapper.map_key("a", "b")
-mapper.map_key("d", "i")
+mapper.map_key("+a", "b")
+
+
+def l1(): print("shift down"); reader.send_raw("{shift down}")
+mapper.map("{shift down}", l1)
+def l2(): print("shift up"); reader.send_raw("{shift up}")
+mapper.map("+{shift up}", l2)
+
+
 mapper2 = map2.Mapper(mapper)
-mapper2.map_key("b", "c")
-mapper2.map_key("e", "f")
+# mapper2.map_key("b", "c")
 
 
-def hi():
-    # print("hi", 10 / 0)
-    reader.send("a")
-
-mapper.map("j", hi)
-mapper2.map("k", hi)
+# def hi():
+#     # print("hi", 10 / 0)
+#     reader.send("{shift down}")
+#
+# mapper.map("j", hi)
+# mapper2.map("k", hi)
 
 
 writer = map2.Writer(mapper2)
