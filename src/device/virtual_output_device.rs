@@ -1,6 +1,8 @@
-use evdev_rs::{UInputDevice, UninitDevice};
+use evdev_rs::{Device, UInputDevice, UninitDevice};
+
 use crate::*;
 use crate::device::virt_device::DeviceCapabilities;
+
 use super::*;
 
 pub struct VirtualOutputDevice {
@@ -33,6 +35,6 @@ pub fn init_virtual_output_device(device_name: &str, capabilities: &DeviceCapabi
     let output_device = input_device.map_err(|err| anyhow!("failed to initialize uinput device: {}", err))?;
 
     Ok(VirtualOutputDevice {
-        output_device
+        output_device,
     })
 }

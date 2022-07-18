@@ -77,7 +77,7 @@ pub trait Sendable<T> {
 
 
 fn grab_device<Tx: 'static + Sendable<InputEvent> + Send>(fd_path: &Path,
-                                                          writer: Tx)
+                                                          ev_tx: Tx)
                                                           -> Result<oneshot::Sender<()>> {
     let fd_file = fs::OpenOptions::new()
         .read(true)
@@ -94,9 +94,7 @@ fn grab_device<Tx: 'static + Sendable<InputEvent> + Send>(fd_path: &Path,
     thread::spawn(move || {
         read_from_device_input_fd_thread_handler(
             device,
-            |ev| {
-                let _ = writer.send(ev);
-            },
+            |ev| { let _ = ev_tx.send(ev); },
             abort_rx,
         );
     });
@@ -105,9 +103,9 @@ fn grab_device<Tx: 'static + Sendable<InputEvent> + Send>(fd_path: &Path,
 }
 
 
-pub fn grab_udev_inputs< Tx: 'static + Sendable<InputEvent> + Send + Clone>
+pub fn grab_udev_inputs<Tx: 'static + Sendable<InputEvent> + Send + Clone>
 (fd_patterns: &[impl AsRef<str>],
- writer_tx: Tx,
+ ev_tx: Tx,
  exit_rx: oneshot::Receiver<()>,
 ) -> Result<thread::JoinHandle<Result<()>>> {
     let device_fd_path_pattens = fd_patterns.into_iter()
@@ -126,7 +124,7 @@ pub fn grab_udev_inputs< Tx: 'static + Sendable<InputEvent> + Send + Clone>
 
         // grab all devices
         for device_fd_path in get_fd_list(&device_fd_path_pattens) {
-            let res = grab_device(&device_fd_path, writer_tx.clone());
+            let res = grab_device(&device_fd_path, ev_tx.clone());
             let abort_tx = match res {
                 Ok(v) => v,
                 Err(err) => {
@@ -150,7 +148,7 @@ pub fn grab_udev_inputs< Tx: 'static + Sendable<InputEvent> + Send + Clone>
                             continue;
                         }
 
-                        let abort_tx = grab_device(&path, writer_tx.clone())?;
+                        let abort_tx = grab_device(&path, ev_tx.clone())?;
                         device_map.insert(path, abort_tx);
                     }
                     DebouncedEvent::Remove(path) => {
