@@ -48,9 +48,6 @@ import time
 #
 #foo = window.on_window_change(hi)
 #foo = window.on_window_change(hi)
-def hi():
-    print("hi", 10 / 0)
-
 reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
 # writer = map2.Writer(reader)
 mapper = map2.Mapper(reader)
@@ -60,6 +57,10 @@ mapper2 = map2.Mapper(mapper)
 mapper2.map_key("b", "c")
 mapper2.map_key("e", "f")
 
+
+def hi():
+    # print("hi", 10 / 0)
+    reader.send("a")
 
 mapper.map("j", hi)
 mapper2.map("k", hi)

@@ -12,6 +12,8 @@ use writer::EventRoute;
 
 use crate::*;
 use crate::device::virtual_input_device::Sendable;
+use crate::parsing::key_action::ParsedKeyActionVecExt;
+use crate::parsing::python::parse_key_sequence_py;
 use crate::writer::EventRoutable;
 
 
@@ -25,6 +27,7 @@ pub type TransformerFn = Box<dyn FnMut(InputEvent, &mut State) -> Vec<InputEvent
 pub enum ReaderMessage {
     AddSubscriber(Subscriber),
     AddTransformer(String, TransformerFn),
+    SendEvent(InputEvent),
 }
 
 #[pyclass]
@@ -79,6 +82,31 @@ impl Reader {
             let mut subscribers = vec![];
             let mut transformers = HashMap::new();
 
+            fn process_event(ev: InputEvent, mut state: &mut State, mut subscribers: &mut Vec<Subscriber>, transformers: &mut HashMap<String, TransformerFn>) {
+                for s in subscribers.iter_mut() {
+                    let mut events = vec![ev.clone()];
+
+                    for id in s.route.iter() {
+                        let transformer: Option<&mut TransformerFn> = transformers.get_mut(id);
+                        match transformer {
+                            Some(transformer) => {
+                                let mut next_events = vec![];
+                                for ev in events.into_iter() {
+                                    let mut new_events = transformer.deref_mut().call_mut((ev, &mut state));
+                                    next_events.append(&mut new_events);
+                                }
+                                events = next_events;
+                            }
+                            None => { panic!("transformer not found") }
+                        }
+                    }
+
+                    for ev in events.into_iter() {
+                        let _ = s.ev_tx.send(ev);
+                    }
+                }
+            }
+
             loop {
                 if let Ok(()) = mapper_exit_rx.try_recv() { return Ok(()); }
 
@@ -86,33 +114,14 @@ impl Reader {
                     match msg {
                         ReaderMessage::AddSubscriber(subscriber) => { subscribers.push(subscriber); }
                         ReaderMessage::AddTransformer(id, transformer_fn) => { transformers.insert(id, transformer_fn); }
+                        ReaderMessage::SendEvent(ev) => {
+                            process_event(ev, &mut state, &mut subscribers, &mut transformers);
+                        }
                     }
                 }
 
                 while let Ok(ev) = ev_rx.try_recv() {
-                    for s in subscribers.iter_mut() {
-                        let mut events = vec![ev.clone()];
-
-                        for id in s.route.iter() {
-                            let transformer: Option<&mut TransformerFn> = transformers.get_mut(id);
-                            match transformer {
-                                Some(transformer) => {
-                                    let mut next_events = vec![];
-                                    for ev in events.into_iter() {
-                                        let mut new_events = transformer.deref_mut().call_mut((ev, &mut state));
-                                        next_events.append(&mut new_events);
-                                    }
-                                    events = next_events;
-                                }
-                                None => { panic!("transformer not found") }
-                            }
-                        }
-
-                        for ev in events.into_iter() {
-                            // println!("ev: {:?}", ev);
-                            let _ = s.ev_tx.send(ev);
-                        }
-                    }
+                    process_event(ev, &mut state, &mut subscribers, &mut transformers);
                 }
             }
         });
@@ -128,6 +137,15 @@ impl Reader {
         };
 
         Ok(handle)
+    }
+
+    pub fn send(&mut self, val: String) {
+        let actions = parse_key_sequence_py(val.as_str()).unwrap();
+
+        for action in actions.to_key_actions() {
+            self.msg_tx.send(ReaderMessage::SendEvent(action.to_input_ev())).unwrap();
+            self.msg_tx.send(ReaderMessage::SendEvent(SYN_REPORT.clone())).unwrap();
+        }
     }
 }
 
