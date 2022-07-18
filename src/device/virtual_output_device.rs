@@ -1,5 +1,6 @@
 use evdev_rs::{UInputDevice, UninitDevice};
 use crate::*;
+use crate::device::virt_device::DeviceCapabilities;
 use super::*;
 
 pub struct VirtualOutputDevice {
@@ -13,12 +14,12 @@ impl VirtualOutputDevice {
     }
 }
 
-pub fn init_virtual_output_device(device_name: &str) -> Result<VirtualOutputDevice> {
+pub fn init_virtual_output_device(device_name: &str, capabilities: &DeviceCapabilities) -> Result<VirtualOutputDevice> {
     let mut new_device = UninitDevice::new()
         .ok_or(anyhow!("failed to instantiate udev device: libevdev didn't return a device"))?
         .unstable_force_init();
 
-    virt_device::init_virtual_device(&mut new_device, device_name)
+    virt_device::init_virtual_device(&mut new_device, device_name, capabilities)
         .map_err(|err| anyhow!("failed to instantiate udev device: {}", err))?;
 
     let input_device = UInputDevice::create_from_device(&new_device);

@@ -39,15 +39,15 @@ import time
 # handle.map("m", hello)
 
 
-#def hi(cls):
+# def hi(cls):
 #    print("window is: {}".format(cls))
 #
-#window = map2.Window()
-#foo = window.on_window_change(hi)
-#window.remove_on_window_change(foo)
+# window = map2.Window()
+# foo = window.on_window_change(hi)
+# window.remove_on_window_change(foo)
 #
-#foo = window.on_window_change(hi)
-#foo = window.on_window_change(hi)
+# foo = window.on_window_change(hi)
+# foo = window.on_window_change(hi)
 reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
 # writer = map2.Writer(reader)
 mapper = map2.Mapper(reader)
@@ -58,7 +58,6 @@ def l1(): print("shift down"); reader.send_raw("{shift down}")
 mapper.map("{shift down}", l1)
 def l2(): print("shift up"); reader.send_raw("{shift up}")
 mapper.map("+{shift up}", l2)
-
 
 mapper2 = map2.Mapper(mapper)
 # mapper2.map_key("b", "c")
@@ -72,7 +71,11 @@ mapper2 = map2.Mapper(mapper)
 # mapper2.map("k", hi)
 
 
-writer = map2.Writer(mapper2)
+writer = map2.Writer(mapper2, options={
+    "capabilities": {
+        "rel": True
+    }
+})
 
 # import asyncio
 # asyncio.new_event_loop()
@@ -82,7 +85,7 @@ async def foo():
     await asyncio.sleep(1)
     print("done")
 
-#writer.map("a", foo)
+# writer.map("a", foo)
 
 
 time.sleep(8)

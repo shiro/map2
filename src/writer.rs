@@ -6,6 +6,7 @@ use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+use crate::device::virt_device::DeviceCapabilities;
 use crate::*;
 use crate::device::virtual_output_device::init_virtual_output_device;
 use crate::mapper::Mapper;
@@ -41,7 +42,12 @@ impl Writer {
     // pub fn new(reader: &mut Reader, kwargs: Option<&PyDict>) -> PyResult<Self> {
     pub fn new(subscribable: &PyAny, kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
-            Some(py_dict) => py_dict.extract()
+            Some(py_dict) => py_dict
+                .extract::<HashMap<&str, &PyAny>>()
+                .unwrap()
+                .remove("options")
+                .ok_or_else(|| PyTypeError::new_err("the options object must be a dict"))?
+                .extract()
                 .map_err(|_| PyTypeError::new_err("the options object must be a dict"))?,
             None => HashMap::new()
         };
@@ -51,6 +57,23 @@ impl Writer {
                 .map_err(|_| PyTypeError::new_err("'name' must be a string"))?,
             None => "Virtual map2 output".to_string()
         };
+
+        println!("{:?}", options.keys());
+
+        let mut capabilities = DeviceCapabilities::new();
+        if let Some(capabilities_input) = options.get("capabilities") {
+            let capabilities_options: HashMap<&str, &PyAny> = capabilities_input.extract()
+                .map_err(|_| PyTypeError::new_err("the 'capabilities' object must be a dict"))?;
+
+            println!("{:?}", capabilities_options);
+
+            if capabilities_options.contains_key("keyboard") { capabilities.enable_keyboard(); }
+            if capabilities_options.contains_key("rel") { capabilities.enable_rel(); }
+            if capabilities_options.contains_key("abs") { capabilities.enable_abs(); }
+        } else {
+            capabilities.enable_keyboard();
+            capabilities.enable_rel();
+        }
 
         let (exit_tx, exit_rx) = oneshot::channel();
         let (out_ev_tx, out_ev_rx) = mpsc::channel();
@@ -67,7 +90,7 @@ impl Writer {
 
         let thread_handle = thread::spawn(move || {
             // make new dev
-            let mut output_device = init_virtual_output_device(&device_name)
+            let mut output_device = init_virtual_output_device(&device_name, &capabilities)
                 .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
             loop {
