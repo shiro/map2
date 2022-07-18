@@ -91,6 +91,8 @@ impl Reader {
             let mut transformers = HashMap::new();
 
             fn process_event(ev: InputEvent, mut subscribers: &mut Vec<Subscriber>, transformers: &mut HashMap<String, TransformerFn>, flags: &TransformerFlags) {
+                let mut transformation_cache: HashMap<&String, Vec<InputEvent>> = HashMap::new();
+
                 for s in subscribers.iter_mut() {
                     // non-key events are currently not supported
                     match ev.event_code {
@@ -107,12 +109,19 @@ impl Reader {
                         let transformer: Option<&mut TransformerFn> = transformers.get_mut(id);
                         match transformer {
                             Some(transformer) => {
+                                // every transformer is run at most once, cached results are always used
+                                if let Some(cached_events) = transformation_cache.get(id) {
+                                    events = cached_events.clone();
+                                    continue;
+                                }
+
                                 let mut next_events = vec![];
                                 for ev in events.into_iter() {
                                     let mut new_events = transformer.deref_mut().call_mut((ev, flags));
                                     next_events.append(&mut new_events);
                                 }
                                 events = next_events;
+                                transformation_cache.insert(id, events.clone());
                             }
                             None => { panic!("transformer not found") }
                         }

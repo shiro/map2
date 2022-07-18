@@ -48,7 +48,12 @@ import time
 #
 # foo = window.on_window_change(hi)
 # foo = window.on_window_change(hi)
-reader = map2.Reader(patterns=["/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"])
+reader = map2.Reader(patterns=[
+    "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd",
+    "/dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-.*",
+    "/dev/input/by-id/usb-Logitech_USB_Receiver-if02-event-.*",
+    "/dev/input/by-id/usb-Logitech_G700s_Rechargeable_Gaming_Mouse_017DF9570007-.*-event-.*",
+])
 # writer = map2.Writer(reader)
 mapper = map2.Mapper(reader)
 mapper.map_key("+a", "b")
@@ -73,7 +78,14 @@ mapper2 = map2.Mapper(mapper)
 
 writer = map2.Writer(mapper2, options={
     "capabilities": {
-        "rel": True
+        "rel": True,
+        "buttons": True,
+    }
+})
+
+writer2 = map2.Writer(mapper2, options={
+    "capabilities": {
+        "keyboard": True
     }
 })
 
