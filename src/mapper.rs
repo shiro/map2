@@ -20,6 +20,13 @@ lazy_static! {
     static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
 }
 
+
+#[derive(Debug)]
+pub enum ControlMessage {
+    AddMapping(KeyActionWithMods, RuntimeAction),
+}
+
+
 #[pyclass]
 pub struct Mapper {
     id: String,
@@ -92,7 +99,6 @@ impl Mapper {
         let from = parse_key_action_with_mods_py(&from).unwrap();
         let mut to = parse_key_action_with_mods_py(&to).unwrap();
         self._map_internal(from, vec![to])?;
-        // println!("map: {:?}", self.mappings);
 
         Ok(())
     }

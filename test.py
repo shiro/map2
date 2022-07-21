@@ -68,6 +68,7 @@ mapper2 = map2.Mapper(mapper)
 # mapper2.map_key("b", "c")
 
 textMapper = map2.TextMapper(mapper2)
+textMapper.map("hello", "by{shift down}e{shift up}")
 
 
 # def hi():

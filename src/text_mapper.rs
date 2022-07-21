@@ -22,12 +22,12 @@ use crate::reader::{Reader, ReaderMessage, Subscriber};
 
 struct Node {
     children: Option<HashMap<String, Node>>,
-    seq: Option<String>,
+    seq: Option<Vec<KeyAction>>,
 }
 
 #[derive(Debug)]
 pub enum ControlMessage {
-    AddMapping(String, String),
+    AddMapping(String, Vec<KeyAction>),
 }
 
 #[pyclass]
@@ -79,10 +79,10 @@ impl TextMapper {
     }
 
     pub fn map(&mut self, py: Python, from: String, to: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from).unwrap();
-        let mut to = parse_key_action_with_mods_py(&to).unwrap();
-        // self._map_internal(from, vec![to])?;
+        // let from = parse_key_sequence_py(&from).unwrap();
+        let to = parse_key_sequence_py(&to).unwrap();
 
+        self._map_internal(from, to)?;
         Ok(())
     }
 }
@@ -100,22 +100,38 @@ impl TextMapper {
         let mut key_window = VecDeque::new();
 
         let mut lookup = HashMap::new();
-        lookup.insert("KEY_A".to_string(),
-                      Node {
-                          children: Some(HashMap::from([(
-                              "KEY_N".to_string(),
-                              Node {
-                                  children: None,
-                                  seq: Some("hello".to_string()),
-                              }
-                          )])),
-                          seq: None,
-                      });
 
         self.reader_msg_tx.send(ReaderMessage::AddTransformer(self.id.clone(), Box::new(move |ev, flags| {
             if ev.value != 1 {
                 return vec![ev];
             }
+
+            if let Ok(msg) = control_rx.try_recv() {
+                match msg {
+                    ControlMessage::AddMapping(from, to) => {
+                        let mut inner = Node {
+                            children: None,
+                            seq: Some(to),
+                        };
+
+                        for (i, char) in from.chars().enumerate() {
+                            // ignore last
+                            if i == from.len() - 1 {
+                                break;
+                            }
+
+                            inner = Node {
+                                children: Some(HashMap::from([(format!("KEY_{}", char.to_uppercase()).to_string(), inner)])),
+                                seq: None,
+                            };
+                        }
+
+                        let last_char = from.chars().nth(from.len() - 1).unwrap();
+                        lookup.insert(format!("KEY_{}", last_char.to_uppercase()).to_string(), inner);
+                    }
+                }
+            }
+
 
             if key_window.len() >= 20 {
                 key_window.pop_back();
@@ -146,11 +162,8 @@ impl TextMapper {
                                 out.push(SYN_REPORT.clone());
                             }
 
-                            for char in seq.chars() {
-                                let key_name = format!("KEY_{}", char.to_uppercase());
-                                out.push(KeyAction { key: Key::from_str(&EventType::EV_KEY, &key_name).unwrap(), value: TYPE_DOWN }.to_input_ev());
-                                out.push(SYN_REPORT.clone());
-                                out.push(KeyAction { key: Key::from_str(&EventType::EV_KEY, &key_name).unwrap(), value: TYPE_UP }.to_input_ev());
+                            for action in seq {
+                                out.push(action.to_input_ev());
                                 out.push(SYN_REPORT.clone());
                             }
 
@@ -164,6 +177,12 @@ impl TextMapper {
 
             vec![ev]
         }))).unwrap();
+    }
+
+    fn _map_internal(&mut self, from: String, mut to: Vec<ParsedKeyAction>) -> PyResult<()> {
+        self.msg_tx.send(ControlMessage::AddMapping(from, to.to_key_actions()))
+            .unwrap();
+        Ok(())
     }
 }
 

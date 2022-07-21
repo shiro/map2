@@ -193,9 +193,3 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
 
     Ok(())
 }
-
-#[derive(Debug)]
-pub enum ControlMessage {
-    AddMapping(KeyActionWithMods, RuntimeAction),
-}
-
