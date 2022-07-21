@@ -23,9 +23,9 @@ lazy_static! {
 #[pyclass]
 pub struct Mapper {
     id: String,
-    route: Vec<String>,
+    pub route: Vec<String>,
     msg_tx: mpsc::Sender<ControlMessage>,
-    reader_msg_tx: mpsc::Sender<ReaderMessage>,
+    pub reader_msg_tx: mpsc::Sender<ReaderMessage>,
 }
 
 #[pymethods]

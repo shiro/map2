@@ -48,4 +48,5 @@ pub mod python;
 pub mod reader;
 pub mod mapper;
 pub mod writer;
+pub mod text_mapper;
 pub mod window;

@@ -10,6 +10,7 @@ use crate::device::virt_device::DeviceCapabilities;
 use crate::*;
 use crate::device::*;
 use crate::mapper::Mapper;
+use crate::text_mapper::TextMapper;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
@@ -94,6 +95,8 @@ impl Writer {
             reader.subscribe(out_ev_tx.clone());
         } else if let Ok(mut mapper) = subscribable.extract::<PyRefMut<Mapper>>() {
             mapper.subscribe(out_ev_tx.clone());
+        } else if let Ok(mut text_mapper) = subscribable.extract::<PyRefMut<TextMapper>>() {
+            text_mapper.subscribe(out_ev_tx.clone());
         } else {
             return Err(PyTypeError::new_err("Invalid type for argument subscribable"));
         }

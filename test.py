@@ -67,6 +67,8 @@ mapper.map("+{shift up}", l2)
 mapper2 = map2.Mapper(mapper)
 # mapper2.map_key("b", "c")
 
+textMapper = map2.TextMapper(mapper2)
+
 
 # def hi():
 #     # print("hi", 10 / 0)
@@ -76,7 +78,7 @@ mapper2 = map2.Mapper(mapper)
 # mapper2.map("k", hi)
 
 
-writer = map2.Writer(mapper2, options={
+writer = map2.Writer(textMapper, options={
     # "capabilities": {
     #     "keyboard": True
     # }
