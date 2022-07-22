@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub fn parse_key_action_with_mods_py(raw: &str) -> Result<ParsedKeyAction> {
     let from = key_action_with_flags(raw).expect("failed to parse key");
     if !from.0.is_empty() { return Err(anyhow!("failed to parse key")); }

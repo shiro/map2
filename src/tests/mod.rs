@@ -1,6 +1,6 @@
-mod script_testing;
 use script_testing::*;
 
+mod script_testing;
 #[allow(unused)]
 #[path = "../event_handlers.rs"]
 mod event_handlers;

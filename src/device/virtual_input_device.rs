@@ -7,7 +7,6 @@ use std::sync::mpsc;
 use anyhow::{anyhow, Result};
 use evdev_rs::*;
 use notify::{DebouncedEvent, Watcher};
-use regex::internal::Input;
 use regex::Regex;
 use walkdir::WalkDir;
 

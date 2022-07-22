@@ -1,11 +1,10 @@
 use std::array::IntoIter;
 use std::borrow::Borrow;
 use std::collections::vec_deque::VecDeque;
-use std::fmt::{Debug, format};
+use std::fmt::Debug;
 use std::sync::mpsc;
-use std::thread;
-use evdev_rs::enums::EventType;
 
+use evdev_rs::enums::EventType;
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -18,7 +17,6 @@ use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
 use crate::reader::{Reader, ReaderMessage, Subscriber};
-
 
 struct Node {
     children: Option<HashMap<String, Node>>,
@@ -98,8 +96,8 @@ impl TextMapper {
 
     fn init_callback(&mut self, control_rx: mpsc::Receiver<ControlMessage>) {
         let mut key_window = VecDeque::new();
-
         let mut lookup = HashMap::new();
+        let mut key_window_len = 0;
 
         self.reader_msg_tx.send(ReaderMessage::AddTransformer(self.id.clone(), Box::new(move |ev, flags| {
             if ev.value != 1 {
@@ -109,6 +107,10 @@ impl TextMapper {
             if let Ok(msg) = control_rx.try_recv() {
                 match msg {
                     ControlMessage::AddMapping(from, to) => {
+                        if from.len() > key_window_len {
+                            key_window_len = from.len();
+                        }
+
                         let mut inner = Node {
                             children: None,
                             seq: Some(to),
@@ -132,14 +134,16 @@ impl TextMapper {
                 }
             }
 
+            if key_window_len == 0 {
+                return vec![ev];
+            }
 
-            if key_window.len() >= 20 {
+            if key_window.len() >= key_window_len {
                 key_window.pop_back();
             }
             key_window.push_front(ev.event_code.to_string());
 
             let mut i = 1;
-            // let node_ref;
 
             let foo = ev.event_code.to_string();
 
@@ -179,7 +183,7 @@ impl TextMapper {
         }))).unwrap();
     }
 
-    fn _map_internal(&mut self, from: String, mut to: Vec<ParsedKeyAction>) -> PyResult<()> {
+    fn _map_internal(&mut self, from: String, to: Vec<ParsedKeyAction>) -> PyResult<()> {
         self.msg_tx.send(ControlMessage::AddMapping(from, to.to_key_actions()))
             .unwrap();
         Ok(())

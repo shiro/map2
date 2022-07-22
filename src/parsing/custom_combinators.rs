@@ -5,7 +5,7 @@ use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until};
 use nom::character::complete::{multispace0, multispace1};
 use nom::combinator::value;
-use nom::error::{ ParseError};
+use nom::error::ParseError;
 use nom::IResult;
 use nom::multi::many0;
 use nom::sequence::tuple;

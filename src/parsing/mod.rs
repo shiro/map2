@@ -1,10 +1,10 @@
 use anyhow::*;
 use evdev_rs::enums::EventType;
-use nom::Err as NomErr;
 use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
-use nom::combinator::{map};
+use nom::combinator::map;
+use nom::Err as NomErr;
 use nom::IResult;
 use nom::multi::many0;
 use nom::sequence::*;

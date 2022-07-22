@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
-use nom::InputLength;
 use nom::error::{ErrorKind, FromExternalError, ParseError};
+use nom::InputLength;
 
 use super::*;
 

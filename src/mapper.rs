@@ -1,9 +1,6 @@
-use std::array::IntoIter;
 use std::sync::mpsc;
-use std::sync::mpsc::TryRecvError;
-use std::thread;
 
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -14,7 +11,7 @@ use crate::event_loop::EventLoop;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
-use crate::reader::{Reader, ReaderMessage, Subscriber, TransformerFlags, TransformerFn};
+use crate::reader::{Reader, ReaderMessage, Subscriber, TransformerFlags};
 
 lazy_static! {
     static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
@@ -78,7 +75,7 @@ impl Mapper {
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if let Ok(to) = to.extract::<String>(py) {
             let from = parse_key_action_with_mods_py(&from).unwrap();
-            let mut to = parse_key_sequence_py(&to).unwrap();
+            let to = parse_key_sequence_py(&to).unwrap();
 
             self._map_internal(from, to)?;
             return Ok(());
@@ -273,25 +270,24 @@ impl Mapper {
                         ParsedKeyAction::KeyClickAction(to) => {
                             let mappings = map_click_to_click(&from, &to);
 
-                            IntoIter::new(mappings).for_each(|(from, to)| {
+                            IntoIterator::into_iter(mappings).for_each(|(from, to)| {
                                 let _ = self.msg_tx.send(ControlMessage::AddMapping(from, to));
                             });
-                            return Ok(());
                         }
                         // click to action
                         ParsedKeyAction::KeyAction(to) => {
                             let mappings = map_click_to_action(&from, &to);
-                            IntoIter::new(mappings).for_each(|(from, to)| {
+                            IntoIterator::into_iter(mappings).for_each(|(from, to)| {
                                 let _ = self.msg_tx.send(ControlMessage::AddMapping(from, to));
                             });
-                            return Ok(());
                         }
                     };
+                    return Ok(());
                 }
 
                 // click to seq
                 let mappings = map_click_to_seq(from, to);
-                IntoIter::new(mappings).for_each(|(from, to)| {
+                IntoIterator::into_iter(mappings).for_each(|(from, to)| {
                     let _ = self.msg_tx.send(ControlMessage::AddMapping(from, to));
                 });
             }

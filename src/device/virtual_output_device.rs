@@ -1,4 +1,4 @@
-use evdev_rs::{Device, UInputDevice, UninitDevice};
+use evdev_rs::{UInputDevice, UninitDevice};
 
 use crate::*;
 use crate::device::virt_device::DeviceCapabilities;

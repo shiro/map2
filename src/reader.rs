@@ -1,22 +1,17 @@
-use core::mem;
-use std::rc::Rc;
-use std::sync::{mpsc, MutexGuard};
+use std::sync::mpsc;
 use std::thread;
 
 use ::oneshot;
 use bitflags::bitflags;
 use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::number::sub;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict};
-use writer::EventRoute;
+use pyo3::types::PyDict;
 
 use crate::*;
 use crate::device::virtual_input_device::Sendable;
 use crate::parsing::key_action::ParsedKeyActionVecExt;
 use crate::parsing::python::parse_key_sequence_py;
 use crate::writer::EventRoutable;
-
 
 pub struct Subscriber {
     pub ev_tx: mpsc::Sender<InputEvent>,

@@ -1,4 +1,4 @@
-use crate::{InputEvent, EventCode};
+use crate::{EventCode, InputEvent};
 
 pub fn print_debug(msg: impl AsRef<str>) {
     println!("[DEBUG] {}", msg.as_ref());

@@ -1,4 +1,3 @@
-use std::array::IntoIter;
 use std::sync::mpsc;
 use std::thread;
 
@@ -6,15 +5,14 @@ use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::device::virt_device::DeviceCapabilities;
 use crate::*;
 use crate::device::*;
+use crate::device::virt_device::DeviceCapabilities;
 use crate::mapper::Mapper;
-use crate::text_mapper::TextMapper;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
-use crate::python::*;
 use crate::reader::Reader;
+use crate::text_mapper::TextMapper;
 
 pub trait EventRoutable {
     fn route(&mut self) -> Result<mpsc::Receiver<InputEvent>>;
@@ -32,7 +30,6 @@ impl EventRoutable for EventRoute {
 pub struct Writer {
     exit_tx: Option<oneshot::Sender<()>>,
     thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
-    // message_tx: std::sync::mpsc::Sender<ControlMessage>,
     out_ev_tx: mpsc::Sender<InputEvent>,
 }
 

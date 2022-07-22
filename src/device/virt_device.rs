@@ -1,9 +1,9 @@
 use std::collections::HashSet;
+
 use anyhow::Result;
 use evdev_rs::*;
 use evdev_rs::Device;
 use evdev_rs::enums::*;
-use libc::clone;
 
 use crate::*;
 

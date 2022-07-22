@@ -1,8 +1,10 @@
-use crate::*;
-use pyo3::*;
 use std::thread;
-use crate::time::Duration;
+
+use pyo3::*;
 use pyo3::prelude::*;
+
+use crate::*;
+use crate::time::Duration;
 
 #[pyclass]
 pub struct Window {

@@ -1,5 +1,6 @@
-use crate::*;
 use messaging::*;
+
+use crate::*;
 use crate::cli::Configuration;
 
 // TODO: none of this is relevant, reimplement testing python

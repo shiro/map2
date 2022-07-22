@@ -1,14 +1,16 @@
-use map2::*;
-use map2::device::virtual_input_device::read_from_device_input_fd_thread_handler;
 use std::collections::hash_map::Entry;
 use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
+
 use evdev_rs::{Device, DeviceWrapper};
 use ncurses::*;
 use regex::RegexBuilder;
 use tokio::sync::mpsc;
 use walkdir::WalkDir;
+
+use map2::*;
+use map2::device::virtual_input_device::read_from_device_input_fd_thread_handler;
 
 fn get_fd_list() -> Vec<PathBuf> {
     let mut list = vec![];
