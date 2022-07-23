@@ -19,13 +19,13 @@ use crate::python::*;
 use crate::reader::{Reader, ReaderMessage, Subscriber};
 
 struct Node {
-    children: Option<HashMap<String, Node>>,
+    children: Option<HashMap<u8, Node>>,
     seq: Option<Vec<KeyAction>>,
 }
 
 #[derive(Debug)]
 pub enum ControlMessage {
-    AddMapping(String, Vec<KeyAction>),
+    AddMapping(Vec<u8>, Vec<KeyAction>),
 }
 
 #[pyclass]
@@ -76,9 +76,21 @@ impl TextMapper {
         Ok(handle)
     }
 
-    pub fn map(&mut self, py: Python, from: String, to: String) -> PyResult<()> {
-        // let from = parse_key_sequence_py(&from).unwrap();
+    pub fn map(&mut self, from: String, to: String) -> PyResult<()> {
+        let from = parse_key_sequence_py(&from).unwrap();
         let to = parse_key_sequence_py(&to).unwrap();
+
+        let from = from
+            .to_key_actions()
+            .into_iter()
+            .filter(|action| {
+                action.value == 0
+            })
+            .map(|action| match action.key.event_code {
+                EventCode::EV_KEY(key) => { key as u8 }
+                _ => panic!("only keys are supported")
+            })
+            .collect();
 
         self._map_internal(from, to)?;
         Ok(())
@@ -116,20 +128,19 @@ impl TextMapper {
                             seq: Some(to),
                         };
 
-                        for (i, char) in from.chars().enumerate() {
+                        let from_len = from.len();
+                        for (i, code) in from.into_iter().enumerate() {
                             // ignore last
-                            if i == from.len() - 1 {
+                            if i == from_len - 1 {
+                                lookup.insert(code, inner);
                                 break;
                             }
 
                             inner = Node {
-                                children: Some(HashMap::from([(format!("KEY_{}", char.to_uppercase()).to_string(), inner)])),
+                                children: Some(HashMap::from([(code, inner)])),
                                 seq: None,
                             };
                         }
-
-                        let last_char = from.chars().nth(from.len() - 1).unwrap();
-                        lookup.insert(format!("KEY_{}", last_char.to_uppercase()).to_string(), inner);
                     }
                 }
             }
@@ -141,16 +152,23 @@ impl TextMapper {
             if key_window.len() >= key_window_len {
                 key_window.pop_back();
             }
-            key_window.push_front(ev.event_code.to_string());
 
+            let code = match ev.event_code {
+                EventCode::EV_KEY(key) => { key as u8 }
+                _ => panic!("only keys are supported")
+            };
+
+            key_window.push_front(code);
             let mut i = 1;
 
-            let foo = ev.event_code.to_string();
-
-            if let Some(mut node_ref) = lookup.get(&foo) {
+            if let Some(mut node_ref) = lookup.get(&code) {
                 loop {
                     if let Some(children) = &node_ref.children {
-                        if let Some(n) = children.get(key_window.get(i).unwrap_or(&"_".to_string())) {
+                        let code = match key_window.get(i) {
+                            Some(code) => code,
+                            None => break
+                        };
+                        if let Some(n) = children.get(code) {
                             node_ref = n;
                             i = i + 1;
                         } else {
@@ -183,7 +201,7 @@ impl TextMapper {
         }))).unwrap();
     }
 
-    fn _map_internal(&mut self, from: String, to: Vec<ParsedKeyAction>) -> PyResult<()> {
+    fn _map_internal(&mut self, from: Vec<u8>, to: Vec<ParsedKeyAction>) -> PyResult<()> {
         self.msg_tx.send(ControlMessage::AddMapping(from, to.to_key_actions()))
             .unwrap();
         Ok(())
