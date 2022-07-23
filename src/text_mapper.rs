@@ -4,7 +4,7 @@ use std::collections::vec_deque::VecDeque;
 use std::fmt::Debug;
 use std::sync::mpsc;
 
-use evdev_rs::enums::EventType;
+use evdev_rs::enums::{EV_KEY, EventType};
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -110,9 +110,15 @@ impl TextMapper {
         let mut key_window = VecDeque::new();
         let mut lookup = HashMap::new();
         let mut key_window_len = 0;
+        let backspace = Key::from_str(&EventType::EV_KEY, "KEY_BACKSPACE").unwrap();
 
         self.reader_msg_tx.send(ReaderMessage::AddTransformer(self.id.clone(), Box::new(move |ev, flags| {
             if ev.value != 1 {
+                return vec![ev];
+            }
+
+            if ev.event_code == backspace.event_code {
+                key_window.pop_front();
                 return vec![ev];
             }
 
@@ -178,9 +184,9 @@ impl TextMapper {
                         if let Some(seq) = &node_ref.seq {
                             let mut out = vec![];
                             for _ in 0..i - 1 {
-                                out.push(KeyAction { key: Key::from_str(&EventType::EV_KEY, "KEY_BACKSPACE").unwrap(), value: TYPE_DOWN }.to_input_ev());
+                                out.push(KeyAction { key: backspace.clone(), value: TYPE_DOWN }.to_input_ev());
                                 out.push(SYN_REPORT.clone());
-                                out.push(KeyAction { key: Key::from_str(&EventType::EV_KEY, "KEY_BACKSPACE").unwrap(), value: TYPE_UP }.to_input_ev());
+                                out.push(KeyAction { key: backspace.clone(), value: TYPE_UP }.to_input_ev());
                                 out.push(SYN_REPORT.clone());
                             }
 
