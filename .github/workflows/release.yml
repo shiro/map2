@@ -1,0 +1,75 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: |
+          The version to build and upload to GH releases.
+          The release will be marked as a draft.
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+
+      - run: ldd --version # print glibc version
+
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: install dependencies
+        run: sudo apt-get install -y libevdev-dev
+
+      - name: Build
+        run: cargo build --release
+
+      - name: package
+        run: |
+          set -x
+          ls -la target/release
+          mkdir -p _package/usr/bin
+          mkdir -p _package/usr/share/man/man1
+          strip target/release/map2 -o _package/usr/bin/map2
+          target/release/man-gen | gzip -c > _package/usr/share/man/man1/map2.1.gz
+          tar -czvf "map2-$TAG-x86_64.tar.gz" -C _package .
+        env:
+          TAG: ${{ github.event.inputs.tag }}
+
+      - uses: actions/upload-artifact@v3
+        with:
+          path: map2-${{ github.event.inputs.tag }}-x86_64.tar.gz
+          name: map2-${{ github.event.inputs.tag }}-x86_64
+          if-no-files-found: error
+
+  publish:
+    runs-on: ubuntu-20.04
+
+    permissions: write-all
+
+    needs:
+      - build
+
+    steps:
+
+      # needed by `draft release` below
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: map2-${{ github.event.inputs.tag }}-x86_64
+
+      - name: draft release
+        run: |
+          gh release create "$TAG" --draft --title "$TAG" \
+            --target "$(git rev-parse --verify HEAD)" \
+            --generate-notes --verify-tag \
+            "map2-$TAG-x86_64.tar.gz"
+        env:
+          TAG: ${{ github.event.inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
