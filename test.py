@@ -41,6 +41,9 @@ import time
 
 # def hi(cls):
 #    print("window is: {}".format(cls))
+def hi():
+   print("hello")
+
 #
 # window = map2.Window()
 # foo = window.on_window_change(hi)
@@ -49,14 +52,15 @@ import time
 # foo = window.on_window_change(hi)
 # foo = window.on_window_change(hi)
 reader = map2.Reader(patterns=[
-    "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd",
-    # "/dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-.*",
-    # "/dev/input/by-id/usb-Logitech_USB_Receiver-if02-event-.*",
-    # "/dev/input/by-id/usb-Logitech_G700s_Rechargeable_Gaming_Mouse_017DF9570007-.*-event-.*",
+    "/dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-.*",
+    "/dev/input/by-id/usb-Logitech_USB_Receiver-if02-event-.*",
+    "/dev/input/by-id/usb-Logitech_G700s_Rechargeable_Gaming_Mouse_017DF9570007-.*-event-.*",
+    "/dev/input/by-id/usb-0416_Gaming_Keyboard-event-kbd",
 ])
 # writer = map2.Writer(reader)
 mapper = map2.Mapper(reader)
 mapper.map_key("+a", "b")
+mapper.map("u", hi)
 
 
 def l1(): print("shift down"); reader.send_raw("{shift down}")
@@ -83,7 +87,8 @@ writer = map2.Writer(textMapper, options={
     # "capabilities": {
     #     "keyboard": True
     # }
-    "clone_from": "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
+    # "clone_from": "/dev/input/by-path/pci-0000:03:00.0-usb-0:9:1.0-event-kbd"
+    "clone_from": "/dev/input/by-id/usb-0416_Gaming_Keyboard-event-kbd"
 })
 
 # writer2 = map2.Writer(mapper2, options={
