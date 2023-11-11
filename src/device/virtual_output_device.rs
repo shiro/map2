@@ -10,7 +10,7 @@ pub struct VirtualOutputDevice {
 }
 
 impl VirtualOutputDevice {
-    pub fn send(&mut self, ev: &InputEvent) -> Result<()> {
+    pub fn send(&mut self, ev: &EvdevInputEvent) -> Result<()> {
         self.output_device.write_event(&ev)
             .map_err(|err| anyhow!("failed to write event into uinput device: {}", err))
     }

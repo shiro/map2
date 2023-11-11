@@ -188,7 +188,7 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Mapper>()?;
     m.add_class::<TextMapper>()?;
     m.add_class::<Writer>()?;
-    m.add_class::<EventRoute>()?;
+    // m.add_class::<EventRoute>()?;
     m.add_class::<Window>()?;
 
     Ok(())

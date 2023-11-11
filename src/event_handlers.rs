@@ -82,7 +82,7 @@ lazy_static! {
 
 pub fn handle_stdin_ev(
     mut state: &mut State,
-    ev: InputEvent,
+    ev: EvdevInputEvent,
     mappings: &Mappings,
     output_device: &mut VirtualOutputDevice,
 ) -> Result<()> {

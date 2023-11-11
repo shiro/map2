@@ -96,9 +96,9 @@ pub struct KeyAction {
 
 impl KeyAction {
     pub fn new(key: Key, value: i32) -> Self { KeyAction { key, value } }
-    pub fn from_input_ev(ev: &InputEvent) -> Self { KeyAction { key: Key { event_code: ev.event_code }, value: ev.value } }
-    pub fn to_input_ev(&self) -> InputEvent {
-        InputEvent { event_code: self.key.event_code, value: self.value, time: INPUT_EV_DUMMY_TIME }
+    pub fn from_input_ev(ev: &EvdevInputEvent) -> Self { KeyAction { key: Key { event_code: ev.event_code }, value: ev.value } }
+    pub fn to_input_ev(&self) -> EvdevInputEvent {
+        EvdevInputEvent { event_code: self.key.event_code, value: self.value, time: INPUT_EV_DUMMY_TIME }
     }
 }
 

@@ -14,23 +14,23 @@ use crate::parsing::python::*;
 use crate::reader::Reader;
 use crate::text_mapper::TextMapper;
 
-pub trait EventRoutable {
-    fn route(&mut self) -> Result<mpsc::Receiver<InputEvent>>;
-}
+// pub trait EventRoutable {
+//     fn route(&mut self) -> Result<mpsc::Receiver<EvdevInputEvent>>;
+// }
 
-#[pyclass]
-#[derive(Clone)]
-pub struct EventRoute {}
-
-impl EventRoutable for EventRoute {
-    fn route(&mut self) -> Result<mpsc::Receiver<InputEvent>> { panic!("hey, listen") }
-}
+// #[pyclass]
+// #[derive(Clone)]
+// pub struct EventRoute {}
+//
+// impl EventRoutable for EventRoute {
+//     fn route(&mut self) -> Result<mpsc::Receiver<EvdevInputEvent>> { panic!("hey, listen") }
+// }
 
 #[pyclass]
 pub struct Writer {
-    exit_tx: Option<oneshot::Sender<()>>,
-    thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
-    out_ev_tx: mpsc::Sender<InputEvent>,
+    // exit_tx: Option<oneshot::Sender<()>>,
+    // thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
+    // out_ev_tx: mpsc::Sender<EvdevInputEvent>,
 }
 
 #[pymethods]
@@ -38,7 +38,7 @@ impl Writer {
     #[new]
     #[args(kwargs = "**")]
     // pub fn new(reader: &mut Reader, kwargs: Option<&PyDict>) -> PyResult<Self> {
-    pub fn new(subscribable: &PyAny, kwargs: Option<&PyDict>) -> PyResult<Self> {
+    pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict
                 .extract::<HashMap<&str, &PyAny>>()
@@ -84,42 +84,42 @@ impl Writer {
             }
         };
 
-        let (exit_tx, exit_rx) = oneshot::channel();
-        let (out_ev_tx, out_ev_rx) = mpsc::channel();
+        // let (exit_tx, exit_rx) = oneshot::channel();
+        // let (out_ev_tx, out_ev_rx) = mpsc::channel();
 
 
-        if let Ok(mut reader) = subscribable.extract::<PyRefMut<Reader>>() {
-            reader.subscribe(out_ev_tx.clone());
-        } else if let Ok(mut mapper) = subscribable.extract::<PyRefMut<Mapper>>() {
-            mapper.subscribe(out_ev_tx.clone());
-        } else if let Ok(mut text_mapper) = subscribable.extract::<PyRefMut<TextMapper>>() {
-            text_mapper.subscribe(out_ev_tx.clone());
-        } else {
-            return Err(PyTypeError::new_err("Invalid type for argument subscribable"));
-        }
+        // if let Ok(mut reader) = subscribable.extract::<PyRefMut<Reader>>() {
+        //     reader.subscribe(out_ev_tx.clone());
+        // } else if let Ok(mut mapper) = subscribable.extract::<PyRefMut<Mapper>>() {
+        //     mapper.subscribe(out_ev_tx.clone());
+        // } else if let Ok(mut text_mapper) = subscribable.extract::<PyRefMut<TextMapper>>() {
+        //     text_mapper.subscribe(out_ev_tx.clone());
+        // } else {
+        //     return Err(PyTypeError::new_err("Invalid type for argument subscribable"));
+        // }
 
 
-        let thread_handle = thread::spawn(move || {
-            // grab udev device
-            let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
-                .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
-
-            loop {
-                if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
-
-                while let Ok(ev) = out_ev_rx.try_recv() {
-                    let _ = output_device.send(&ev);
-                }
-
-                thread::sleep(time::Duration::from_millis(2));
-                thread::yield_now();
-            }
-        });
+        // let thread_handle = thread::spawn(move || {
+        //     // grab udev device
+        //     let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
+        //         .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+        //
+        //     loop {
+        //         if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
+        //
+        //         while let Ok(ev) = out_ev_rx.try_recv() {
+        //             let _ = output_device.send(&ev);
+        //         }
+        //
+        //         thread::sleep(time::Duration::from_millis(2));
+        //         thread::yield_now();
+        //     }
+        // });
 
         let handle = Self {
-            exit_tx: Some(exit_tx),
-            thread_handle: Some(thread_handle),
-            out_ev_tx,
+            // exit_tx: Some(exit_tx),
+            // thread_handle: Some(thread_handle),
+            // out_ev_tx,
         };
 
         Ok(handle)
@@ -129,17 +129,17 @@ impl Writer {
         let actions = parse_key_sequence_py(val.as_str()).unwrap();
 
         for action in actions.to_key_actions() {
-            self.out_ev_tx.send(action.to_input_ev()).unwrap();
-            self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
+            // self.out_ev_tx.send(action.to_input_ev()).unwrap();
+            // self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
         }
     }
 }
 
 impl Drop for Writer {
     fn drop(&mut self) {
-        if let Some(exit_tx) = self.exit_tx.take() {
-            exit_tx.send(()).unwrap();
-            self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000)).unwrap();
-        }
+        // if let Some(exit_tx) = self.exit_tx.take() {
+        //     // exit_tx.send(()).unwrap();
+        //     // self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000)).unwrap();
+        // }
     }
 }

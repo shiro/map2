@@ -6,7 +6,7 @@ use crate::*;
 
 pub const INPUT_EV_DUMMY_TIME: TimeVal = TimeVal { tv_sec: 0, tv_usec: 0 };
 
-pub static SYN_REPORT: InputEvent = InputEvent { event_code: EventCode::EV_SYN(EV_SYN::SYN_REPORT), value: 0, time: INPUT_EV_DUMMY_TIME };
+pub static SYN_REPORT: EvdevInputEvent = EvdevInputEvent { event_code: EventCode::EV_SYN(EV_SYN::SYN_REPORT), value: 0, time: INPUT_EV_DUMMY_TIME };
 
 lazy_static! {
 pub static ref KEY_LEFT_META: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap();

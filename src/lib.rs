@@ -1,5 +1,7 @@
 #![feature(fn_traits)]
 
+#![allow(warnings)]
+
 extern crate core;
 #[macro_use]
 extern crate lazy_static;
@@ -17,7 +19,7 @@ pub use std::time::Duration;
 pub use anyhow::{anyhow, Result};
 pub use async_recursion::async_recursion;
 pub use evdev_rs::enums::EventCode;
-pub use evdev_rs::InputEvent;
+pub use evdev_rs::InputEvent as EvdevInputEvent;
 pub use nom::lib::std::collections::HashMap;
 use thread_tryjoin::TryJoinHandle;
 pub use uuid::Uuid;
@@ -38,6 +40,7 @@ pub mod device;
 pub mod event_handlers;
 pub mod logging;
 pub mod event_loop;
+pub mod event;
 
 #[cfg(test)]
 pub mod tests;

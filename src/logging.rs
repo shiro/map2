@@ -1,10 +1,10 @@
-use crate::{EventCode, InputEvent};
+use crate::*;
 
 pub fn print_debug(msg: impl AsRef<str>) {
     println!("[DEBUG] {}", msg.as_ref());
 }
 
-pub fn print_input_event(ev: &InputEvent) -> String {
+pub fn print_input_event(ev: &EvdevInputEvent) -> String {
     match ev.event_code {
         EventCode::EV_SYN(_) =>
             ev.event_type().unwrap().to_string(),
