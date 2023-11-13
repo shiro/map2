@@ -43,6 +43,15 @@ signal-hook = "0.3.10"
 async-channel = "1.6.1"
 uuid = { version = "1.1.2", features = ["v4"] }
 bitflags = "1.3.2"
+byteorder = "1.5.0"
+tempfile = "3.8.1"
+
+# wayland
+wayland-client = "0.31.1"
+wayland-protocols-misc = { version = "0.2.0", features = ["client", "wayland-server", "wayland-client"] }
+xkeysym = "0.2.0"
+unicode-segmentation = "1.10.1"
+xkbcommon = { version = "0.7.0", features = ["wayland"] }
 
 [[bin]]
 name = "evlist"
