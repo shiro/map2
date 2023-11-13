@@ -78,7 +78,6 @@ fn release_restore_modifiers(
 
 
 pub struct MapperInner {
-    // state: Arc<ArcSwap<State>>,
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     state_map: RwLock<HashMap<String, RwLock<State>>>,
     mappings: RwLock<Mappings>,
@@ -116,10 +115,7 @@ impl MapperInner {
                 modifiers: from_modifiers,
             };
 
-            // if !flags.contains(TransformerFlags::RAW_MODE) {
             if let Some(runtime_action) = mappings.get(&from_key_action) {
-                // let mut events = vec![];
-
                 match runtime_action {
                     RuntimeAction::ActionSequence(seq) => {
                         for action in seq {
@@ -154,7 +150,6 @@ impl MapperInner {
 
                 return;
             }
-            // }
 
             event_handlers::update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
             // end
@@ -230,10 +225,6 @@ impl Mapper {
             self.subscriber.store(
                 Some(Arc::new(Subscriber::Writer(target.inner.clone())))
             );
-            // target.add_source(self.id.clone());
-            // self.msg_tx.send(ReaderMessage::AddSubscriber(
-            //     Subscriber::Mapper(target.inner.clone()))
-            // ).unwrap();
         }else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
             self.subscriber.store(
                 Some(Arc::new(Subscriber::Mapper(target.inner.clone())))

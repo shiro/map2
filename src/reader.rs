@@ -1,11 +1,9 @@
-use std::ops::Sub;
 use std::sync::mpsc;
 use std::thread;
 
 use ::oneshot;
 use bitflags::bitflags;
-use libc::printf;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -13,14 +11,8 @@ use crate::*;
 use crate::device::virtual_input_device::Sendable;
 use crate::event::InputEvent;
 use crate::mapper::{Mapper, MapperInner};
-use crate::parsing::key_action::ParsedKeyActionVecExt;
-use crate::parsing::python::parse_key_sequence_py;
 use crate::writer::WriterInner;
 
-// pub struct Subscriber {
-//     pub ev_tx: mpsc::Sender<InputEvent>,
-//     pub route: Vec<String>,
-// }
 pub enum Subscriber {
     Mapper(Arc<MapperInner>),
     Writer(Arc<WriterInner>)
@@ -53,14 +45,6 @@ pub enum ReaderMessage {
 pub struct Reader {
     reader_exit_tx: Option<oneshot::Sender<()>>,
     reader_thread_handle: Option<thread::JoinHandle<Result<()>>>,
-
-    // mapper_exit_tx: Option<oneshot::Sender<()>>,
-    // mapper_thread_handle: Option<thread::JoinHandle<Result<()>>>,
-
-    pub msg_tx: mpsc::Sender<ReaderMessage>,
-
-    // new
-    // targets: Vec<Arc<MapperInner>>,
     subscriber: Arc<ArcSwapOption<Subscriber>>,
 }
 
@@ -93,22 +77,12 @@ impl Reader {
             .map_err(|_| PyTypeError::new_err("'patterns' must be a list"))?;
 
         let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
-        // let (mapper_exit_tx, mapper_exit_rx) = oneshot::channel();
-        // let (evdev_reader_tx, evdev_reader_rx) = mpsc::channel();
-        let (msg_tx, msg_rx) = mpsc::channel();
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
         let s = subscriber.clone();
-        // let _subscriber = subscriber.clone
+
         let handler = Arc::new(move |id: String, ev: EvdevInputEvent| {
-            // while let Ok(msg) = msg_rx.try_recv() {
-            //     match msg {
-            //         ReaderMessage::AddSubscriber(subscriber) => { subscribers.push(subscriber); }
-            //         .. => {}
-            //     }
-            // }
             if let Some(s) = s.load().deref() {
-                // println!("READ!");
                 s.handle(id, InputEvent::Raw(ev));
             }
         });
@@ -120,7 +94,6 @@ impl Reader {
         let handle = Self {
             reader_exit_tx: Some(reader_exit_tx),
             reader_thread_handle: Some(reader_thread_handle),
-            msg_tx,
             subscriber,
         };
 
@@ -135,35 +108,35 @@ impl Reader {
         }
     }
 
-    pub fn send(&mut self, val: String) {
-        let actions = parse_key_sequence_py(val.as_str()).unwrap().to_key_actions();
+    // pub fn send(&mut self, val: String) {
+    //     let actions = parse_key_sequence_py(val.as_str()).unwrap().to_key_actions();
+    //
+    //     for action in actions {
+    //         // self.msg_tx.send(ReaderMessage::SendEvent(action.to_input_ev())).unwrap();
+    //         // self.msg_tx.send(ReaderMessage::SendEvent(SYN_REPORT.clone())).unwrap();
+    //     }
+    // }
 
-        for action in actions {
-            self.msg_tx.send(ReaderMessage::SendEvent(action.to_input_ev())).unwrap();
-            self.msg_tx.send(ReaderMessage::SendEvent(SYN_REPORT.clone())).unwrap();
-        }
-    }
-
-    pub fn send_raw(&mut self, val: String) -> PyResult<()> {
-        let actions = parse_key_sequence_py(val.as_str())
-            .unwrap()
-            .to_key_actions();
-
-        if actions.len() != 1 {
-            return Err(PyValueError::new_err(format!("expected a single key action, got {}", actions.len())));
-        }
-
-        let action = actions.get(0).unwrap();
-
-        if ![*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
-            .contains(&action.key) {
-            return Err(PyValueError::new_err("key action needs to be a modifier event"));
-        }
-
-        self.msg_tx.send(ReaderMessage::SendRawEvent(action.to_input_ev())).unwrap();
-
-        Ok(())
-    }
+    // pub fn send_raw(&mut self, val: String) -> PyResult<()> {
+    //     let actions = parse_key_sequence_py(val.as_str())
+    //         .unwrap()
+    //         .to_key_actions();
+    //
+    //     if actions.len() != 1 {
+    //         return Err(PyValueError::new_err(format!("expected a single key action, got {}", actions.len())));
+    //     }
+    //
+    //     let action = actions.get(0).unwrap();
+    //
+    //     if ![*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
+    //         .contains(&action.key) {
+    //         return Err(PyValueError::new_err("key action needs to be a modifier event"));
+    //     }
+    //
+    //     // self.msg_tx.send(ReaderMessage::SendRawEvent(action.to_input_ev())).unwrap();
+    //
+    //     Ok(())
+    // }
 }
 
 
