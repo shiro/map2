@@ -10,7 +10,7 @@ use crate::event_loop::EventLoop;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
-use crate::reader::Subscriber;
+use crate::subscriber::Subscriber;
 use crate::writer::Writer;
 
 lazy_static! {

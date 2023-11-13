@@ -6,6 +6,7 @@ use crate::mapper::Mapper;
 use crate::parsing::key_action::*;
 use crate::reader::*;
 use crate::text_mapper::TextMapper;
+use crate::virtual_reader::VirtualReader;
 use crate::window::Window;
 use crate::writer::*;
 
@@ -188,6 +189,7 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Mapper>()?;
     m.add_class::<TextMapper>()?;
     m.add_class::<Writer>()?;
+    m.add_class::<VirtualReader>()?;
     // m.add_class::<EventRoute>()?;
     m.add_class::<Window>()?;
 

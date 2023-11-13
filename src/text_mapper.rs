@@ -1,22 +1,13 @@
-use std::array::IntoIter;
 use std::borrow::Borrow;
-use std::collections::vec_deque::VecDeque;
 use std::fmt::Debug;
 use std::sync::mpsc;
 
-use evdev_rs::enums::{EV_KEY, EventType};
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::*;
-use crate::device::*;
-use crate::device::virt_device::DeviceCapabilities;
-use crate::mapper::Mapper;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
-use crate::python::*;
-use crate::reader::{Reader, ReaderMessage, Subscriber};
 
 struct Node {
     children: Option<HashMap<u8, Node>>,

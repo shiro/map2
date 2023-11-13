@@ -43,6 +43,7 @@ pub mod event_handlers;
 pub mod logging;
 pub mod event_loop;
 pub mod event;
+pub mod subscriber;
 
 #[cfg(test)]
 pub mod tests;
@@ -50,6 +51,7 @@ pub mod tests;
 
 pub mod python;
 pub mod reader;
+pub mod virtual_reader;
 pub mod mapper;
 pub mod writer;
 pub mod text_mapper;
