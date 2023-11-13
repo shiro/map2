@@ -30,7 +30,7 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 
 pub fn read_from_device_input_fd_thread_handler(
     device: Device,
-    mut ev_handler: Arc<impl Fn(String, EvdevInputEvent) + Send + Sync + 'static>,
+    mut ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
     abort_rx: oneshot::Receiver<()>,
 ) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
@@ -52,7 +52,7 @@ pub fn read_from_device_input_fd_thread_handler(
                         }
                     }
                 }
-                ReadStatus::Success => { ev_handler(id.clone(), result.1); }
+                ReadStatus::Success => { ev_handler(&id, result.1); }
             }
         } else {
             let err = a.err().unwrap();
@@ -81,7 +81,7 @@ pub trait Sendable<T> {
 fn grab_device
 (
     fd_path: &Path,
-    ev_handler: Arc<impl Fn(String, EvdevInputEvent) + Send + Sync + 'static>,
+    ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
 )
     -> Result<oneshot::Sender<()>> {
     let fd_file = fs::OpenOptions::new()
@@ -111,7 +111,7 @@ fn grab_device
 pub fn grab_udev_inputs
 (
     fd_patterns: &[impl AsRef<str>],
-    ev_handler: Arc<impl Fn(String, EvdevInputEvent) + Send + Sync + 'static>,
+    ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
     exit_rx: oneshot::Receiver<()>,
 ) -> Result<thread::JoinHandle<Result<()>>> {
     let device_fd_path_pattens = fd_patterns.into_iter()

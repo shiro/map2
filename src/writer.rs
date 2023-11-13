@@ -1,18 +1,15 @@
-use std::sync::{mpsc, RwLock};
+use std::sync::mpsc;
 use std::thread;
 
-use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
+use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use crate::*;
 use crate::device::*;
 use crate::device::virt_device::DeviceCapabilities;
-use crate::mapper::Mapper;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
-use crate::reader::Reader;
-use crate::text_mapper::TextMapper;
 
 // pub trait EventRoutable {
 //     fn route(&mut self) -> Result<mpsc::Receiver<EvdevInputEvent>>;
@@ -26,18 +23,13 @@ use crate::text_mapper::TextMapper;
 //     fn route(&mut self) -> Result<mpsc::Receiver<EvdevInputEvent>> { panic!("hey, listen") }
 // }
 pub struct WriterInner {
-    // state: Arc<ArcSwap<State>>,
-    // state_map: RwLock<HashMap<String, State>>,
     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
 }
 
 impl WriterInner {
-    pub fn handle(&self, id: String, ev: InputEvent) {
-        // self.state.load();
-        // let state = self.state_map.read().unwrap();
+    pub fn handle(&self, id: &str, ev: InputEvent) {
         match ev {
             InputEvent::Raw(ev) => {
-                // println!("handle! {:?}", ev);
                 self.out_ev_tx.send(ev).unwrap();
             }
         }

@@ -84,24 +84,24 @@ pub struct MapperInner {
 }
 
 impl MapperInner {
-    pub fn handle(&self, id: String, ev: InputEvent) {
+    pub fn handle(&self, id: &str, raw_ev: InputEvent) {
         if let Some(subscriber) = self.subscriber.load().deref() {
             let mut state_map = self.state_map.read().unwrap();
-            let mut state_guard = state_map.get(&id);
+            let mut state_guard = state_map.get(id);
             if state_guard.is_none() {
                 drop(state_map);
                 let mut writable_state_map = self.state_map.write().unwrap();
-                writable_state_map.insert(id.clone(), RwLock::new(State::new()));
+                writable_state_map.insert(id.to_string(), RwLock::new(State::new()));
                 drop(writable_state_map);
                 state_map = self.state_map.read().unwrap();
-                state_guard = state_map.get(&id);
+                state_guard = state_map.get(id);
             }
 
             let mappings = self.mappings.read().unwrap();
             let mut state = state_guard.unwrap().write().unwrap();
 
             // start
-            let ev = match ev { InputEvent::Raw(ev) => ev };
+            let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
 
             let mut from_modifiers = KeyModifierFlags::new();
             from_modifiers.ctrl = state.modifiers.is_ctrl();
@@ -123,14 +123,14 @@ impl MapperInner {
                                 RuntimeKeyAction::KeyAction(key_action) => {
                                     let ev = key_action.to_input_ev();
 
-                                    subscriber.handle("".to_string(), InputEvent::Raw(ev));
-                                    subscriber.handle("".to_string(), InputEvent::Raw(SYN_REPORT.clone()));
+                                    subscriber.handle("", InputEvent::Raw(ev));
+                                    subscriber.handle("", InputEvent::Raw(SYN_REPORT.clone()));
                                 }
                                 RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
                                     let mut new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);
                                     // events.append(&mut new_events);
                                     for ev in new_events {
-                                        subscriber.handle("".to_string(), InputEvent::Raw(ev));
+                                        subscriber.handle("", InputEvent::Raw(ev));
                                     }
                                 }
                             }
@@ -140,7 +140,7 @@ impl MapperInner {
                         // always release all trigger mods before running the callback
                         let mut new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
                         for ev in new_events {
-                            subscriber.handle("".to_string(), InputEvent::Raw(ev));
+                            subscriber.handle("", InputEvent::Raw(ev));
                         }
 
                         EVENT_LOOP.lock().unwrap().execute(callback_object.clone());
@@ -155,7 +155,7 @@ impl MapperInner {
             // end
 
 
-            subscriber.handle("".to_string(), InputEvent::Raw(ev));
+            subscriber.handle("", raw_ev);
         }
     }
 }

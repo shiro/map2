@@ -19,7 +19,7 @@ pub enum Subscriber {
 }
 
 impl Subscriber {
-    pub(crate) fn handle(&self, id: String, ev: InputEvent) {
+    pub(crate) fn handle(&self, id: &str, ev: InputEvent) {
         match self {
             Subscriber::Mapper(target) => { target.handle(id, ev) }
             Subscriber::Writer(target) => { target.handle(id, ev) }
@@ -81,7 +81,7 @@ impl Reader {
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
         let s = subscriber.clone();
 
-        let handler = Arc::new(move |id: String, ev: EvdevInputEvent| {
+        let handler = Arc::new(move |id: &str, ev: EvdevInputEvent| {
             if let Some(s) = s.load().deref() {
                 s.handle(id, InputEvent::Raw(ev));
             }
