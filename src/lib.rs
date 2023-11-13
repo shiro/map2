@@ -17,6 +17,7 @@ pub use std::sync::Mutex;
 pub use std::time::Duration;
 
 pub use anyhow::{anyhow, Result};
+use arc_swap::ArcSwapOption;
 pub use async_recursion::async_recursion;
 pub use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent as EvdevInputEvent;
@@ -25,6 +26,7 @@ use thread_tryjoin::TryJoinHandle;
 pub use uuid::Uuid;
 
 pub use crate::device::virtual_input_device::grab_udev_inputs;
+use crate::event::InputEvent;
 pub use crate::key_defs::*;
 pub use crate::key_primitives::*;
 pub use crate::state::*;

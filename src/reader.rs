@@ -1,8 +1,10 @@
+use std::ops::Sub;
 use std::sync::mpsc;
 use std::thread;
 
 use ::oneshot;
 use bitflags::bitflags;
+use libc::printf;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -13,6 +15,7 @@ use crate::event::InputEvent;
 use crate::mapper::{Mapper, MapperInner};
 use crate::parsing::key_action::ParsedKeyActionVecExt;
 use crate::parsing::python::parse_key_sequence_py;
+use crate::writer::WriterInner;
 
 // pub struct Subscriber {
 //     pub ev_tx: mpsc::Sender<InputEvent>,
@@ -20,12 +23,14 @@ use crate::parsing::python::parse_key_sequence_py;
 // }
 pub enum Subscriber {
     Mapper(Arc<MapperInner>),
+    Writer(Arc<WriterInner>)
 }
 
 impl Subscriber {
-    fn handle(&self, ev: InputEvent) {
+    pub(crate) fn handle(&self, id: String, ev: InputEvent) {
         match self {
-            Subscriber::Mapper(target) => {target.handle(ev)}
+            Subscriber::Mapper(target) => { target.handle(id, ev) }
+            Subscriber::Writer(target) => { target.handle(id, ev) }
         }
     }
 }
@@ -49,13 +54,14 @@ pub struct Reader {
     reader_exit_tx: Option<oneshot::Sender<()>>,
     reader_thread_handle: Option<thread::JoinHandle<Result<()>>>,
 
-    mapper_exit_tx: Option<oneshot::Sender<()>>,
-    mapper_thread_handle: Option<thread::JoinHandle<Result<()>>>,
+    // mapper_exit_tx: Option<oneshot::Sender<()>>,
+    // mapper_thread_handle: Option<thread::JoinHandle<Result<()>>>,
 
     pub msg_tx: mpsc::Sender<ReaderMessage>,
 
     // new
     // targets: Vec<Arc<MapperInner>>,
+    subscriber: Arc<ArcSwapOption<Subscriber>>,
 }
 
 
@@ -87,98 +93,45 @@ impl Reader {
             .map_err(|_| PyTypeError::new_err("'patterns' must be a list"))?;
 
         let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
-        let (mapper_exit_tx, mapper_exit_rx) = oneshot::channel();
-        let (evdev_reader_tx, evdev_reader_rx) = mpsc::channel();
+        // let (mapper_exit_tx, mapper_exit_rx) = oneshot::channel();
+        // let (evdev_reader_tx, evdev_reader_rx) = mpsc::channel();
         let (msg_tx, msg_rx) = mpsc::channel();
 
-        let reader_thread_handle = grab_udev_inputs(&patterns, evdev_reader_tx, reader_exit_rx)
-            .map_err(|err| PyTypeError::new_err(err.to_string()))?;
-
-        let mapper_thread_handle = thread::spawn(move || {
-            let mut subscribers = vec![];
-            // let mut transformers = HashMap::new();
-
-            fn process_event(ev: EvdevInputEvent, mut subscribers: &mut Vec<Subscriber>) {
-                // let mut transformation_cache: HashMap<&String, Vec<InputEvent>> = HashMap::new();
-
-                for s in subscribers.iter_mut() {
-                    s.handle(InputEvent::Raw(ev.clone()));
-                    //     // non-key events are currently not supported
-                    //     match ev.event_code {
-                    //         EventCode::EV_KEY(_) => {}
-                    //         _ => {
-                    //             let _ = s.ev_tx.send(ev.clone());
-                    //             continue;
-                    //         }
-                    //     }
-                    //
-                    //     let mut events = vec![ev.clone()];
-                    //
-                    //     for id in s.route.iter() {
-                    //         let transformer: Option<&mut TransformerFn> = transformers.get_mut(id);
-                    //         match transformer {
-                    //             Some(transformer) => {
-                    //                 // every transformer is run at most once, cached results are always used
-                    //                 if let Some(cached_events) = transformation_cache.get(id) {
-                    //                     events = cached_events.clone();
-                    //                     continue;
-                    //                 }
-                    //
-                    //                 let mut next_events = vec![];
-                    //                 for ev in events.into_iter() {
-                    //                     let mut new_events = transformer.deref_mut().call_mut((ev, flags));
-                    //                     next_events.append(&mut new_events);
-                    //                 }
-                    //                 events = next_events;
-                    //                 transformation_cache.insert(id, events.clone());
-                    //             }
-                    //             None => { panic!("transformer not found") }
-                    //         }
-                    //     }
-                    //
-                    //     for ev in events.into_iter() {
-                    //         let _ = s.ev_tx.send(ev);
-                    //     }
-                }
-            }
-
-            loop {
-                if let Ok(()) = mapper_exit_rx.try_recv() { return Ok(()); }
-
-                while let Ok(msg) = msg_rx.try_recv() {
-                    match msg {
-                        ReaderMessage::AddSubscriber(subscriber) => { subscribers.push(subscriber); }
-                        ReaderMessage::SendEvent(ev) => {
-                            process_event(ev, &mut subscribers);
-                        }
-                        ReaderMessage::SendRawEvent(ev) => {
-                            process_event(ev, &mut subscribers);
-                        }
-                    }
-                }
-
-                while let Ok(ev) = evdev_reader_rx.try_recv() {
-                    process_event(ev, &mut subscribers);
-                }
+        let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
+        let s = subscriber.clone();
+        // let _subscriber = subscriber.clone
+        let handler = Arc::new(move |id: String, ev: EvdevInputEvent| {
+            // while let Ok(msg) = msg_rx.try_recv() {
+            //     match msg {
+            //         ReaderMessage::AddSubscriber(subscriber) => { subscribers.push(subscriber); }
+            //         .. => {}
+            //     }
+            // }
+            if let Some(s) = s.load().deref() {
+                // println!("READ!");
+                s.handle(id, InputEvent::Raw(ev));
             }
         });
+
+        let reader_thread_handle = grab_udev_inputs(&patterns, handler, reader_exit_rx)
+            .map_err(|err| PyTypeError::new_err(err.to_string()))?;
+
 
         let handle = Self {
             reader_exit_tx: Some(reader_exit_tx),
             reader_thread_handle: Some(reader_thread_handle),
-            mapper_exit_tx: Some(mapper_exit_tx),
-            mapper_thread_handle: Some(mapper_thread_handle),
             msg_tx,
+            subscriber,
         };
 
         Ok(handle)
     }
 
     pub fn link(&mut self, target: &PyAny) {
-        if let Ok(target) = target.extract::<PyRefMut<Mapper>>() {
-            self.msg_tx.send(ReaderMessage::AddSubscriber(
-                Subscriber::Mapper(target.inner.clone()))
-            ).unwrap();
+        if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
+            self.subscriber.store(
+                Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
+            );
         }
     }
 
@@ -225,10 +178,10 @@ impl Reader {
 
 impl Drop for Reader {
     fn drop(&mut self) {
-        let _ = self.reader_exit_tx.take().unwrap().send(());
-        let _ = self.mapper_exit_tx.take().unwrap().send(());
-
-        let _ = self.reader_thread_handle.take().unwrap().try_timed_join(Duration::from_millis(100)).unwrap();
-        let _ = self.mapper_thread_handle.take().unwrap().try_timed_join(Duration::from_millis(100)).unwrap();
+        // let _ = self.reader_exit_tx.take().unwrap().send(());
+        // let _ = self.mapper_exit_tx.take().unwrap().send(());
+        //
+        // let _ = self.reader_thread_handle.take().unwrap().try_timed_join(Duration::from_millis(100)).unwrap();
+        // let _ = self.mapper_thread_handle.take().unwrap().try_timed_join(Duration::from_millis(100)).unwrap();
     }
 }

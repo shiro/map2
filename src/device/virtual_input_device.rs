@@ -2,13 +2,15 @@ use std::{fs, io, thread, time};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::mpsc;
+use std::sync::{Arc, mpsc};
 
 use anyhow::{anyhow, Result};
 use evdev_rs::*;
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
+use uuid::Uuid;
 use walkdir::WalkDir;
+use crate::EvdevInputEvent;
 
 fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     let mut list = vec![];
@@ -28,10 +30,11 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 
 pub fn read_from_device_input_fd_thread_handler(
     device: Device,
-    mut handler: impl FnMut(InputEvent),
+    mut ev_handler: Arc<impl Fn(String, EvdevInputEvent) + Send + Sync + 'static>,
     abort_rx: oneshot::Receiver<()>,
 ) {
     let mut a: io::Result<(ReadStatus, InputEvent)>;
+    let id = Uuid::new_v4().to_string();
     loop {
         if abort_rx.try_recv().is_ok() { return; }
 
@@ -49,15 +52,15 @@ pub fn read_from_device_input_fd_thread_handler(
                         }
                     }
                 }
-                ReadStatus::Success => { handler(result.1); }
+                ReadStatus::Success => { ev_handler(id.clone(), result.1); }
             }
         } else {
             let err = a.err().unwrap();
             match err.raw_os_error() {
                 Some(libc::ENODEV) => { return; }
                 Some(libc::EWOULDBLOCK) => {
-                    // thread::yield_now();
-                    thread::sleep(time::Duration::from_millis(2));
+                    thread::sleep(time::Duration::from_millis(10));
+                    thread::yield_now();
                     continue;
                 }
                 _ => {
@@ -75,9 +78,12 @@ pub trait Sendable<T> {
 }
 
 
-fn grab_device<Tx: 'static + Sendable<InputEvent> + Send>(fd_path: &Path,
-                                                          ev_tx: Tx)
-                                                          -> Result<oneshot::Sender<()>> {
+fn grab_device
+(
+    fd_path: &Path,
+    ev_handler: Arc<impl Fn(String, EvdevInputEvent) + Send + Sync + 'static>,
+)
+    -> Result<oneshot::Sender<()>> {
     let fd_file = fs::OpenOptions::new()
         .read(true)
         .open(&fd_path)
@@ -93,7 +99,8 @@ fn grab_device<Tx: 'static + Sendable<InputEvent> + Send>(fd_path: &Path,
     thread::spawn(move || {
         read_from_device_input_fd_thread_handler(
             device,
-            |ev| { let _ = ev_tx.send(ev); },
+            // |ev| { let _ = ev_tx.send(ev); },
+            ev_handler,
             abort_rx,
         );
     });
@@ -101,11 +108,11 @@ fn grab_device<Tx: 'static + Sendable<InputEvent> + Send>(fd_path: &Path,
     Ok(abort_tx)
 }
 
-
-pub fn grab_udev_inputs<Tx: 'static + Sendable<InputEvent> + Send + Clone>
-(fd_patterns: &[impl AsRef<str>],
- ev_tx: Tx,
- exit_rx: oneshot::Receiver<()>,
+pub fn grab_udev_inputs
+(
+    fd_patterns: &[impl AsRef<str>],
+    ev_handler: Arc<impl Fn(String, EvdevInputEvent) + Send + Sync + 'static>,
+    exit_rx: oneshot::Receiver<()>,
 ) -> Result<thread::JoinHandle<Result<()>>> {
     let device_fd_path_pattens = fd_patterns.into_iter()
         .map(|v| Regex::new(v.as_ref()))
@@ -123,7 +130,7 @@ pub fn grab_udev_inputs<Tx: 'static + Sendable<InputEvent> + Send + Clone>
 
         // grab all devices
         for device_fd_path in get_fd_list(&device_fd_path_pattens) {
-            let res = grab_device(&device_fd_path, ev_tx.clone());
+            let res = grab_device(&device_fd_path, ev_handler.clone());
             let abort_tx = match res {
                 Ok(v) => v,
                 Err(err) => {
@@ -147,7 +154,7 @@ pub fn grab_udev_inputs<Tx: 'static + Sendable<InputEvent> + Send + Clone>
                             continue;
                         }
 
-                        let abort_tx = grab_device(&path, ev_tx.clone())?;
+                        let abort_tx = grab_device(&path, ev_handler.clone())?;
                         device_map.insert(path, abort_tx);
                     }
                     DebouncedEvent::Remove(path) => {

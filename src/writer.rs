@@ -1,4 +1,4 @@
-use std::sync::mpsc;
+use std::sync::{mpsc, RwLock};
 use std::thread;
 
 use pyo3::exceptions::{PyRuntimeError, PyTypeError, PyValueError};
@@ -25,12 +25,32 @@ use crate::text_mapper::TextMapper;
 // impl EventRoutable for EventRoute {
 //     fn route(&mut self) -> Result<mpsc::Receiver<EvdevInputEvent>> { panic!("hey, listen") }
 // }
+pub struct WriterInner {
+    // state: Arc<ArcSwap<State>>,
+    // state_map: RwLock<HashMap<String, State>>,
+    out_ev_tx: mpsc::Sender<EvdevInputEvent>,
+}
+
+impl WriterInner {
+    pub fn handle(&self, id: String, ev: InputEvent) {
+        // self.state.load();
+        // let state = self.state_map.read().unwrap();
+        match ev {
+            InputEvent::Raw(ev) => {
+                // println!("handle! {:?}", ev);
+                self.out_ev_tx.send(ev).unwrap();
+            }
+        }
+    }
+}
+
 
 #[pyclass]
 pub struct Writer {
-    // exit_tx: Option<oneshot::Sender<()>>,
-    // thread_handle: Option<std::thread::JoinHandle<Result<()>>>,
-    // out_ev_tx: mpsc::Sender<EvdevInputEvent>,
+    exit_tx: Option<oneshot::Sender<()>>,
+    out_ev_tx: mpsc::Sender<EvdevInputEvent>,
+    thread_handle: Option<thread::JoinHandle<Result<()>>>,
+    pub inner: Arc<WriterInner>,
 }
 
 #[pymethods]
@@ -84,9 +104,10 @@ impl Writer {
             }
         };
 
-        // let (exit_tx, exit_rx) = oneshot::channel();
-        // let (out_ev_tx, out_ev_rx) = mpsc::channel();
+        // output_device.send()
 
+        let (exit_tx, exit_rx) = oneshot::channel();
+        let (out_ev_tx, out_ev_rx) = mpsc::channel();
 
         // if let Ok(mut reader) = subscribable.extract::<PyRefMut<Reader>>() {
         //     reader.subscribe(out_ev_tx.clone());
@@ -99,27 +120,32 @@ impl Writer {
         // }
 
 
-        // let thread_handle = thread::spawn(move || {
-        //     // grab udev device
-        //     let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
-        //         .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
-        //
-        //     loop {
-        //         if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
-        //
-        //         while let Ok(ev) = out_ev_rx.try_recv() {
-        //             let _ = output_device.send(&ev);
-        //         }
-        //
-        //         thread::sleep(time::Duration::from_millis(2));
-        //         thread::yield_now();
-        //     }
-        // });
+        let thread_handle = thread::spawn(move || {
+            // grab udev device
+            let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
+                .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+
+            loop {
+                if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
+
+                while let Ok(ev) = out_ev_rx.try_recv() {
+                    let _ = output_device.send(&ev);
+                }
+
+                thread::sleep(Duration::from_millis(10));
+                thread::yield_now();
+            }
+        });
+
+        let inner = Arc::new(WriterInner {
+            out_ev_tx: out_ev_tx.clone(),
+        });
 
         let handle = Self {
-            // exit_tx: Some(exit_tx),
-            // thread_handle: Some(thread_handle),
-            // out_ev_tx,
+            exit_tx: Some(exit_tx),
+            out_ev_tx,
+            thread_handle: Some(thread_handle),
+            inner,
         };
 
         Ok(handle)
@@ -129,17 +155,17 @@ impl Writer {
         let actions = parse_key_sequence_py(val.as_str()).unwrap();
 
         for action in actions.to_key_actions() {
-            // self.out_ev_tx.send(action.to_input_ev()).unwrap();
-            // self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
+            self.out_ev_tx.send(action.to_input_ev()).unwrap();
+            self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
         }
     }
 }
 
 impl Drop for Writer {
     fn drop(&mut self) {
-        // if let Some(exit_tx) = self.exit_tx.take() {
-        //     // exit_tx.send(()).unwrap();
-        //     // self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000)).unwrap();
-        // }
+        if let Some(exit_tx) = self.exit_tx.take() {
+            exit_tx.send(()).unwrap();
+            self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000)).unwrap();
+        }
     }
 }
