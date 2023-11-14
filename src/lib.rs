@@ -45,6 +45,7 @@ pub mod event_loop;
 pub mod event;
 pub mod subscriber;
 pub mod encoding;
+pub mod xkb;
 
 #[cfg(test)]
 pub mod tests;

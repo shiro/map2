@@ -1,8 +1,8 @@
-// use widestring::iter::EncodeUtf32;
 use xkbcommon::xkb::Keysym;
 use xkeysym::key;
 
-pub fn xkb_utf32_to_keysym(ucs: u32) ->Keysym{
+
+pub fn xkb_utf32_to_keysym(ucs: u32) -> Keysym {
     // First check for Latin-1 characters (1:1 mapping).
     if matches!(ucs, 0x0020..=0x007e) || matches!(ucs, 0x00a0..=0x00ff) {
         return Keysym::new(ucs);
@@ -26,7 +26,7 @@ pub fn xkb_utf32_to_keysym(ucs: u32) ->Keysym{
         || ucs > 0x10ffff
         || (ucs & 0xfffe == 0xfffe)
     {
-        return unsafe { Keysym::from(0)} ;
+        return unsafe { Keysym::from(0) };
     }
 
     // Search main table.

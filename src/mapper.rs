@@ -12,6 +12,7 @@ use crate::parsing::python::*;
 use crate::python::*;
 use crate::subscriber::Subscriber;
 use crate::writer::Writer;
+use crate::xkb::UTFToRawInputTransformer;
 
 lazy_static! {
     static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
@@ -100,6 +101,7 @@ impl MapperInner {
             let mappings = self.mappings.read().unwrap();
             let mut state = state_guard.unwrap().write().unwrap();
 
+
             // start
             let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
 
@@ -173,10 +175,20 @@ impl Mapper {
     #[new]
     #[args(kwargs = "**")]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
-        let options: HashMap<&str, &PyAny> = match kwargs {
-            Some(py_dict) => py_dict.extract().unwrap(),
-            None => HashMap::new()
-        };
+        // let options: HashMap<&str, &PyAny> = match kwargs {
+        //     Some(py_dict) => py_dict.extract().unwrap(),
+        //     None => HashMap::new()
+        // };
+
+        let t = UTFToRawInputTransformer::new(
+            None,
+            Some("rabbit"),
+            None,
+            None,
+        );
+        let r = t.utf_to_raw("Š".to_string());
+        // let r = t.utf_to_raw("y".to_string());
+        println!("keys! {r:?}");
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
 
@@ -225,7 +237,7 @@ impl Mapper {
             self.subscriber.store(
                 Some(Arc::new(Subscriber::Writer(target.inner.clone())))
             );
-        }else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
+        } else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
             self.subscriber.store(
                 Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
             );

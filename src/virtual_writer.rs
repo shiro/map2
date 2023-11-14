@@ -185,7 +185,6 @@ fn init_virtual_keyboard_v2(keyboard: &ZwpVirtualKeyboardV1, keymap: &HashMap<Ke
         } else {
             format!("U{:X}", key.raw() & 0xFFFFF).to_string()
         };
-        println!("al {alias}");
         keymap_file.write_all(alias.as_bytes())?;
 
         keymap_file.write_all("]};\n".as_bytes())?;
