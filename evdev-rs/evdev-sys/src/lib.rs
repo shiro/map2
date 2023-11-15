@@ -1,3 +1,4 @@
+#![allow(warnings)]
 #![allow(bad_style)]
 #![allow(dead_code)]
 #![allow(improper_ctypes)]

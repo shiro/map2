@@ -71,34 +71,12 @@ lazy_static! {
     pub(crate) static ref KEY_ALIAS_TABLE: HashMap<&'static str, (Key, KeyModifierFlags)> = {
         let mut m = HashMap::new();
         m.insert(" ", (Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap(), KeyModifierFlags::new()));
-        m.insert("#", (Key::from_str(&EventType::EV_KEY, "KEY_3").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        m.insert("$", (Key::from_str(&EventType::EV_KEY, "KEY_4").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        m.insert("%", (Key::from_str(&EventType::EV_KEY, "KEY_5").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        m.insert("&", (Key::from_str(&EventType::EV_KEY, "KEY_7").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        m.insert("'", (Key::from_str(&EventType::EV_KEY, "KEY_APOSTROPHE").unwrap(), KeyModifierFlags::new()));
-        m.insert("(", (Key::from_str(&EventType::EV_KEY, "KEY_9").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        m.insert(")", (Key::from_str(&EventType::EV_KEY, "KEY_0").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        m.insert("*", (Key::from_str(&EventType::EV_KEY, "KEY_8").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        m.insert(",", (Key::from_str(&EventType::EV_KEY, "KEY_COMMA").unwrap(), KeyModifierFlags::new()));
-        m.insert("-", (Key::from_str(&EventType::EV_KEY, "KEY_MINUS").unwrap(), KeyModifierFlags::new()));
-        m.insert(".", (Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap(), KeyModifierFlags::new()));
-        m.insert("/", (Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap(), KeyModifierFlags::new()));
-        m.insert(":", (Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap(), KeyModifierFlags::new()));
-        m.insert(";", (Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap(), KeyModifierFlags::new()));
-        m.insert("<", (Key::from_str(&EventType::EV_KEY, "KEY_COMMA").unwrap(), KeyModifierFlags::new()));
-        m.insert("=", (Key::from_str(&EventType::EV_KEY, "KEY_EQUAL").unwrap(), KeyModifierFlags::new()));
-        m.insert(">", (Key::from_str(&EventType::EV_KEY, "KEY_DOT").unwrap(), KeyModifierFlags::new()));
-        m.insert("?", (Key::from_str(&EventType::EV_KEY, "KEY_SLASH").unwrap(), KeyModifierFlags::new()));
-        m.insert("@", (Key::from_str(&EventType::EV_KEY, "KEY_1").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
         m.insert("[", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new()));
         // TODO implement escaped chars so this doesn't break sequence parsing
-        // m.insert("\"", (Key::from_str(&EventType::EV_KEY, "KEY_APOSTROPHE").unwrap(), KeyModifierFlags::new()));
         m.insert("]", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap(), KeyModifierFlags::new()));
-        m.insert("^", (Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
         m.insert("{", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
         m.insert("|", (Key::from_str(&EventType::EV_KEY, "KEY_BACKSLASH").unwrap(), KeyModifierFlags::new()));
         m.insert("}", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        m.insert("~", (Key::from_str(&EventType::EV_KEY, "KEY_GRAVE").unwrap(), KeyModifierFlags::new()));
         m.insert("SHIFT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap(), KeyModifierFlags::new()));
         m.insert("ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("META", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap(), KeyModifierFlags::new()));

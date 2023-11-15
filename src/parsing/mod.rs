@@ -19,6 +19,24 @@ use key_sequence::*;
 #[cfg(test)]
 use tests::*;
 
+
+#[cfg(test)]
+pub(super) fn nom_ok<'a, T>(value: T) -> ResNew<&'a str, T> { Ok(("", (value, None))) }
+
+#[cfg(test)]
+pub(super) fn nom_ok_rest<T>(rest: &str, value: T) -> ResNew<&str, T> { Ok((rest, (value, None))) }
+
+#[cfg(test)]
+pub(super) fn nom_eval<'a, T>(value: ResNew<&str, T>) -> T { value.unwrap().1.0 }
+
+#[cfg(test)]
+pub(super) fn nom_no_last_err<'a, T>(value: ResNew<&str, T>) -> ResNew<&str, T> {
+    match value {
+        Ok((input, (val, _))) => Ok((input, (val, None))),
+        Err(err) => Err(err)
+    }
+}
+
 use crate::*;
 
 mod custom_combinators;

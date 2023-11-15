@@ -5,21 +5,21 @@ use nom::InputLength;
 
 use super::*;
 
-pub(super) type ResNew<I, O> = IResult<I, (O, Option<CustomError<I>>), CustomError<I>>;
+pub type ResNew<I, O> = IResult<I, (O, Option<CustomError<I>>), CustomError<I>>;
 
-pub(super) fn make_generic_nom_err_new<I>(input: I) -> NomErr<CustomError<I>> {
+pub fn make_generic_nom_err_new<I>(input: I) -> NomErr<CustomError<I>> {
     NomErr::Error(CustomError { input, expected: vec![] })
 }
 
-pub(super) fn make_generic_nom_err_options<I>(input: I, options: Vec<String>) -> NomErr<CustomError<I>> {
+pub fn make_generic_nom_err_options<I>(input: I, options: Vec<String>) -> NomErr<CustomError<I>> {
     NomErr::Error(CustomError { input, expected: options })
 }
 
 
 #[derive(Debug, PartialEq)]
-pub(super) struct CustomError<I> {
-    pub(super) input: I,
-    pub(super) expected: Vec<String>,
+pub struct CustomError<I> {
+    pub input: I,
+    pub expected: Vec<String>,
 }
 
 impl<I> ParseError<I> for CustomError<I> where I: InputLength {

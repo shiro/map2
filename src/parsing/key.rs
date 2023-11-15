@@ -1,6 +1,8 @@
+use evdev_rs::enums::EV_KEY;
+use crate::xkb::UTFToRawInputTransformer;
 use super::*;
 
-pub(super) fn key_flags(input: &str) -> ResNew<&str, KeyModifierFlags> {
+pub fn key_flags(input: &str) -> ResNew<&str, KeyModifierFlags> {
     many0(one_of("^!+#"))(input).and_then(|(next, val)| {
         let mut flags = KeyModifierFlags::new();
         for v in val {
@@ -16,37 +18,74 @@ pub(super) fn key_flags(input: &str) -> ResNew<&str, KeyModifierFlags> {
     })
 }
 
-pub(super) fn key(input: &str) -> ResNew<&str, (Key, KeyModifierFlags)> {
-    alt(( // multiple asci chars or 1 arbitrary char
-          map(ident, |v| v.0),
-          map(take(1usize), |v: &str| v.to_string())
-    ))(input)
-        .and_then(|(next, val)| {
-            let mut key_name = val.to_uppercase();
+pub fn key(input: &str) -> ResNew<&str, (Key, KeyModifierFlags)> {
+    key_utf(None)(input)
+}
 
-            let (key, mut flags) = match KEY_ALIAS_TABLE.get(&*key_name) {
-                Some(v) => *v,
-                None => {
-                    if !key_name.starts_with("KEY_") && !key_name.starts_with("BTN_") {
-                        key_name = "KEY_".to_string()
-                            .tap_mut(|s| s.push_str(&key_name));
+pub fn key_utf<'a>(
+    transformer: Option<&'a UTFToRawInputTransformer>
+) -> impl Fn(&'a str) -> ResNew<&'a str, (Key, KeyModifierFlags)> + 'a {
+    move |input: &str| {
+        alt((
+            // multiple asci chars
+            map(ident, |v| v.0),
+            // escaped flag char
+            map(tuple((
+                tag_custom("\\"),
+                map(one_of("^!+#"), |v| v.to_string())
+            )), |(_, v)| v),
+            // one arbitrary char
+            map(take(1usize), |v: &str| v.to_string())
+        ))(input)
+            .and_then(|(next, key_name)| {
+                let (key, mut flags) = match KEY_ALIAS_TABLE.get(&*key_name) {
+                    Some(v) => *v,
+                    None => {
+                        if let Some(transformer) = transformer {
+                            let mut seq = transformer.utf_to_raw(key_name.to_string())
+                                .ok_or_else(|| make_generic_nom_err_new(input))?;
+
+                            let key = seq.remove(seq.len() - 1);
+
+                            let mut flags = KeyModifierFlags::new();
+
+                            for ev in seq.iter() {
+                                match ev {
+                                    Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_LEFTALT) } => { flags.alt(); }
+                                    Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_RIGHTALT) } => { flags.right_alt(); }
+                                    Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_LEFTSHIFT) } => { flags.shift(); }
+                                    Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_RIGHTSHIFT) } => { flags.shift(); }
+                                    _ => { unreachable!("unhandled modifier") }
+                                }
+                            }
+
+                            (key, flags)
+                        } else {
+                            let mut key_name = key_name.to_uppercase();
+                            if !key_name.starts_with("KEY_") && !key_name.starts_with("BTN_") {
+                                key_name = "KEY_".to_string()
+                                    .tap_mut(|s| s.push_str(&key_name));
+                            }
+
+                            let key = Key::from_str(&EventType::EV_KEY, key_name.as_str())
+                                .map_err(|_| make_generic_nom_err_new(input))?;
+
+                            (key, KeyModifierFlags::new())
+                        }
                     }
+                };
 
-                    let key = Key::from_str(&EventType::EV_KEY, key_name.as_str())
-                        .map_err(|_| make_generic_nom_err_new(input))?;
-
-                    (key, KeyModifierFlags::new())
+                if transformer.is_none() {
+                    // only 1 char and it's uppercase
+                    let mut it = key_name.chars();
+                    if it.next().unwrap().is_uppercase() && it.next().is_none() {
+                        flags.shift();
+                    }
                 }
-            };
 
-            // only 1 char and it's uppercase
-            let mut it = val.chars();
-            if it.next().unwrap().is_uppercase() && it.next().is_none() {
-                flags.shift();
-            }
-
-            Ok((next, ((key, flags), None)))
-        })
+                Ok((next, ((key, flags), None)))
+            })
+    }
 }
 
 fn key_state(input: &str) -> ResNew<&str, i32> {
@@ -60,13 +99,21 @@ fn key_state(input: &str) -> ResNew<&str, i32> {
     }))
 }
 
-pub(super) fn key_with_state(input: &str) -> ResNew<&str, ((Key, KeyModifierFlags), i32)> {
-    tuple((
-        key,
-        ws1,
-        key_state,
-    ))(input)
-        .map(|(next, val)| (next, ((val.0.0, val.2.0), None)))
+pub fn key_with_state(input: &str) -> ResNew<&str, ((Key, KeyModifierFlags), i32)> {
+    key_with_state_utf(None)(input)
+}
+
+pub fn key_with_state_utf<'a>(
+    transformer: Option<&'a UTFToRawInputTransformer>
+) -> impl Fn(&'a str) -> ResNew<&'a str, ((Key, KeyModifierFlags), i32)> + 'a {
+    move |input: &str| {
+        tuple((
+            key_utf(transformer),
+            ws1,
+            key_state,
+        ))(input)
+            .map(|(next, val)| (next, ((val.0.0, val.2.0), None)))
+    }
 }
 
 
@@ -91,7 +138,8 @@ mod tests {
 
         assert_eq!(key("btn_forward"), nom_ok((
             Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap(),
-            KeyModifierFlags::new())));
+            KeyModifierFlags::new()))
+        );
     }
 
     #[test]
@@ -111,5 +159,29 @@ mod tests {
                 v.meta();
             })));
         assert_eq!(key_flags("#a!"), nom_ok_rest("a!", KeyModifierFlags::new().tap_mut(|v| v.meta())));
+    }
+
+
+    #[test]
+    fn test_utf_key() {
+        let t = UTFToRawInputTransformer::new(None, Some("rabbit"), None, None);
+
+        assert_eq!(key_utf(Some(&t))("š"), nom_ok((
+            Key::from_str(&EventType::EV_KEY, "KEY_S").unwrap(),
+            KeyModifierFlags::new()
+                .tap_mut(|x| x.right_alt())
+        )));
+
+        assert_eq!(key_utf(Some(&t))(":"), nom_ok((
+            Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap(),
+            KeyModifierFlags::new()
+                .tap_mut(|x| x.shift())
+        )));
+
+        assert_eq!(key_utf(Some(&t))("^"), nom_ok((
+            Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(),
+            KeyModifierFlags::new()
+                .tap_mut(|x| x.shift())
+        )));
     }
 }

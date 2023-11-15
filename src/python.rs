@@ -56,6 +56,7 @@ pub fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods
 
     if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
     if !from.modifiers.alt && to.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+    if !from.modifiers.right_alt && to.modifiers.right_alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_RIGHT_ALT, value: TYPE_DOWN })); }
     if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
     if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
 
@@ -65,6 +66,7 @@ pub fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods
     // revert to original
     if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
     if !from.modifiers.alt && to.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+    if !from.modifiers.right_alt && to.modifiers.right_alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_RIGHT_ALT, value: TYPE_UP })); }
     if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
     if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
 
@@ -79,6 +81,7 @@ pub fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) ->
 
     if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
     if !from.modifiers.alt && to.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+    if !from.modifiers.right_alt && to.modifiers.right_alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_RIGHT_ALT, value: TYPE_DOWN })); }
     if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
     if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
 
@@ -87,6 +90,7 @@ pub fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) ->
     // revert to original
     if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
     if !from.modifiers.alt && to.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+    if !from.modifiers.right_alt && to.modifiers.right_alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_RIGHT_ALT, value: TYPE_UP })); }
     if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
     if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
 
@@ -117,6 +121,7 @@ pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWith
         seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
         if to.modifiers.alt && !from.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+        if to.modifiers.right_alt && !from.modifiers.right_alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_RIGHT_ALT, value: TYPE_DOWN })); }
         if to.modifiers.shift && !from.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
         if to.modifiers.meta && !from.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_DOWN }));
@@ -128,6 +133,7 @@ pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWith
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_UP }));
         if to.modifiers.ctrl && !from.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
         if to.modifiers.alt && !from.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+        if to.modifiers.right_alt && !from.modifiers.right_alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_RIGHT_ALT, value: TYPE_UP })); }
         if to.modifiers.shift && !from.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
         if to.modifiers.meta && !from.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
         seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
@@ -149,6 +155,7 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
 
     if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_DOWN })); }
     if !from.modifiers.alt && to.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_DOWN })); }
+    if !from.modifiers.right_alt && to.modifiers.right_alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_RIGHT_ALT, value: TYPE_DOWN })); }
     if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_DOWN })); }
     if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_DOWN })); }
 
@@ -157,6 +164,7 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     // revert to original
     if !from.modifiers.ctrl && to.modifiers.ctrl { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_CTRL, value: TYPE_UP })); }
     if !from.modifiers.alt && to.modifiers.alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_ALT, value: TYPE_UP })); }
+    if !from.modifiers.right_alt && to.modifiers.right_alt { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_RIGHT_ALT, value: TYPE_UP })); }
     if !from.modifiers.shift && to.modifiers.shift { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_SHIFT, value: TYPE_UP })); }
     if !from.modifiers.meta && to.modifiers.meta { seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: *KEY_LEFT_META, value: TYPE_UP })); }
 

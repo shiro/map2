@@ -1,6 +1,6 @@
 use std::sync::RwLock;
 
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -61,6 +61,8 @@ fn release_restore_modifiers(
     }
     if from_flags.alt && !to_flags.alt {
         release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFT_ALT);
+    }
+    if from_flags.right_alt && !to_flags.right_alt {
         release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHT_ALT);
     }
     if from_flags.meta && !to_flags.meta {
@@ -108,6 +110,7 @@ impl MapperInner {
             let mut from_modifiers = KeyModifierFlags::new();
             from_modifiers.ctrl = state.modifiers.is_ctrl();
             from_modifiers.alt = state.modifiers.is_alt();
+            from_modifiers.right_alt = state.modifiers.is_right_alt();
             from_modifiers.shift = state.modifiers.is_shift();
             from_modifiers.meta = state.modifiers.is_meta();
 
@@ -167,7 +170,7 @@ impl MapperInner {
 pub struct Mapper {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     pub inner: Arc<MapperInner>,
-
+    transformer: UTFToRawInputTransformer,
 }
 
 #[pymethods]
@@ -180,15 +183,15 @@ impl Mapper {
         //     None => HashMap::new()
         // };
 
-        let t = UTFToRawInputTransformer::new(
+        let transformer = UTFToRawInputTransformer::new(
             None,
             Some("rabbit"),
             None,
             None,
         );
-        let r = t.utf_to_raw("Š".to_string());
+        // let r = t.utf_to_raw("Š".to_string());
         // let r = t.utf_to_raw("y".to_string());
-        println!("keys! {r:?}");
+        // println!("keys! {r:?}");
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
 
@@ -201,12 +204,13 @@ impl Mapper {
         Ok(Self {
             subscriber,
             inner,
+            transformer,
         })
     }
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if let Ok(to) = to.extract::<String>(py) {
-            let from = parse_key_action_with_mods_py(&from).unwrap();
+            let from = parse_key_action_with_mods_py(&from, &self.transformer).unwrap();
             let to = parse_key_sequence_py(&to).unwrap();
 
             self._map_key(from, to)?;
@@ -225,10 +229,13 @@ impl Mapper {
     }
 
     pub fn map_key(&mut self, py: Python, from: String, to: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from).unwrap();
-        let to = parse_key_action_with_mods_py(&to).unwrap();
-        self._map_key(from, vec![to])?;
+        let from = parse_key_action_with_mods_py(&from, &self.transformer)
+            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
+        let to = parse_key_action_with_mods_py(&to, &self.transformer)
+            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+
+        self._map_key(from, vec![to])?;
         Ok(())
     }
 
@@ -247,7 +254,7 @@ impl Mapper {
 
 impl Mapper {
     fn _map_callback(&mut self, from: String, to: PyObject) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from).unwrap();
+        let from = parse_key_action_with_mods_py(&from, &self.transformer).unwrap();
 
         match from {
             ParsedKeyAction::KeyAction(from) => {

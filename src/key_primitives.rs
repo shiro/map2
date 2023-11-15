@@ -37,13 +37,15 @@ pub struct KeyModifierFlags {
     pub ctrl: bool,
     pub shift: bool,
     pub alt: bool,
+    pub right_alt: bool,
     pub meta: bool,
 }
 
 impl KeyModifierFlags {
-    pub fn new() -> Self { KeyModifierFlags { ctrl: false, shift: false, alt: false, meta: false } }
+    pub fn new() -> Self { KeyModifierFlags { ctrl: false, shift: false, alt: false, right_alt: false, meta: false } }
     pub fn ctrl(&mut self) { self.ctrl = true; }
     pub fn alt(&mut self) { self.alt = true; }
+    pub fn right_alt(&mut self) { self.right_alt = true; }
     pub fn shift(&mut self) { self.shift = true; }
     pub fn meta(&mut self) {
         self.meta = true;
@@ -51,6 +53,7 @@ impl KeyModifierFlags {
     pub fn apply_from(&mut self, other: &KeyModifierFlags) {
         if other.ctrl { self.ctrl(); }
         if other.alt { self.alt(); }
+        if other.right_alt { self.right_alt(); }
         if other.shift { self.shift(); }
         if other.meta { self.meta(); }
     }
@@ -82,7 +85,8 @@ impl KeyModifierState {
         }
     }
     pub fn is_ctrl(&self) -> bool { self.left_ctrl || self.right_ctrl }
-    pub fn is_alt(&self) -> bool { self.left_alt || self.right_alt }
+    pub fn is_alt(&self) -> bool { self.left_alt }
+    pub fn is_right_alt(&self) -> bool { self.right_alt }
     pub fn is_shift(&self) -> bool { self.left_shift || self.right_shift }
     pub fn is_meta(&self) -> bool { self.left_meta || self.right_meta }
 }

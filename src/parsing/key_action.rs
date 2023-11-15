@@ -1,3 +1,4 @@
+use crate::xkb::UTFToRawInputTransformer;
 use super::*;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -44,44 +45,61 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
     }
 }
 
-pub(super) fn key_action(input: &str) -> ResNew<&str, ParsedKeyAction> {
-    alt((
-        map(tuple((tag_custom("{"), key_with_state, tag_custom("}"))), |(_, (v, _), _)| (v.0, Some(v.1))),
-        map(
-            alt((
-                map(tuple((tag_custom("{"), key, tag_custom("}"))), |v| v.1.0),
-                map(key, |v| v.0),
-            )),
-            |v| (v, None),
-        ),
-    ))(input).and_then(|(next, ((key, mods), state))| {
-        let action = match state {
-            Some(state) => {
-                ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, state, mods))
-            }
-            None => {
-                ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods))
-            }
-        };
 
-        Ok((next, (action, None)))
-    })
+pub fn key_action(input: &str) -> ResNew<&str, ParsedKeyAction> {
+    key_action_utf(None)(input)
 }
 
-pub(super) fn key_action_with_flags(input: &str) -> ResNew<&str, ParsedKeyAction> {
-    tuple((
-        key_flags,
-        key_action,
-    ))(input).and_then(|(next, parts)| {
-        let flags = parts.0;
-        let mut action = parts.1;
+pub fn key_action_utf<'a>(
+    transformer: Option<&'a UTFToRawInputTransformer>
+) -> impl Fn(&'a str) -> ResNew<&'a str, ParsedKeyAction> {
+    move |input: &str| {
+        alt((
+            map(tuple((tag_custom("{"), key_with_state_utf(transformer), tag_custom("}"))), |(_, (v, _), _)| (v.0, Some(v.1))),
+            map(
+                alt((
+                    map(tuple((tag_custom("{"), key_utf(transformer), tag_custom("}"))), |v| v.1.0),
+                    map(key_utf(transformer), |v| v.0),
+                )),
+                |v| (v, None),
+            ),
+        ))(input).and_then(|(next, ((key, mods), state))| {
+            let action = match state {
+                Some(state) => {
+                    ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, state, mods))
+                }
+                None => {
+                    ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods))
+                }
+            };
 
-        match &mut action.0 {
-            ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags.0) }
-            ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags.0) }
-        }
+            Ok((next, (action, None)))
+        })
+    }
+}
 
-        Ok((next, (action.0, None)))
+pub fn key_action_with_flags(input: &str) -> ResNew<&str, ParsedKeyAction> {
+    key_action_with_flags_utf(None)(input)
+}
+
+pub fn key_action_with_flags_utf<'a>(
+    transformer: Option<&'a UTFToRawInputTransformer>,
+) -> Box<dyn Fn(&'a str) -> ResNew<&'a str, ParsedKeyAction> + 'a> {
+    Box::new(move |input: &str| {
+        tuple((
+            key_flags,
+            key_action_utf(transformer),
+        ))(input).and_then(|(next, parts)| {
+            let flags = parts.0;
+            let mut action = parts.1;
+
+            match &mut action.0 {
+                ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags.0) }
+                ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags.0) }
+            }
+
+            Ok((next, (action.0, None)))
+        })
     })
 }
 
@@ -109,6 +127,34 @@ mod tests {
 
         assert_eq!(key_action_with_flags("!{j down}"), nom_ok(ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_J").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.alt()))
+        )));
+    }
+
+    #[test]
+    fn parse_key_action_utf() {
+        let t = UTFToRawInputTransformer::new(None, Some("rabbit"), None, None);
+        //
+        // assert_eq!(key_action_utf(Some(&t))("{š down}"), nom_ok(ParsedKeyAction::KeyAction(
+        //     KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_S").unwrap(), 1,
+        //         KeyModifierFlags::new().tap_mut(|x| x.right_alt()),
+        //     )
+        // )));
+        //
+        // assert_eq!(key_action_utf(Some(&t))("{^ down}"), nom_ok(ParsedKeyAction::KeyAction(
+        //     KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(), 1,
+        //         KeyModifierFlags::new().tap_mut(|x| x.shift()),
+        //     )
+        // )));
+        //
+        // assert_eq!(key_action_utf(Some(&t))("^"), nom_ok(ParsedKeyAction::KeyClickAction(
+        //     KeyClickActionWithMods::new_with_mods(Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(),
+        //         KeyModifierFlags::new().tap_mut(|x| x.shift()),
+        //     )
+        // )));
+        //
+        assert_eq!(key_action_with_flags_utf(Some(&t))("\\^"), nom_ok(ParsedKeyAction::KeyClickAction(
+            KeyClickActionWithMods::new_with_mods(Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(),
+                KeyModifierFlags::new().tap_mut(|v| v.shift()))
         )));
     }
 }
