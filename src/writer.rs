@@ -11,17 +11,7 @@ use crate::device::virt_device::DeviceCapabilities;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 
-// pub trait EventRoutable {
-//     fn route(&mut self) -> Result<mpsc::Receiver<EvdevInputEvent>>;
-// }
 
-// #[pyclass]
-// #[derive(Clone)]
-// pub struct EventRoute {}
-//
-// impl EventRoutable for EventRoute {
-//     fn route(&mut self) -> Result<mpsc::Receiver<EvdevInputEvent>> { panic!("hey, listen") }
-// }
 pub struct WriterInner {
     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
 }
@@ -49,16 +39,9 @@ pub struct Writer {
 impl Writer {
     #[new]
     #[args(kwargs = "**")]
-    // pub fn new(reader: &mut Reader, kwargs: Option<&PyDict>) -> PyResult<Self> {
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
-            Some(py_dict) => py_dict
-                .extract::<HashMap<&str, &PyAny>>()
-                .unwrap()
-                .remove("options")
-                .ok_or_else(|| PyTypeError::new_err("the options object must be a dict"))?
-                .extract()
-                .map_err(|_| PyTypeError::new_err("the options object must be a dict"))?,
+            Some(py_dict) => py_dict.extract().unwrap(),
             None => HashMap::new()
         };
 
@@ -85,9 +68,8 @@ impl Writer {
 
         let device_init_policy = match options.get("clone_from") {
             Some(_existing_dev_fd) => {
-                let existing_dev_fd = _existing_dev_fd.extract::<&str>()
-                    .map_err(|_| PyTypeError::new_err("the 'clone_from' option must be a string"))?
-                    .to_string();
+                let existing_dev_fd = _existing_dev_fd.extract::<String>()
+                    .map_err(|_| PyRuntimeError::new_err("the 'clone_from' option must be a string"))?;
 
                 virtual_output_device::DeviceInitPolicy::CloneExistingDevice(existing_dev_fd)
             }
@@ -96,21 +78,8 @@ impl Writer {
             }
         };
 
-        // output_device.send()
-
         let (exit_tx, exit_rx) = oneshot::channel();
         let (out_ev_tx, out_ev_rx) = mpsc::channel();
-
-        // if let Ok(mut reader) = subscribable.extract::<PyRefMut<Reader>>() {
-        //     reader.subscribe(out_ev_tx.clone());
-        // } else if let Ok(mut mapper) = subscribable.extract::<PyRefMut<Mapper>>() {
-        //     mapper.subscribe(out_ev_tx.clone());
-        // } else if let Ok(mut text_mapper) = subscribable.extract::<PyRefMut<TextMapper>>() {
-        //     text_mapper.subscribe(out_ev_tx.clone());
-        // } else {
-        //     return Err(PyTypeError::new_err("Invalid type for argument subscribable"));
-        // }
-
 
         let thread_handle = thread::spawn(move || {
             // grab udev device

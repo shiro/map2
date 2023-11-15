@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 
@@ -175,6 +176,10 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     let up_mapping = (KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
     let repeat_mapping = (KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
     [down_mapping, up_mapping, repeat_mapping]
+}
+
+pub fn err_to_py(err: anyhow::Error) -> PyErr {
+    PyRuntimeError::new_err(err.to_string())
 }
 
 #[pyfunction]

@@ -32,6 +32,7 @@ pub use crate::key_primitives::*;
 pub use crate::state::*;
 pub use crate::x11::{get_window_info_x11, x11_initialize};
 pub use crate::x11::ActiveWindowInfo;
+pub use python::err_to_py;
 
 pub mod x11;
 pub mod key_defs;

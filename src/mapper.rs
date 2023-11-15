@@ -178,20 +178,17 @@ impl Mapper {
     #[new]
     #[args(kwargs = "**")]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
-        // let options: HashMap<&str, &PyAny> = match kwargs {
-        //     Some(py_dict) => py_dict.extract().unwrap(),
-        //     None => HashMap::new()
-        // };
+        let options: HashMap<&str, &PyAny> = match kwargs {
+            Some(py_dict) => py_dict.extract().unwrap(),
+            None => HashMap::new()
+        };
 
         let transformer = UTFToRawInputTransformer::new(
-            None,
-            Some("rabbit"),
-            None,
-            None,
+            options.get("model").and_then(|x| x.extract().ok()),
+            options.get("layout").and_then(|x| x.extract().ok()),
+            options.get("variant").and_then(|x| x.extract().ok()),
+            options.get("options").and_then(|x| x.extract().ok()),
         );
-        // let r = t.utf_to_raw("Š".to_string());
-        // let r = t.utf_to_raw("y".to_string());
-        // println!("keys! {r:?}");
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
 

@@ -1,7 +1,7 @@
 use std::thread;
 
 use ::oneshot;
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -24,14 +24,14 @@ impl Reader {
     #[args(kwargs = "**")]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = kwargs
-            .ok_or_else(|| PyTypeError::new_err("no options provided"))?
+            .ok_or_else(|| PyRuntimeError::new_err("no options provided"))?
             .extract()
-            .map_err(|_| PyTypeError::new_err("the options object must be a dict"))?;
+            .map_err(|_| PyRuntimeError::new_err("the options object must be a dict"))?;
 
         let patterns: Vec<&str> = options.get("patterns")
-            .ok_or_else(|| PyTypeError::new_err("'patterns' is required but was not provided"))?
+            .ok_or_else(|| PyRuntimeError::new_err("'patterns' is required but was not provided"))?
             .extract()
-            .map_err(|_| PyTypeError::new_err("'patterns' must be a list"))?;
+            .map_err(|_| PyRuntimeError::new_err("'patterns' must be a list"))?;
 
         let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
 
@@ -44,8 +44,7 @@ impl Reader {
             }
         });
 
-        let reader_thread_handle = grab_udev_inputs(&patterns, handler, reader_exit_rx)
-            .map_err(|err| PyTypeError::new_err(err.to_string()))?;
+        let reader_thread_handle = grab_udev_inputs(&patterns, handler, reader_exit_rx).map_err(err_to_py)?;
 
         Ok(Self {
             reader_exit_tx: Some(reader_exit_tx),
