@@ -221,7 +221,7 @@ impl Mapper {
             return Ok(());
         }
 
-        Err(PyRuntimeError::new_err("unknown type"))
+        Err(PyRuntimeError::new_err("expected a callable object"))
     }
 
     pub fn map_key(&mut self, py: Python, from: String, to: String) -> PyResult<()> {

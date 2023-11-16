@@ -33,6 +33,10 @@ impl Reader {
             .extract()
             .map_err(|_| PyRuntimeError::new_err("'patterns' must be a list"))?;
 
+        if patterns.is_empty() {
+            return Err(PyRuntimeError::new_err("the pattern list cannot be empty"));
+        }
+
         let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));

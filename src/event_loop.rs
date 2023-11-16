@@ -36,10 +36,12 @@ impl EventLoop {
                                     // tasks only actually get run if we convert the coroutine to a rust future, even though we don't use it...
                                     if let Err(err) = pyo3_asyncio::tokio::into_future(coroutine) {
                                         eprintln!("an uncaught error was thrown by the python callback: {}", err);
+                                        std::process::exit(1);
                                     }
                                 } else {
                                     if let Err(err) = callback_object.call(py, (), None) {
                                         eprintln!("an uncaught error was thrown by the python callback: {}", err);
+                                        std::process::exit(1);
                                     }
                                 }
                             });
