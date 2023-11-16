@@ -126,7 +126,7 @@ pub fn handle_stdin_ev(
                 // always release all trigger mods before running the callback
                 release_restore_modifiers(state, output_device, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
 
-                EVENT_LOOP.lock().unwrap().execute(callback_object.clone());
+                EVENT_LOOP.lock().unwrap().execute(callback_object.clone(), None);
             }
             RuntimeAction::NOP => {}
         }

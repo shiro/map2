@@ -7,7 +7,7 @@ use pyo3::types::PyDict;
 
 use crate::*;
 use crate::event::InputEvent;
-use crate::event_loop::EventLoop;
+use crate::event_loop::{EventLoop, PythonArgument};
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
@@ -85,6 +85,7 @@ pub struct MapperInner {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     state_map: RwLock<HashMap<String, RwLock<State>>>,
     mappings: RwLock<Mappings>,
+    fallback_handler: RwLock<Option<PyObject>>,
 }
 
 impl MapperInner {
@@ -148,11 +149,27 @@ impl MapperInner {
                             subscriber.handle("", InputEvent::Raw(ev));
                         }
 
-                        EVENT_LOOP.lock().unwrap().execute(callback_object.clone());
+                        EVENT_LOOP.lock().unwrap().execute(callback_object.clone(), None);
                     }
                     RuntimeAction::NOP => {}
                 }
 
+                return;
+            }
+
+            if let Some(fallback_handler) = self.fallback_handler.read().unwrap().as_ref() {
+                match ev {
+                    EvdevInputEvent {
+                        event_code: EventCode::EV_KEY(_key),
+                        value,
+                        ..
+                    } => {
+                        EVENT_LOOP.lock().unwrap().execute(fallback_handler.clone(), Some(vec![
+                            PythonArgument::String(format!("{_key:?} {value}").to_string()),
+                        ]));
+                    },
+                    &_ => {}
+                }
                 return;
             }
 
@@ -176,7 +193,7 @@ pub struct Mapper {
 #[pymethods]
 impl Mapper {
     #[new]
-    #[pyo3(signature = (**kwargs))]
+    #[pyo3(signature = (* * kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),
@@ -196,6 +213,7 @@ impl Mapper {
             subscriber: subscriber.clone(),
             state_map: RwLock::new(HashMap::new()),
             mappings: RwLock::new(Mappings::new()),
+            fallback_handler: RwLock::new(None),
         });
 
         Ok(Self {
@@ -233,6 +251,17 @@ impl Mapper {
 
         self._map_key(from, vec![to])?;
         Ok(())
+    }
+
+    pub fn map_fallback(&mut self, py: Python, fallback_handler: PyObject) -> PyResult<()> {
+        let is_callable = fallback_handler.as_ref(py).is_callable();
+
+        if is_callable {
+            *self.inner.fallback_handler.write().unwrap() = Some(fallback_handler);
+            return Ok(());
+        }
+
+        Err(PyRuntimeError::new_err("expected a callable object"))
     }
 
     pub fn link(&mut self, target: &PyAny) {
