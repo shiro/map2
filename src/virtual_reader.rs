@@ -46,7 +46,6 @@ impl VirtualReader {
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
 
-
         let transformer = UTFToRawInputTransformer::new(
             options.get("model").and_then(|x| x.extract().ok()),
             options.get("layout").and_then(|x| x.extract().ok()),
@@ -79,7 +78,6 @@ impl VirtualReader {
 
             for action in actions {
                 subscriber.handle(&self.id, InputEvent::Raw(action.to_input_ev()));
-                subscriber.handle(&self.id, InputEvent::Raw(SYN_REPORT.clone()));
             }
         }
     }

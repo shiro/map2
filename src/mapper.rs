@@ -1,5 +1,4 @@
 use std::sync::RwLock;
-use std::thread;
 
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
 use pyo3::prelude::*;
@@ -130,7 +129,6 @@ impl MapperInner {
                                     let ev = key_action.to_input_ev();
 
                                     subscriber.handle("", InputEvent::Raw(ev));
-                                    subscriber.handle("", InputEvent::Raw(SYN_REPORT.clone()));
                                 }
                                 RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
                                     let mut new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);

@@ -8,9 +8,6 @@ use pyo3::types::PyDict;
 use crate::*;
 use crate::device::*;
 use crate::device::virt_device::DeviceCapabilities;
-use crate::parsing::key_action::*;
-use crate::parsing::python::*;
-
 
 pub struct WriterInner {
     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
@@ -91,6 +88,7 @@ impl Writer {
 
                 while let Ok(ev) = out_ev_rx.try_recv() {
                     let _ = output_device.send(&ev);
+                    let _ = output_device.send(&SYN_REPORT.clone());
 
                     // this is a hack that stops successive events to not get registered
                     // maybe if we add proper times to the events it'll be fine...
