@@ -76,9 +76,17 @@ lazy_static! {
         let mut m = HashMap::new();
         m.insert(" ", (Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap(), KeyModifierFlags::new()));
         m.insert("SHIFT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap(), KeyModifierFlags::new()));
+        m.insert("LEFT_SHIFT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap(), KeyModifierFlags::new()));
+        m.insert("RIGHT_SHIFT", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTSHIFT").unwrap(), KeyModifierFlags::new()));
         m.insert("ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
+        m.insert("LEFT_ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
+        m.insert("RIGHT_ALT", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("META", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap(), KeyModifierFlags::new()));
+        m.insert("LEFT_ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
+        m.insert("RIGHT_ALT", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("CTRL", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTCTRL").unwrap(), KeyModifierFlags::new()));
+        m.insert("LEFT_CTRL", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTCTRL").unwrap(), KeyModifierFlags::new()));
+        m.insert("RIGHT_CTRL", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTCTRL").unwrap(), KeyModifierFlags::new()));
         m.insert("CAPS", (Key::from_str(&EventType::EV_KEY, "KEY_CAPSLOCK").unwrap(), KeyModifierFlags::new()));
         m
     };

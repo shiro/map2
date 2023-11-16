@@ -1,10 +1,9 @@
 use std::thread;
 
 use pyo3::{Py, PyAny, Python};
-use pyo3::types::PyBool;
 
 pub struct EventLoop {
-    thread_handle: Option<std::thread::JoinHandle<()>>,
+    thread_handle: Option<thread::JoinHandle<()>>,
     callback_tx: tokio::sync::mpsc::Sender<Py<PyAny>>,
 }
 
@@ -20,18 +19,16 @@ impl EventLoop {
                     pyo3_asyncio::tokio::run::<_, ()>(py, async move {
                         loop {
                             let callback_object = callback_rx.recv().await.unwrap();
-                            let f = Python::with_gil(|py| {
-                                let callback_object = callback_object.cast_as::<PyAny>(py).unwrap();
-
+                            Python::with_gil(|py| {
                                 let asyncio = py.import("asyncio").unwrap();
-                                let is_async_callback = asyncio
-                                    .call_method1("iscoroutinefunction", (callback_object, ))
+                                let is_async_callback: bool = asyncio
+                                    .call_method1("iscoroutinefunction", (callback_object.as_ref(py), ))
                                     .unwrap()
-                                    .cast_as::<PyBool>()
+                                    .extract()
                                     .unwrap();
 
-                                if is_async_callback.is_true() {
-                                    let coroutine = callback_object.call((), None).unwrap();
+                                if is_async_callback {
+                                    let coroutine = callback_object.call(py, (), None).unwrap();
 
                                     let event_loop = pyo3_asyncio::tokio::get_current_loop(py).unwrap();
                                     let coroutine = event_loop.call_method1("create_task", (coroutine, )).unwrap();
@@ -41,7 +38,7 @@ impl EventLoop {
                                         eprintln!("an uncaught error was thrown by the python callback: {}", err);
                                     }
                                 } else {
-                                    if let Err(err) = callback_object.call((), None) {
+                                    if let Err(err) = callback_object.call(py, (), None) {
                                         eprintln!("an uncaught error was thrown by the python callback: {}", err);
                                     }
                                 }

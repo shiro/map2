@@ -1,6 +1,7 @@
 use std::sync::RwLock;
 
 use pyo3::exceptions::{PyRuntimeError, PyTypeError};
+use pyo3::impl_::wrap::OkWrap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -175,7 +176,7 @@ pub struct Mapper {
 #[pymethods]
 impl Mapper {
     #[new]
-    #[args(kwargs = "**")]
+    #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),
@@ -213,15 +214,14 @@ impl Mapper {
             return Ok(());
         }
 
-        let is_callable = to.cast_as::<PyAny>(py)
-            .map_or(false, |obj| obj.is_callable());
+        let is_callable = to.as_ref(py).is_callable();
 
         if is_callable {
             self._map_callback(from, to)?;
             return Ok(());
         }
 
-        Err(PyTypeError::new_err("unknown type"))
+        Err(PyRuntimeError::new_err("unknown type"))
     }
 
     pub fn map_key(&mut self, py: Python, from: String, to: String) -> PyResult<()> {

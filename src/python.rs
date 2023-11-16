@@ -192,8 +192,8 @@ fn wait(py: Python) {
     });
 }
 
-#[pyfunction(exit_code = "0")]
-fn exit(exit_code: i32) { std::process::exit(exit_code); }
+#[pyfunction]
+fn exit(exit_code: Option<i32>) { std::process::exit(exit_code.unwrap_or(0)); }
 
 #[pymodule]
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {

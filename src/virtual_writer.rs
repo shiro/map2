@@ -31,7 +31,7 @@ pub struct VirtualWriter {
 #[pymethods]
 impl VirtualWriter {
     #[new]
-    #[args(kwargs = "**")]
+    #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let keyboard = VirtualKeyboard::new().unwrap();
         Ok(Self {

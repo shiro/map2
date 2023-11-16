@@ -30,7 +30,7 @@ pub struct TextMapper {
 #[pymethods]
 impl TextMapper {
     #[new]
-    #[args(kwargs = "**")]
+    #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),

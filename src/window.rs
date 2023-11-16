@@ -1,15 +1,12 @@
 use std::thread;
 
+use hyprland::event_listener::EventListenerMutable as EventListener;
 use pyo3::*;
+use pyo3::impl_::wrap::OkWrap;
 use pyo3::prelude::*;
 
 use crate::*;
 use crate::time::Duration;
-
-use hyprland::prelude::*;
-use hyprland::event_listener::EventListenerMutable as EventListener;
-use hyprland::dispatch::*;
-
 
 #[pyclass]
 pub struct Window {
@@ -85,13 +82,14 @@ pub fn spawn_x11_thread() -> (mpsc::Sender<ControlMessage>, thread::JoinHandle<(
                     name: val.window_title.clone(),
                 };
 
-                let gil = Python::acquire_gil();
-                let py = gil.python();
-                for callback in subscriptions.lock().unwrap().values() {
-                    let is_callable = callback.cast_as::<PyAny>(py).map_or(false, |obj| obj.is_callable());
-                    if !is_callable { continue; }
-                    let _ = callback.call(py, (val.class.clone(), ), None);
-                }
+                Python::with_gil(|py|{
+                    for callback in subscriptions.lock().unwrap().values() {
+                        let is_callable = callback.as_ref(py).is_callable();
+                        if !is_callable { continue; }
+
+                        let _ = callback.call(py, (val.class.clone(), ), None);
+                    }
+                });
             }
         });
         let _ = event_listener.start_listener();
