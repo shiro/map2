@@ -18,7 +18,6 @@ pub use std::time::Duration;
 
 pub use anyhow::{anyhow, Result};
 use arc_swap::ArcSwapOption;
-pub use async_recursion::async_recursion;
 pub use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent as EvdevInputEvent;
 pub use nom::lib::std::collections::HashMap;

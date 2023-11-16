@@ -10,24 +10,23 @@ crate-type = ["lib","cdylib"]
 
 [dependencies]
 anyhow = "1.0"
-async-recursion = "0.3.2"
-clap = "2.33.3"
+clap = "4.4.8"
 evdev-rs = { path = "evdev-rs" }
 futures = "0.3"
 input-linux-sys = "0.3.1"
 itertools = "0.10.0"
 lazy_static = "1.4.0"
-libc = "0.2.71"
+libc = "0.2.150"
 arc-swap = "1.6.0"
 man = "0.3.0"
 nom = "7.1.3"
 notify = "4.0.16"
-regex = "1.4.5"
+regex = "1.10.2"
 tap = "1.0.1"
 tokio = { version = "1.9", features = ["full"] }
 tokio-file-unix = "0.5.1"
-unicode-xid = "0.2.1"
-walkdir = "2.3.2"
+unicode-xid = "0.2.4"
+walkdir = "2.4.0"
 x11rb = "0.7.0"
 hyprland = "0.3.12"
 xdg = "2.2.0"
@@ -39,9 +38,8 @@ pyo3 = { version = "0.20.0", features = ["extension-module"] }
 pyo3-asyncio = { version = "0.20.0", features = ["attributes", "tokio-runtime"] }
 oneshot = "0.1.2"
 thread_tryjoin = "0.2.1"
-signal-hook = "0.3.10"
-async-channel = "1.6.1"
-uuid = { version = "1.1.2", features = ["v4"] }
+signal-hook = "0.3.17"
+uuid = { version = "1.5.0", features = ["v4"] }
 bitflags = "1.3.2"
 byteorder = "1.5.0"
 tempfile = "3.8.1"
