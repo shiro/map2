@@ -1,3 +1,4 @@
+use std::ops::Add;
 use std::sync::RwLock;
 
 use pyo3::exceptions::PyRuntimeError;
@@ -123,6 +124,11 @@ impl MapperInner {
                 modifiers: from_modifiers,
             };
 
+            // let since_the_epoch = time::SystemTime::now()
+            //     .duration_since(time::UNIX_EPOCH)
+            //     .unwrap();
+            // let mut usec = since_the_epoch.subsec_micros() as i64;
+
             if let Some(runtime_action) = mappings.get(&from_key_action) {
                 match runtime_action {
                     RuntimeAction::ActionSequence(seq) => {
@@ -198,7 +204,7 @@ pub struct Mapper {
 #[pymethods]
 impl Mapper {
     #[new]
-    #[pyo3(signature = (**kwargs))]
+    #[pyo3(signature = (* * kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),

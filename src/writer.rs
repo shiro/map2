@@ -38,7 +38,7 @@ impl Writer {
     #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
-            Some(py_dict) => py_dict.extract().unwrap(),
+            Some(py_dict) => py_dict.extract()?,
             None => HashMap::new()
         };
 
@@ -76,7 +76,7 @@ impl Writer {
         };
 
         let (exit_tx, exit_rx) = oneshot::channel();
-        let (out_ev_tx, out_ev_rx) = mpsc::channel();
+        let (out_ev_tx, out_ev_rx) = mpsc::channel::<EvdevInputEvent>();
 
         let thread_handle = thread::spawn(move || {
             // grab udev device
@@ -87,12 +87,15 @@ impl Writer {
                 if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
 
                 while let Ok(ev) = out_ev_rx.try_recv() {
+                    let mut syn = SYN_REPORT.clone();
+                    syn.time.tv_sec = ev.time.tv_sec;
+                    syn.time.tv_usec = ev.time.tv_usec;
+
                     let _ = output_device.send(&ev);
-                    let _ = output_device.send(&SYN_REPORT.clone());
+                    let _ = output_device.send(&syn);
 
                     // this is a hack that stops successive events to not get registered
-                    // maybe if we add proper times to the events it'll be fine...
-                    thread::sleep(Duration::from_millis(5));
+                    thread::sleep(Duration::from_millis(1));
                 }
 
                 thread::sleep(Duration::from_millis(10));
@@ -113,22 +116,13 @@ impl Writer {
 
         Ok(handle)
     }
-
-    // pub fn send(&mut self, val: String) {
-    //     let actions = parse_key_sequence_py(val.as_str()).unwrap();
-    //
-    //     for action in actions.to_key_actions() {
-    //         self.out_ev_tx.send(action.to_input_ev()).unwrap();
-    //         self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
-    //     }
-    // }
 }
 
 impl Drop for Writer {
     fn drop(&mut self) {
         if let Some(exit_tx) = self.exit_tx.take() {
-            exit_tx.send(()).unwrap();
-            self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000)).unwrap();
+            let _ =exit_tx.send(());
+            let _ = self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000));
         }
     }
 }

@@ -1,7 +1,7 @@
 use std::thread;
 
 use pyo3::{IntoPy, Py, PyAny, Python};
-use pyo3::types::{PyList, PyTuple};
+use pyo3::types::{PyTuple};
 
 #[derive(Debug)]
 pub enum PythonArgument {
@@ -40,23 +40,29 @@ impl EventLoop {
                 Python::with_gil(|py| {
                     pyo3_asyncio::tokio::run::<_, ()>(py, async move {
                         loop {
-                            let (callback_object, args): (Py<PyAny>, Option<Args>) = callback_rx.recv().await.unwrap();
+                            let (callback_object, args): (Py<PyAny>, Option<Args>) = callback_rx.recv().await
+                                .expect("python runtime error: event loop channel is closed");
 
                             Python::with_gil(|py| {
                                 let args = args_to_py(py, args.unwrap_or_default());
 
-                                let asyncio = py.import("asyncio").unwrap();
+                                let asyncio = py.import("asyncio")
+                                    .expect("python runtime error: failed to import 'asyncio', is it installed?");
+
                                 let is_async_callback: bool = asyncio
                                     .call_method1("iscoroutinefunction", (callback_object.as_ref(py), ))
-                                    .unwrap()
+                                    .expect("python runtime error: 'iscoroutinefunction' lookup failed")
                                     .extract()
-                                    .unwrap();
+                                    .expect("python runtime error: 'iscoroutinefunction' call failed");
 
                                 if is_async_callback {
-                                    let coroutine = callback_object.call(py, args, None).unwrap();
+                                    let coroutine = callback_object.call(py, args, None)
+                                        .expect("python runtime error: failed to call async callback");
 
-                                    let event_loop = pyo3_asyncio::tokio::get_current_loop(py).unwrap();
-                                    let coroutine = event_loop.call_method1("create_task", (coroutine, )).unwrap();
+                                    let event_loop = pyo3_asyncio::tokio::get_current_loop(py)
+                                        .expect("python runtime error: failed to get the event loop");
+                                    let coroutine = event_loop.call_method1("create_task", (coroutine, ))
+                                        .expect("python runtime error: failed to create task");
 
                                     // tasks only actually get run if we convert the coroutine to a rust future, even though we don't use it...
                                     if let Err(err) = pyo3_asyncio::tokio::into_future(coroutine) {
@@ -71,7 +77,7 @@ impl EventLoop {
                                 }
                             });
                         }
-                    }).unwrap();
+                    }).expect("python runtime error: failed to start the event loop");
                 });
                 // let elapsed = now.elapsed();
             });

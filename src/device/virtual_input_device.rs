@@ -33,20 +33,21 @@ pub fn read_from_device_input_fd_thread_handler(
     mut ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
     abort_rx: oneshot::Receiver<()>,
 ) {
-    let mut a: io::Result<(ReadStatus, InputEvent)>;
+    let mut read_buf: io::Result<(ReadStatus, InputEvent)>;
     let id = Uuid::new_v4().to_string();
+
     loop {
         if abort_rx.try_recv().is_ok() { return; }
 
-        a = device.next_event(ReadFlag::NORMAL);
-        if a.is_ok() {
-            let mut result = a.ok().unwrap();
+        read_buf = device.next_event(ReadFlag::NORMAL);
+        if read_buf.is_ok() {
+            let mut result = read_buf.ok().unwrap();
             match result.0 {
                 ReadStatus::Sync => { // dropped, need to sync
                     while result.0 == ReadStatus::Sync {
-                        a = device.next_event(ReadFlag::SYNC);
-                        if a.is_ok() {
-                            result = a.ok().unwrap();
+                        read_buf = device.next_event(ReadFlag::SYNC);
+                        if read_buf.is_ok() {
+                            result = read_buf.ok().unwrap();
                         } else { // something failed, abort sync and carry on
                             break;
                         }
@@ -55,7 +56,7 @@ pub fn read_from_device_input_fd_thread_handler(
                 ReadStatus::Success => { ev_handler(&id, result.1); }
             }
         } else {
-            let err = a.err().unwrap();
+            let err = read_buf.err().unwrap();
             match err.raw_os_error() {
                 Some(libc::ENODEV) => { return; }
                 Some(libc::EWOULDBLOCK) => {

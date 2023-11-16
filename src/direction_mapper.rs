@@ -100,8 +100,8 @@ impl DirectionMapperInner {
                         ..
                     } => {
                         let name = match key {
-                            EV_REL::REL_X => "REL_X",
-                            EV_REL::REL_Y => "REL_Y",
+                            EV_REL::REL_X => "X",
+                            EV_REL::REL_Y => "Y",
                             _ => {return;}
                         }.to_string();
 
