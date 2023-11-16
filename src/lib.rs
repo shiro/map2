@@ -33,6 +33,11 @@ pub use crate::x11::{get_window_info_x11, x11_initialize};
 pub use crate::x11::ActiveWindowInfo;
 pub use python::err_to_py;
 
+use reader::Reader;
+use writer::Writer;
+use mapper::Mapper;
+use direction_mapper::DirectionMapper;
+
 pub mod x11;
 pub mod key_defs;
 pub mod state;
@@ -55,6 +60,7 @@ pub mod python;
 pub mod reader;
 pub mod virtual_reader;
 pub mod mapper;
+pub mod direction_mapper;
 pub mod writer;
 pub mod virtual_writer;
 pub mod text_mapper;

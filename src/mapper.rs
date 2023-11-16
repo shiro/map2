@@ -1,6 +1,6 @@
 use std::sync::RwLock;
 
-use pyo3::exceptions::{PyRuntimeError, PyTypeError};
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::impl_::wrap::OkWrap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -198,7 +198,7 @@ pub struct Mapper {
 #[pymethods]
 impl Mapper {
     #[new]
-    #[pyo3(signature = (* * kwargs))]
+    #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),
@@ -278,6 +278,10 @@ impl Mapper {
         } else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
             self.subscriber.store(
                 Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
+            );
+        } else if let Ok(mut target) = target.extract::<PyRefMut<DirectionMapper>>() {
+            self.subscriber.store(
+                Some(Arc::new(Subscriber::DirectionMapper(target.inner.clone())))
             );
         }
     }
