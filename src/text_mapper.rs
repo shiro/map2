@@ -67,25 +67,25 @@ impl TextMapper {
         Ok(handle)
     }
 
-    pub fn map(&mut self, from: String, to: String) -> PyResult<()> {
-        let from = parse_key_sequence_py(&from).unwrap();
-        let to = parse_key_sequence_py(&to).unwrap();
-
-        let from = from
-            .to_key_actions()
-            .into_iter()
-            .filter(|action| {
-                action.value == 0
-            })
-            .map(|action| match action.key.event_code {
-                EventCode::EV_KEY(key) => { key as u8 }
-                _ => panic!("only keys are supported")
-            })
-            .collect();
-
-        self._map_internal(from, to)?;
-        Ok(())
-    }
+    // pub fn map(&mut self, from: String, to: String) -> PyResult<()> {
+    //     let from = parse_key_sequence_py(&from, &self.tr).unwrap();
+    //     let to = parse_key_sequence_py(&to).unwrap();
+    //
+    //     let from = from
+    //         .to_key_actions()
+    //         .into_iter()
+    //         .filter(|action| {
+    //             action.value == 0
+    //         })
+    //         .map(|action| match action.key.event_code {
+    //             EventCode::EV_KEY(key) => { key as u8 }
+    //             _ => panic!("only keys are supported")
+    //         })
+    //         .collect();
+    //
+    //     self._map_internal(from, to)?;
+    //     Ok(())
+    // }
 }
 
 

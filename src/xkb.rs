@@ -7,6 +7,7 @@ use xkbcommon::xkb;
 use xkbcommon::xkb::Keycode;
 use xkeysym::Keysym;
 
+use crate::*;
 use crate::{encoding, Key};
 
 pub struct UTFToRawInputTransformer {
@@ -68,8 +69,14 @@ impl UTFToRawInputTransformer {
         Self { key_map }
     }
 
-    pub fn utf_to_raw(&self, key: String) -> Option<Vec<Key>> {
-        let encoded = key.chars().next().unwrap() as u32;
+    pub fn utf_to_raw(&self, key: String) -> Result<Vec<Key>> {
+        let mut it = key.chars().into_iter();
+        let encoded = it.next().unwrap() as u32;
+
+        if it.next().is_some() {
+            return Err(anyhow!("received more than 1 UTF character"));
+        }
+
         let keysym = encoding::xkb_utf32_to_keysym(encoded);
 
         self.key_map.get(&keysym).and_then(|keysyms| {
@@ -79,7 +86,7 @@ impl UTFToRawInputTransformer {
                         .and_then(|x| Some(Key { event_code: EventCode::EV_KEY(x) }))
                 )
                 .collect::<Option<Vec<Key>>>()
-        })
+        }).ok_or_else(|| anyhow!("failed to convert utf to raw"))
     }
 }
 

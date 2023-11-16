@@ -208,7 +208,7 @@ impl Mapper {
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if let Ok(to) = to.extract::<String>(py) {
             let from = parse_key_action_with_mods_py(&from, &self.transformer).unwrap();
-            let to = parse_key_sequence_py(&to).unwrap();
+            let to = parse_key_sequence_py(&to, &self.transformer).unwrap();
 
             self._map_key(from, to)?;
             return Ok(());

@@ -112,14 +112,14 @@ impl Writer {
         Ok(handle)
     }
 
-    pub fn send(&mut self, val: String) {
-        let actions = parse_key_sequence_py(val.as_str()).unwrap();
-
-        for action in actions.to_key_actions() {
-            self.out_ev_tx.send(action.to_input_ev()).unwrap();
-            self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
-        }
-    }
+    // pub fn send(&mut self, val: String) {
+    //     let actions = parse_key_sequence_py(val.as_str()).unwrap();
+    //
+    //     for action in actions.to_key_actions() {
+    //         self.out_ev_tx.send(action.to_input_ev()).unwrap();
+    //         self.out_ev_tx.send(SYN_REPORT.clone()).unwrap();
+    //     }
+    // }
 }
 
 impl Drop for Writer {

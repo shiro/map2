@@ -24,6 +24,27 @@ use tests::*;
 pub(super) fn nom_ok<'a, T>(value: T) -> ResNew<&'a str, T> { Ok(("", (value, None))) }
 
 #[cfg(test)]
+pub(super) fn nom_err<I, T>(rest: I, expected: Vec<String>) -> ResNew<I, T> {
+    Err(NomErr::Error(CustomError {
+        input: rest,
+        expected,
+    }))
+}
+
+#[cfg(test)]
+pub(super) fn assert_nom_err<T>(parse_result: ResNew<&str, T>, rest: &str) {
+    // if !matches!(parse_result, Err(NomErr::Error(CustomError { input: "bb", .. }))){
+    match parse_result {
+        Err(NomErr::Error(x)) => {
+            assert_eq!(x.input, rest);
+        }
+        Err(err) => { panic!("got other nom error: {err}") }
+        Ok((rest, err)) => { panic!("expected nom error, but got Ok\nrest: {}", rest) }
+    }
+    // }
+}
+
+#[cfg(test)]
 pub(super) fn nom_ok_rest<T>(rest: &str, value: T) -> ResNew<&str, T> { Ok((rest, (value, None))) }
 
 #[cfg(test)]

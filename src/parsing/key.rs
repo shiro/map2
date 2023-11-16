@@ -1,5 +1,7 @@
 use evdev_rs::enums::EV_KEY;
+
 use crate::xkb::UTFToRawInputTransformer;
+
 use super::*;
 
 pub fn key_flags(input: &str) -> ResNew<&str, KeyModifierFlags> {
@@ -29,21 +31,23 @@ pub fn key_utf<'a>(
         alt((
             // multiple asci chars
             map(ident, |v| v.0),
-            // escaped flag char
-            map(tuple((
-                tag_custom("\\"),
-                map(one_of("^!+#"), |v| v.to_string())
-            )), |(_, v)| v),
+            // escaped char
+            // map(tuple((
+            //     tag_custom("\\"),
+            //     map(one_of("^!+#{}"), |v| v.to_string())
+            // )), |(_, v)| v),
+
             // one arbitrary char
+            // map(none_of("\\{}^!+#"), |v| v.to_string()),
             map(take(1usize), |v: &str| v.to_string())
         ))(input)
             .and_then(|(next, key_name)| {
-                let (key, mut flags) = match KEY_ALIAS_TABLE.get(&*key_name) {
+                let (key, mut flags) = match KEY_ALIAS_TABLE.get(&*key_name.to_uppercase()) {
                     Some(v) => *v,
                     None => {
                         if let Some(transformer) = transformer {
                             let mut seq = transformer.utf_to_raw(key_name.to_string())
-                                .ok_or_else(|| make_generic_nom_err_new(input))?;
+                                .map_err(|_| make_generic_nom_err_new(input))?;
 
                             let key = seq.remove(seq.len() - 1);
 
@@ -161,7 +165,6 @@ mod tests {
         assert_eq!(key_flags("#a!"), nom_ok_rest("a!", KeyModifierFlags::new().tap_mut(|v| v.meta())));
     }
 
-
     #[test]
     fn test_utf_key() {
         let t = UTFToRawInputTransformer::new(None, Some("rabbit"), None, None);
@@ -183,5 +186,13 @@ mod tests {
             KeyModifierFlags::new()
                 .tap_mut(|x| x.shift())
         )));
+    }
+
+    #[test]
+    fn invalid_key_multiple_chars() {
+        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
+
+        // assert_eq!(key_utf(Some(&t))("ab"), nom_err("ab"));
+        assert_nom_err(key_utf(Some(&t))("ab"), "ab");
     }
 }
