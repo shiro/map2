@@ -2,13 +2,13 @@ use unicode_xid::UnicodeXID;
 
 use super::*;
 
-pub(super) fn ident(input: &str) -> ResNew<&str, String> {
+pub(super) fn ident(input: &str) -> ResNew2<&str, String> {
     let (rest, id) = match word(input) {
         Ok((rest, id)) => (rest, id),
         Err(_) => return Err(make_generic_nom_err_options(input, vec!["identifier".to_string()])),
     };
 
-    match id.0.as_ref() {
+    match id.as_ref() {
         "break" | "continue" | "do" | "else" | "false" | "for" |
         "if" | "in" | "let" | "loop" | "return" | "true" | "while"
         => Err(make_generic_nom_err_new(input)),
@@ -16,8 +16,8 @@ pub(super) fn ident(input: &str) -> ResNew<&str, String> {
     }
 }
 
-pub(super) fn word(input: &str) -> ResNew<&str, String> {
-    let (input, _) = ws0(input)?;
+pub(super) fn word(input: &str) -> ResNew2<&str, String> {
+    let (input, _) = multispace0(input)?;
 
     let mut chars = input.char_indices();
     match chars.next() {
@@ -27,11 +27,11 @@ pub(super) fn word(input: &str) -> ResNew<&str, String> {
 
     while let Some((i, ch)) = chars.next() {
         if !UnicodeXID::is_xid_continue(ch) {
-            return Ok((&input[i..], (input[..i].into(), None)));
+            return Ok((&input[i..], input[..i].into()));
         }
     }
 
-    Ok(("", (input.into(), None)))
+    Ok(("", input.into()))
 }
 
 #[cfg(test)]

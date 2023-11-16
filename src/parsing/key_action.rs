@@ -1,5 +1,5 @@
-use nom::combinator::{map_res, recognize};
 use crate::xkb::UTFToRawInputTransformer;
+
 use super::*;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -46,125 +46,78 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
     }
 }
 
-fn foo<'a, Output>(
-    from_token: &'a str,
-    to_token: &'a str,
-    parser: impl Fn(&'a str) -> ResNew2<&'a str, Output> + 'a,
-) -> Box<dyn Fn(&'a str) -> ResNew<&'a str, Output> + 'a> {
-    Box::new(move |input| {
-        // map(
-            map_res(
-                tuple((
-                    tag_custom(from_token),
-                    terminated(take_until(to_token), tag_custom(to_token))
-                )),
-                |(_, input)| {
-                    let (input, res) = parser(input)?;
-                    if !input.is_empty() { return Err(make_generic_nom_err_new(input)); }
-                    Ok((res, None))
-                },
-            // ),
-            // |(v, _)| v,
-        )(input)
-    })
-}
 
-pub fn key_action(input: &str) -> ResNew<&str, ParsedKeyAction> {
+pub fn key_action(input: &str) -> ResNew2<&str, ParsedKeyAction> {
     key_action_utf(None)(input)
 }
 
 pub fn key_action_utf<'a>(
     transformer: Option<&'a UTFToRawInputTransformer>
-) -> impl Fn(&'a str) -> ResNew<&'a str, ParsedKeyAction> {
+) -> impl Fn(&'a str) -> ResNew2<&'a str, ParsedKeyAction> {
     move |input: &str| {
-        alt((
-            // with state
-            // map_res(
-            //     tuple((
-            //         tag_custom("{"),
-            //         terminated(take_until("}"), tag_custom("}"))),
-            //     ),
-            //     |(_, input)| {
-            //         let (input, (action, _)) = key_with_state_utf(transformer)(input)?;
-            //         if !input.is_empty() { return Err(make_generic_nom_err_new(input)); }
-            //         Ok((action.0, Some(action.1)))
-            //     },
-            // ),
-            // map(foo("{", "}",
-            //     key_with_state_utf(transformer)),
-            //     |(key, state)| (key, Some(state)),
-            // ),
-            // foo("{", "}",
-            //     key_with_state_utf(transformer))
+        map_res(
+            alt((
+                // with state
+                map(surrounded_group("{", "}", key_with_state_utf(transformer)),
+                    |(key, state)| (key, Some(state)),
+                ),
 
-            map_res(
-                recognize(tuple((
-                    tag_custom("{"),
-                    terminated(take_until("}"), tag_custom("}"))),
-                )),
-                |input| {
-                    let (input, (action, _)) = key_with_state_utf(transformer)(input)?;
-                    if !input.is_empty() { return Err(make_generic_nom_err_new(input)); }
-                    Ok((action.0, Some(action.1)))
-                },
-            ),
+                // no state - {KEY}
+                map(surrounded_group("{", "}", key_utf(transformer)),
+                    |key| (key, None),
+                ),
 
-            // no state
-            map(
-                alt((
-                    // {KEY}
-                    map_res(
-                        recognize(tuple((
-                            tag_custom("{"),
-                            terminated(take_until("}"), tag_custom("}"))),
-                        )),
-                        |input| {
-                            let (input, (action, err)) = key_utf(transformer)(input)?;
-                            if !input.is_empty() { return Err(make_generic_nom_err_new(input)); }
-                            Ok(action)
-                        },
-                    ),
-                    map(key_utf(transformer), |v| v.0),
-                )),
-                |v| (v, None),
-            ),
-        ))(input).and_then(|(next, ((key, mods), state))| {
-            let action = match state {
-                Some(state) => {
-                    ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, state, mods))
-                }
-                None => {
-                    ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods))
-                }
-            };
+                // escaped special char
+                map(tuple((tag_custom("\\"), key_utf(transformer))), |(_, key)| (key, None)),
 
-            Ok((next, (action, None)))
-        })
+                // any 1 char except special ones
+                map_res(
+                    recognize(none_of("{}")),
+                    |input| {
+                        let (_, key) = key_utf(transformer)(input)?;
+                        Ok::<_, nom::Err<CustomError<&str>>>((key, None))
+                    },
+                ),
+            )), |((key, mods), state)| {
+                let action = match state {
+                    Some(state) => {
+                        ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, state, mods))
+                    }
+                    None => {
+                        ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods))
+                    }
+                };
+
+                Ok::<ParsedKeyAction, CustomError<&str>>(action)
+            })(input)
     }
 }
 
-pub fn key_action_with_flags(input: &str) -> ResNew<&str, ParsedKeyAction> {
+pub fn key_action_with_flags(input: &str) -> ResNew2<&str, ParsedKeyAction> {
     key_action_with_flags_utf(None)(input)
 }
 
 pub fn key_action_with_flags_utf<'a>(
     transformer: Option<&'a UTFToRawInputTransformer>,
-) -> Box<dyn Fn(&'a str) -> ResNew<&'a str, ParsedKeyAction> + 'a> {
+) -> Box<dyn Fn(&'a str) -> ResNew2<&'a str, ParsedKeyAction> + 'a> {
     Box::new(move |input: &str| {
-        tuple((
-            key_flags,
-            key_action_utf(transformer),
-        ))(input).and_then(|(next, parts)| {
-            let flags = parts.0;
-            let mut action = parts.1;
+        map_res(
+            tuple((
+                key_flags,
+                key_action_utf(transformer),
+            )),
+            |parts| {
+                let flags = parts.0;
+                let mut action = parts.1;
 
-            match &mut action.0 {
-                ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags.0) }
-                ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags.0) }
-            }
+                match &mut action {
+                    ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags) }
+                    ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags) }
+                }
 
-            Ok((next, (action.0, None)))
-        })
+                Ok::<ParsedKeyAction, CustomError<&str>>(action)
+            },
+        )(input)
     })
 }
 
@@ -174,7 +127,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_key_action() {
+    fn action_with_state() {
         assert_eq!(key_action("{a down}"), nom_ok(ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new())
         )));
@@ -189,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_flags() {
+    fn action_with_mods() {
         assert_eq!(key_action_with_flags("+{a down}"), nom_ok(ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.shift()))
         )));
@@ -200,36 +153,48 @@ mod tests {
     }
 
     #[test]
-    fn parse_key_action_utf() {
-        let t = UTFToRawInputTransformer::new(None, Some("rabbit"), None, None);
+    fn action_utf() {
+        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
 
-        assert_eq!(key_action_utf(Some(&t))("{š down}"), nom_ok(ParsedKeyAction::KeyAction(
-            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_S").unwrap(), 1,
-                KeyModifierFlags::new().tap_mut(|x| x.right_alt()),
+        assert_eq!(key_action_utf(Some(&t))("{: down}"), nom_ok(ParsedKeyAction::KeyAction(
+            KeyActionWithMods::new(*KEY_SEMICOLON, 1,
+                KeyModifierFlags::new().tap_mut(|x| x.shift()),
             )
         )));
 
         assert_eq!(key_action_utf(Some(&t))("{^ down}"), nom_ok(ParsedKeyAction::KeyAction(
-            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(), 1,
+            KeyActionWithMods::new(*KEY_6, 1,
                 KeyModifierFlags::new().tap_mut(|x| x.shift()),
             )
         )));
 
         assert_eq!(key_action_utf(Some(&t))("^"), nom_ok(ParsedKeyAction::KeyClickAction(
-            KeyClickActionWithMods::new_with_mods(Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(),
+            KeyClickActionWithMods::new_with_mods(*KEY_6,
                 KeyModifierFlags::new().tap_mut(|x| x.shift()),
             )
         )));
+    }
+
+    #[test]
+    fn action_handle_special_chars() {
+        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
+
+        assert_nom_err(key_action_utf(Some(&t))("{"), "{");
 
         assert_eq!(key_action_with_flags_utf(Some(&t))("\\^"), nom_ok(ParsedKeyAction::KeyClickAction(
-            KeyClickActionWithMods::new_with_mods(Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(),
+            KeyClickActionWithMods::new_with_mods(*KEY_6,
+                KeyModifierFlags::new().tap_mut(|v| v.shift()))
+        )));
+
+        assert_eq!(key_action_with_flags_utf(Some(&t))("\\{"), nom_ok(ParsedKeyAction::KeyClickAction(
+            KeyClickActionWithMods::new_with_mods(*KEY_LEFTBRACE,
                 KeyModifierFlags::new().tap_mut(|v| v.shift()))
         )));
     }
 
     #[test]
     fn invalid_action_multiple_keys_in_special_group() {
-        let t = UTFToRawInputTransformer::new(None, Some("rabbit"), None, None);
+        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
 
         assert_nom_err(key_action_utf(Some(&t))("{abc}"), "{abc}");
     }

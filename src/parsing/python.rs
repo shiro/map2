@@ -15,7 +15,7 @@ pub fn parse_key_action_with_mods_py(raw: &str, transformer: &UTFToRawInputTrans
         .map_err(format_err)?;
     if !from.0.is_empty() { return Err(anyhow!("failed to parse key")); }
     let from = from.1;
-    Ok(from.0)
+    Ok(from)
 }
 
 pub fn parse_key_sequence_py(raw: &str, transformer: &UTFToRawInputTransformer) -> Result<Vec<ParsedKeyAction>> {
@@ -23,5 +23,5 @@ pub fn parse_key_sequence_py(raw: &str, transformer: &UTFToRawInputTransformer) 
         .map_err(format_err)?;
     if !from.0.is_empty() { return Err(anyhow!("failed to parse key sequence")); }
     let from = from.1;
-    Ok(from.0)
+    Ok(from)
 }

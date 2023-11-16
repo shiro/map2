@@ -66,6 +66,8 @@ pub static ref KEY_KPD6: Key = Key::from_str(&EventType::EV_KEY, "KEY_KP6").unwr
 pub static ref KEY_KPD7: Key = Key::from_str(&EventType::EV_KEY, "KEY_KP7").unwrap();
 pub static ref KEY_LEFTBRACE: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap();
 pub static ref KEY_RIGHTBRACE: Key = Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap();
+pub static ref KEY_SEMICOLON: Key = Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap();
+pub static ref KEY_6: Key = Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap();
 }
 
 
@@ -73,10 +75,6 @@ lazy_static! {
     pub(crate) static ref KEY_ALIAS_TABLE: HashMap<&'static str, (Key, KeyModifierFlags)> = {
         let mut m = HashMap::new();
         m.insert(" ", (Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap(), KeyModifierFlags::new()));
-        // m.insert("[", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new()));
-        // m.insert("]", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap(), KeyModifierFlags::new()));
-        // m.insert("{", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
-        // m.insert("}", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap(), KeyModifierFlags::new().tap_mut(|f|{f.shift();})));
         m.insert("SHIFT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap(), KeyModifierFlags::new()));
         m.insert("ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("META", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTMETA").unwrap(), KeyModifierFlags::new()));

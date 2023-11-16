@@ -1,60 +1,23 @@
 use std::fmt::Display;
 
 use nom::{Compare, CompareResult, Err, InputLength, InputTake};
-use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag, take_until};
-use nom::character::complete::{multispace0, multispace1};
-use nom::combinator::value;
-use nom::error::ParseError;
 use nom::IResult;
-use nom::multi::many0;
-use nom::sequence::tuple;
+use nom::sequence::Tuple;
 
 use crate::parsing::error::FromTagError;
 
-fn line_comment<'a, E>(input: &'a str) -> IResult<&str, (), E>
-    where E: ParseError<&'a str>,
-{
-    value((), tuple((
-        tag("//"),
-        is_not("\r\n")
-    )))(input)
-}
+use super::*;
 
-fn inline_comment<'a, E>(input: &'a str) -> IResult<&str, (), E> where E: ParseError<&'a str> {
-    value((), tuple((
-        tag("/*"),
-        take_until("*/"),
-        tag("*/"),
-    )))(input)
-}
-
-pub fn ws0<'a, E>(input: &'a str) -> IResult<&str, (), E> where E: ParseError<&'a str> {
-    value((), tuple((
-        multispace0,
-        many0(
-            tuple((
-                alt((
-                    line_comment,
-                    inline_comment,
-                )),
-                multispace0,
-            ))
-        )
-    )))(input)
-}
-
-pub fn ws1<'a, E>(input: &'a str) -> IResult<&str, (), E> where E: ParseError<&'a str> {
-    value((), tuple((
-        multispace1,
-        many0(tuple((
-            alt((
-                line_comment,
-                inline_comment,
-            )),
-            multispace0,
-        )))
-    )))(input)
+pub fn tuple<I: Clone, O, List: Tuple<I, O, CustomError<I>>>(
+    mut l: List,
+) -> impl FnMut(I) -> ResNew2<I, O> {
+    move |i: I| {
+        let res = l.parse(i.clone());
+        if res.is_err() {
+            return Err(make_generic_nom_err_new(i));
+        }
+        res
+    }
 }
 
 
@@ -75,4 +38,25 @@ pub fn tag_custom<T, Input, Error: FromTagError<Input>>(
         };
         res
     }
+}
+
+
+pub fn surrounded_group<'a, Output>(
+    from_token: &'a str,
+    to_token: &'a str,
+    parser: impl Fn(&'a str) -> ResNew2<&'a str, Output> + 'a,
+) -> Box<dyn Fn(&'a str) -> ResNew2<&'a str, Output> + 'a> {
+    Box::new(move |input| {
+        map_res(
+            tuple((
+                tag_custom(from_token),
+                terminated(take_until(to_token), tag_custom(to_token))
+            )),
+            |(_, input)| {
+                let (input, res) = parser(input)?;
+                if !input.is_empty() { return Err(make_generic_nom_err_new(input)); }
+                Ok(res)
+            },
+        )(input)
+    })
 }

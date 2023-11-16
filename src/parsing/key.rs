@@ -4,7 +4,7 @@ use crate::xkb::UTFToRawInputTransformer;
 
 use super::*;
 
-pub fn key_flags(input: &str) -> ResNew<&str, KeyModifierFlags> {
+pub fn key_flags(input: &str) -> ResNew2<&str, KeyModifierFlags> {
     many0(one_of("^!+#"))(input).and_then(|(next, val)| {
         let mut flags = KeyModifierFlags::new();
         for v in val {
@@ -16,29 +16,23 @@ pub fn key_flags(input: &str) -> ResNew<&str, KeyModifierFlags> {
                 _ => unreachable!()
             }
         };
-        Ok((next, (flags, None)))
+        Ok((next, flags))
     })
 }
 
-pub fn key(input: &str) -> ResNew<&str, (Key, KeyModifierFlags)> {
+pub fn key(input: &str) -> ResNew2<&str, (Key, KeyModifierFlags)> {
     key_utf(None)(input)
 }
 
 pub fn key_utf<'a>(
     transformer: Option<&'a UTFToRawInputTransformer>
-) -> impl Fn(&'a str) -> ResNew<&'a str, (Key, KeyModifierFlags)> + 'a {
+) -> impl Fn(&'a str) -> ResNew2<&'a str, (Key, KeyModifierFlags)> + 'a {
     move |input: &str| {
         alt((
             // multiple asci chars
-            map(ident, |v| v.0),
-            // escaped char
-            // map(tuple((
-            //     tag_custom("\\"),
-            //     map(one_of("^!+#{}"), |v| v.to_string())
-            // )), |(_, v)| v),
+            ident,
 
             // one arbitrary char
-            // map(none_of("\\{}^!+#"), |v| v.to_string()),
             map(take(1usize), |v: &str| v.to_string())
         ))(input)
             .and_then(|(next, key_name)| {
@@ -87,36 +81,34 @@ pub fn key_utf<'a>(
                     }
                 }
 
-                Ok((next, ((key, flags), None)))
+                Ok((next, (key, flags)))
             })
     }
 }
 
-fn key_state(input: &str) -> ResNew<&str, i32> {
+fn key_state(input: &str) -> ResNew2<&str, i32> {
     alt((
         tag("down"), tag("up"), tag("repeat"),
     ))(input).map(|(next, v)| (next, match v.to_uppercase().as_str() {
-        "UP" => (0, None),
-        "DOWN" => (1, None),
-        "REPEAT" => (2, None),
+        "UP" => 0,
+        "DOWN" => 1,
+        "REPEAT" => 2,
         _ => unreachable!()
     }))
 }
 
-pub fn key_with_state(input: &str) -> ResNew<&str, ((Key, KeyModifierFlags), i32)> {
+pub fn key_with_state(input: &str) -> ResNew2<&str, ((Key, KeyModifierFlags), i32)> {
     key_with_state_utf(None)(input)
 }
 
 pub fn key_with_state_utf<'a>(
     transformer: Option<&'a UTFToRawInputTransformer>
-) -> impl Fn(&'a str) -> ResNew<&'a str, ((Key, KeyModifierFlags), i32)> + 'a {
+) -> impl Fn(&'a str) -> ResNew2<&'a str, ((Key, KeyModifierFlags), i32)> + 'a {
     move |input: &str| {
-        tuple((
-            key_utf(transformer),
-            ws1,
-            key_state,
-        ))(input)
-            .map(|(next, val)| (next, ((val.0.0, val.2.0), None)))
+        map(
+            tuple((key_utf(transformer), multispace1, key_state)),
+            |(key, _, state)| (key, state),
+        )(input)
     }
 }
 
@@ -128,8 +120,7 @@ mod tests {
     #[test]
     fn test_special_key() {
         assert_eq!(key_with_state("a down"), nom_ok((
-            (Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), KeyModifierFlags::new()),
-            1,
+            (*KEY_A, KeyModifierFlags::new()), 1
         )));
     }
 
