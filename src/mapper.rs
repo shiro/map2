@@ -84,6 +84,7 @@ fn release_restore_modifiers(
 pub struct MapperInner {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     state_map: RwLock<HashMap<String, RwLock<State>>>,
+    transformer: UTFToRawInputTransformer,
     mappings: RwLock<Mappings>,
     fallback_handler: RwLock<Option<PyObject>>,
 }
@@ -157,23 +158,27 @@ impl MapperInner {
                 return;
             }
 
+            let was_modifier = event_handlers::update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
+
             if let Some(fallback_handler) = self.fallback_handler.read().unwrap().as_ref() {
+                if was_modifier { return; }
                 match ev {
                     EvdevInputEvent {
-                        event_code: EventCode::EV_KEY(_key),
+                        event_code: EventCode::EV_KEY(key),
                         value,
                         ..
                     } => {
-                        EVENT_LOOP.lock().unwrap().execute(fallback_handler.clone(), Some(vec![
-                            PythonArgument::String(format!("{_key:?} {value}").to_string()),
-                        ]));
-                    },
+                        if let Some(key) = self.transformer.raw_to_utf(key, &*state.modifiers) {
+                            EVENT_LOOP.lock().unwrap().execute(fallback_handler.clone(), Some(vec![
+                                PythonArgument::String(key),
+                                PythonArgument::Number(*value),
+                            ]));
+                        }
+                    }
                     &_ => {}
                 }
                 return;
             }
-
-            event_handlers::update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
             // end
 
 
@@ -214,6 +219,7 @@ impl Mapper {
             state_map: RwLock::new(HashMap::new()),
             mappings: RwLock::new(Mappings::new()),
             fallback_handler: RwLock::new(None),
+            transformer: transformer.clone(),
         });
 
         Ok(Self {

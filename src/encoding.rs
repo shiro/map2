@@ -1,30 +1,30 @@
 use xkbcommon::xkb::Keysym;
-use xkeysym::key;
+use xkeysym::{key, RawKeysym};
 
 
-pub fn xkb_utf32_to_keysym(ucs: u32) -> Keysym {
+pub fn xkb_utf32_to_keysym(utf: u32) -> Keysym {
     // First check for Latin-1 characters (1:1 mapping).
-    if matches!(ucs, 0x0020..=0x007e) || matches!(ucs, 0x00a0..=0x00ff) {
-        return Keysym::new(ucs);
+    if matches!(utf, 0x0020..=0x007e) || matches!(utf, 0x00a0..=0x00ff) {
+        return Keysym::new(utf);
     }
 
     // Special keysyms.
-    if (key::BackSpace & 0x7f..=key::Clear & 0x7f).contains(&ucs)
-        || ucs == key::Return & 0x7f
-        || ucs == key::Escape & 0x7f
+    if (key::BackSpace & 0x7f..=key::Clear & 0x7f).contains(&utf)
+        || utf == key::Return & 0x7f
+        || utf == key::Escape & 0x7f
     {
-        return Keysym::new(ucs | 0xff00);
+        return Keysym::new(utf | 0xff00);
     }
 
-    if ucs == key::Delete & 0x7f {
+    if utf == key::Delete & 0x7f {
         return Keysym::new(key::Delete);
     }
 
     // Unicode non-symbols and code points outside Unicode planes.
-    if matches!(ucs, 0xd800..=0xdfff)
-        || matches!(ucs, 0xfdd0..=0xfdef)
-        || ucs > 0x10ffff
-        || (ucs & 0xfffe == 0xfffe)
+    if matches!(utf, 0xd800..=0xdfff)
+        || matches!(utf, 0xfdd0..=0xfdef)
+        || utf > 0x10ffff
+        || (utf & 0xfffe == 0xfffe)
     {
         return unsafe { Keysym::from(0) };
     }
@@ -32,9 +32,45 @@ pub fn xkb_utf32_to_keysym(ucs: u32) -> Keysym {
     // Search main table.
     KEYSYMTAB
         .iter()
-        .find(|pair| pair.ucs as u32 == ucs)
-        .map_or(Keysym::new(ucs | 0x01000000), |pair| {
+        .find(|pair| pair.ucs as u32 == utf)
+        .map_or(Keysym::new(utf | 0x01000000), |pair| {
             Keysym::new(pair.keysym as u32)
+        })
+}
+
+pub fn xkb_keysym_to_utf32(sym: RawKeysym) -> u32 {
+    // First check for Latin-1 characters (1:1 mapping).
+    if matches!(sym, 0x0020..=0x007e) || matches!(sym, 0x00a0..=0x00ff) {
+        return sym;
+    }
+
+    // Special keysyms.
+    if (key::BackSpace | 0x7f..=key::Clear | 0x7f).contains(&sym)
+        || sym == key::Return | 0x7f
+        || sym == key::Escape | 0x7f
+    {
+        return sym & 0xff00;
+    }
+
+    // if sym == key::Delete | 0x7f {
+    //     return key::Delete;
+    // }
+    //
+    // // Unicode non-symbols and code points outside Unicode planes.
+    // if matches!(utf, 0xd800..=0xdfff)
+    //     || matches!(utf, 0xfdd0..=0xfdef)
+    //     || utf > 0x10ffff
+    //     || (utf & 0xfffe == 0xfffe)
+    // {
+    //     return unsafe { Keysym::from(0) };
+    // }
+
+    // Search main table.
+    KEYSYMTAB
+        .iter()
+        .find(|pair| pair.keysym as u32 == sym)
+        .map_or(0, |pair| {
+            pair.ucs as u32
         })
 }
 

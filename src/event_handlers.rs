@@ -3,7 +3,7 @@ use crate::device::virtual_output_device::VirtualOutputDevice;
 use crate::event_loop::EventLoop;
 use crate::python::*;
 
-pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
+pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) -> bool {
     // TODO find a way to do this with a single accessor function
     let pairs: [(Key, fn(&KeyModifierState) -> bool, fn(&mut KeyModifierState) -> &mut bool); 8] = [
         (*KEY_LEFT_CTRL, |s| s.left_ctrl, |s: &mut KeyModifierState| &mut s.left_ctrl),
@@ -21,19 +21,22 @@ pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) {
             let mut new_modifiers = state.modifiers.deref().clone();
             *modifier_mut(&mut new_modifiers) = true;
             state.modifiers = Arc::new(new_modifiers);
-            return;
+            return true;
         } else if action.key.event_code == key.event_code && action.value == TYPE_UP {
             let mut new_modifiers = state.modifiers.deref().clone();
             *modifier_mut(&mut new_modifiers) = false;
             state.modifiers = Arc::new(new_modifiers);
-            return;
+            return true;
             // TODO re-implement eating or throw it out completely
             // if ignore_list.is_ignored(&KeyAction::new(*key, TYPE_UP)) {
             //     ignore_list.unignore(&KeyAction::new(*key, TYPE_UP));
             //     return;
             // }
+        } else if action.value == TYPE_REPEAT {
+            return true;
         }
     };
+    false
 }
 
 fn release_restore_modifiers(state: &mut State, output_device: &mut VirtualOutputDevice, from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags, to_type: &i32) {

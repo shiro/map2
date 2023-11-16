@@ -140,7 +140,7 @@ impl VirtualKeyboard {
 
         for x in input.graphemes(true) {
             let encoded = x.chars().next().unwrap() as u32;
-            let out = encoding::xkb_utf32_to_keysym(encoded as u32);
+            let out = encoding::xkb_utf32_to_keysym(encoded);
 
             let key_idx = keymap.get(&out).unwrap() + 1;
 
