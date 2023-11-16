@@ -12,50 +12,7 @@ pub fn key_sequence_utf<'a>(
     transformer: Option<&'a UTFToRawInputTransformer>
 ) -> impl Fn(&'a str) -> ResNew2<&'a str, Vec<ParsedKeyAction>> + 'a {
     move |input: &str| {
-        map_res(
-            many1(
-                // alt((
-                //     // map_res(
-                //     //     recognize(tuple((
-                //     //         key_flags,
-                //     //         tag_custom("{"),
-                //     //         terminated(take_until("}"), tag_custom("}"))),
-                //     //     )),
-                //     //     |input| {
-                //     //         let (input, action) = alt((
-                //     //             key_action_with_flags_utf(transformer),
-                //     //             key_action_utf(transformer),
-                //     //         ))(input)?;
-                //     //         // TODO properly propagate child error
-                //     //         if !input.is_empty() {
-                //     //             return Err(make_generic_nom_err_new(input));
-                //     //         }
-                //     //
-                //     //         Ok((input, action))
-                //     //     },
-                //     // ),
-                //     // map(surrounded_group("{", "}", key_action_utf(transformer)), |(_, (_,action))| action),
-                //     surrounded_group("{", "}", key_action_utf(transformer)),
-                //     // map_res(take(1usize), key_action_utf(transformer)),
-                //
-                //
-                //
-                // )),
-                key_action_utf(transformer)
-            ),
-            |seq| {
-                // let seq = seq.into_iter()
-                //     .map(|(rest, res)| {
-                //         if !rest.is_empty() { return Err(make_generic_nom_err_new(input)); }
-                //         Ok(res)
-                //     })
-                //     .fold_ok(vec![], |mut acc, v| {
-                //         acc.push(v);
-                //         acc
-                //     })?;
-                Ok::<Vec<ParsedKeyAction>, nom::Err<CustomError<&str>>>(seq)
-            },
-        )(input)
+        many1(key_action_utf(transformer))(input)
     }
 }
 
@@ -98,8 +55,13 @@ mod tests {
 
         assert_eq!(key_sequence_utf(Some(&t))("\\{"), nom_ok(vec![
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
-                *KEY_LEFTBRACE,
-                KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                *KEY_LEFTBRACE, KeyModifierFlags::new().tap_mut(|x| x.shift()),
+            )),
+        ]));
+
+        assert_eq!(key_sequence_utf(Some(&t))("\\}"), nom_ok(vec![
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
+                *KEY_RIGHTBRACE, KeyModifierFlags::new().tap_mut(|x| x.shift()),
             )),
         ]));
     }

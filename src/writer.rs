@@ -91,6 +91,10 @@ impl Writer {
 
                 while let Ok(ev) = out_ev_rx.try_recv() {
                     let _ = output_device.send(&ev);
+
+                    // this is a hack that stops successive events to not get registered
+                    // maybe if we add proper times to the events it'll be fine...
+                    thread::sleep(Duration::from_millis(5));
                 }
 
                 thread::sleep(Duration::from_millis(10));
