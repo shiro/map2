@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::sync::RwLock;
 
 use crate::*;
@@ -72,7 +73,7 @@ fn release_restore_modifiers(
 }
 
 
-pub struct MapperInner {
+struct Inner {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     state_map: RwLock<HashMap<String, RwLock<State>>>,
     transformer: UTFToRawInputTransformer,
@@ -80,7 +81,7 @@ pub struct MapperInner {
     fallback_handler: RwLock<Option<PyObject>>,
 }
 
-impl Subscribable for MapperInner {
+impl Subscribable for Inner {
     fn handle(&self, id: &str, raw_ev: InputEvent) {
         if let Some(subscriber) = self.subscriber.load().deref() {
             let mut state_map = self.state_map.read().unwrap();
@@ -187,7 +188,7 @@ impl Subscribable for MapperInner {
 #[pyclass]
 pub struct Mapper {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
-    inner: Arc<MapperInner>,
+    inner: Arc<Inner>,
     transformer: UTFToRawInputTransformer,
 }
 
@@ -210,7 +211,7 @@ impl Mapper {
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
 
-        let inner = Arc::new(MapperInner {
+        let inner = Arc::new(Inner {
             subscriber: subscriber.clone(),
             state_map: RwLock::new(HashMap::new()),
             mappings: RwLock::new(Mappings::new()),
@@ -227,8 +228,15 @@ impl Mapper {
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if let Ok(to) = to.extract::<String>(py) {
-            let from = parse_key_action_with_mods_py(&from, &self.transformer).unwrap();
-            let to = parse_key_sequence_py(&to, &self.transformer).unwrap();
+            let from = parse_key_action_with_mods_py(&from, &self.transformer)
+                .map_err(|err| PyRuntimeError::new_err(
+                    format!("mapping error on the 'from' side: {}", err.to_string())
+                ))?;
+
+            let to = parse_key_sequence_py(&to, &self.transformer)
+                .map_err(|err| PyRuntimeError::new_err(
+                    format!("mapping error on the 'to' side: {}", err.to_string())
+                ))?;
 
             self._map_key(from, to)?;
             return Ok(());
@@ -244,12 +252,16 @@ impl Mapper {
         Err(PyRuntimeError::new_err("expected a callable object"))
     }
 
-    pub fn map_key(&mut self, py: Python, from: String, to: String) -> PyResult<()> {
+    pub fn map_key(&mut self, from: String, to: String) -> PyResult<()> {
         let from = parse_key_action_with_mods_py(&from, &self.transformer)
-            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+            .map_err(|err| PyRuntimeError::new_err(
+                format!("mapping error on the 'from' side: {}", err.to_string())
+            ))?;
 
         let to = parse_key_action_with_mods_py(&to, &self.transformer)
-            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+            .map_err(|err| PyRuntimeError::new_err(
+                format!("mapping error on the 'to' side: {}", err.to_string())
+            ))?;
 
         self._map_key(from, vec![to])?;
         Ok(())
@@ -267,6 +279,19 @@ impl Mapper {
     }
 
     pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
+
+    pub fn snapshot(&self, existing: Option<&MapperSnapshot>) -> PyResult<Option<MapperSnapshot>> {
+        if let Some(existing) = existing {
+            *self.inner.mappings.write().unwrap() = existing.mappings.clone();
+            *self.inner.fallback_handler.write().unwrap() = existing.fallback_handler.clone();
+            return Ok(None);
+        }
+
+        Ok(Some(MapperSnapshot {
+            mappings: self.inner.mappings.read().unwrap().clone(),
+            fallback_handler: self.inner.fallback_handler.read().unwrap().clone(),
+        }))
+    }
 }
 
 impl Mapper {
@@ -357,4 +382,11 @@ impl Mapper {
 
         Ok(())
     }
+}
+
+
+#[pyclass]
+pub struct MapperSnapshot {
+    mappings: Mappings,
+    fallback_handler: Option<PyObject>,
 }

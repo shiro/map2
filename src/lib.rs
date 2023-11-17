@@ -25,7 +25,7 @@ pub use nom::lib::std::collections::HashMap;
 use thread_tryjoin::TryJoinHandle;
 pub use uuid::Uuid;
 
-use direction_mapper::DirectionMapper;
+use motion_mapper::MotionMapper;
 use event_loop::EVENT_LOOP;
 pub use mapper::mapper::Mapper;
 pub use python::err_to_py;
@@ -65,7 +65,7 @@ pub mod python;
 pub mod reader;
 pub mod virtual_reader;
 pub mod mapper;
-pub mod direction_mapper;
+pub mod motion_mapper;
 pub mod writer;
 pub mod virtual_writer;
 pub mod text_mapper;

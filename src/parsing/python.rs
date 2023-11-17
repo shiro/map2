@@ -13,7 +13,9 @@ fn format_err(err: NomErr<CustomError<&str>>) -> Error {
 pub fn parse_key_action_with_mods_py(raw: &str, transformer: &UTFToRawInputTransformer) -> Result<ParsedKeyAction> {
     let from = key_action_with_flags_utf(Some(transformer))(raw)
         .map_err(format_err)?;
-    if !from.0.is_empty() { return Err(anyhow!("failed to parse key")); }
+
+    if !from.0.is_empty() { return Err(anyhow!("expected exactly 1 key action")); }
+
     let from = from.1;
     Ok(from)
 }
@@ -21,6 +23,8 @@ pub fn parse_key_action_with_mods_py(raw: &str, transformer: &UTFToRawInputTrans
 pub fn parse_key_sequence_py(raw: &str, transformer: &UTFToRawInputTransformer) -> Result<Vec<ParsedKeyAction>> {
     let (rest, res) = key_sequence_utf(Some(transformer))(raw)
         .map_err(format_err)?;
+
     if !rest.is_empty() { return Err(anyhow!("failed to parse key sequence")); }
+
     Ok(res)
 }

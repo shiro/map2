@@ -13,7 +13,7 @@ pub fn add_event_subscription(target: &PyAny) -> Option<Subscriber> {
     if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
         return Some(target.subscribe());
     }
-    if let Ok(mut target) = target.extract::<PyRefMut<DirectionMapper>>() {
+    if let Ok(mut target) = target.extract::<PyRefMut<MotionMapper>>() {
         return Some(target.subscribe())
     }
     if let Ok(mut target) = target.extract::<PyRefMut<Writer>>() {

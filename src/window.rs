@@ -1,12 +1,7 @@
-use std::thread;
-
 use hyprland::event_listener::EventListenerMutable as EventListener;
-use pyo3::*;
-use pyo3::impl_::wrap::OkWrap;
-use pyo3::prelude::*;
+use crate::python::*;
 
 use crate::*;
-use crate::time::Duration;
 
 #[pyclass]
 pub struct Window {

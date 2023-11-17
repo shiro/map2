@@ -10,6 +10,7 @@ use crate::window::Window;
 use crate::*;
 
 use signal_hook::{consts::SIGINT, iterator::Signals};
+use crate::mapper::mapper::MapperSnapshot;
 
 #[pyclass]
 struct PyKey {
@@ -43,7 +44,8 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(exit, m)?)?;
     m.add_class::<Reader>()?;
     m.add_class::<Mapper>()?;
-    m.add_class::<DirectionMapper>()?;
+    m.add_class::<MapperSnapshot>()?;
+    m.add_class::<MotionMapper>()?;
     m.add_class::<TextMapper>()?;
     m.add_class::<Writer>()?;
     m.add_class::<VirtualWriter>()?;

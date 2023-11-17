@@ -7,11 +7,11 @@ use crate::device::*;
 use crate::device::virt_device::DeviceCapabilities;
 use crate::subscriber::{Subscribable, Subscriber};
 
-pub struct WriterInner {
+struct Inner {
     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
 }
 
-impl Subscribable for WriterInner {
+impl Subscribable for Inner {
     fn handle(&self, id: &str, ev: InputEvent) {
         match ev {
             InputEvent::Raw(ev) => {
@@ -27,7 +27,7 @@ pub struct Writer {
     exit_tx: Option<oneshot::Sender<()>>,
     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
     thread_handle: Option<thread::JoinHandle<Result<()>>>,
-    pub inner: Arc<WriterInner>,
+    inner: Arc<Inner>,
 }
 
 #[pymethods]
@@ -101,7 +101,7 @@ impl Writer {
             }
         });
 
-        let inner = Arc::new(WriterInner {
+        let inner = Arc::new(Inner {
             out_ev_tx: out_ev_tx.clone(),
         });
 

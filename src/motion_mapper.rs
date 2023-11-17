@@ -63,12 +63,12 @@ fn release_restore_modifiers(
 }
 
 
-pub struct DirectionMapperInner {
+struct Inner {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     relative_handler: RwLock<Option<PyObject>>,
 }
 
-impl Subscribable for DirectionMapperInner {
+impl Subscribable for Inner {
     fn handle(&self, id: &str, raw_ev: InputEvent) {
         if let Some(subscriber) = self.subscriber.load().deref() {
             let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
@@ -103,19 +103,19 @@ impl Subscribable for DirectionMapperInner {
 
 
 #[pyclass]
-pub struct DirectionMapper {
+pub struct MotionMapper {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
-    inner: Arc<DirectionMapperInner>,
+    inner: Arc<Inner>,
 }
 
 #[pymethods]
-impl DirectionMapper {
+impl MotionMapper {
     #[new]
     #[pyo3(signature = (* * _kwargs))]
     pub fn new(_kwargs: Option<&PyDict>) -> PyResult<Self> {
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
 
-        let inner = Arc::new(DirectionMapperInner {
+        let inner = Arc::new(Inner {
             subscriber: subscriber.clone(),
             relative_handler: RwLock::new(None),
         });
@@ -140,7 +140,7 @@ impl DirectionMapper {
     pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
 }
 
-impl DirectionMapper {
+impl MotionMapper {
     linkable!();
 
     pub fn subscribe(&self) -> Subscriber {
