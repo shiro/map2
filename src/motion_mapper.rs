@@ -6,62 +6,7 @@ use crate::*;
 use crate::event::InputEvent;
 use crate::event_loop::PythonArgument;
 use crate::python::*;
-use crate::subscriber::{Subscribable, Subscriber, add_event_subscription};
-
-fn release_restore_modifiers(
-    state: &mut State,
-    from_flags: &KeyModifierFlags,
-    to_flags: &KeyModifierFlags,
-    to_type: &i32,
-) -> Vec<evdev_rs::InputEvent> {
-    let actual_state = &state.modifiers;
-    let mut output_events = vec![];
-
-    // takes into account the actual state of a modifier and decides whether to release/restore it or not
-    let mut release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
-        if *to_type == 1 { // restore mods if actual mod is still pressed
-            if *is_actual_down {
-                output_events.push(
-                    KeyAction { key: *key, value: *to_type }.to_input_ev()
-                );
-            }
-        } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
-            if *is_actual_down {
-                output_events.push(
-                    KeyAction { key: *key, value: *to_type }.to_input_ev()
-                );
-            }
-        }
-    };
-
-    if from_flags.ctrl && !to_flags.ctrl {
-        release_or_restore_modifier(&actual_state.left_ctrl, &*KEY_LEFT_CTRL);
-        release_or_restore_modifier(&actual_state.right_ctrl, &*KEY_RIGHT_CTRL);
-    }
-    if from_flags.shift && !to_flags.shift {
-        release_or_restore_modifier(&actual_state.left_shift, &*KEY_LEFT_SHIFT);
-        release_or_restore_modifier(&actual_state.right_shift, &*KEY_RIGHT_SHIFT);
-    }
-    if from_flags.alt && !to_flags.alt {
-        release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFT_ALT);
-    }
-    if from_flags.right_alt && !to_flags.right_alt {
-        release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHT_ALT);
-    }
-    if from_flags.meta && !to_flags.meta {
-        release_or_restore_modifier(&actual_state.left_meta, &*KEY_LEFT_META);
-        release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHT_META);
-    }
-
-    if output_events.len() > 0 {
-        output_events.push(SYN_REPORT.clone());
-    }
-
-    output_events
-
-    // TODO eat keys we just released, un-eat keys we just restored
-}
-
+use crate::subscriber::{add_event_subscription, Subscribable, Subscriber};
 
 struct Inner {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
