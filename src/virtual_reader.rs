@@ -11,6 +11,7 @@ use crate::event::InputEvent;
 use crate::parsing::key_action::ParsedKeyActionVecExt;
 use crate::parsing::python::parse_key_sequence_py;
 use crate::subscriber::Subscriber;
+use crate::virtual_writer::VirtualWriter;
 use crate::writer::Writer;
 use crate::xkb::UTFToRawInputTransformer;
 
@@ -62,18 +63,6 @@ impl VirtualReader {
         })
     }
 
-    pub fn link(&mut self, target: &PyAny) {
-        // if let Ok(mut target) = target.extract::<PyRefMut<Writer>>() {
-        //     self.subscriber.store(
-        //         Some(Arc::new(Subscriber::Writer(target.inner.clone())))
-        //     );
-        // } else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
-        //     self.subscriber.store(
-        //         Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
-        //     );
-        // }
-    }
-
     pub fn send(&mut self, val: String) {
         if let Some(subscriber) = self.subscriber.load().deref() {
             let actions = parse_key_sequence_py(val.as_str(), &self.transformer).unwrap().to_key_actions();
@@ -99,24 +88,9 @@ impl VirtualReader {
         Ok(())
     }
 
-    // pub fn send_raw(&mut self, val: String) -> PyResult<()> {
-    //     let actions = parse_key_sequence_py(val.as_str())
-    //         .unwrap()
-    //         .to_key_actions();
-    //
-    //     if actions.len() != 1 {
-    //         return Err(PyValueError::new_err(format!("expected a single key action, got {}", actions.len())));
-    //     }
-    //
-    //     let action = actions.get(0).unwrap();
-    //
-    //     if ![*KEY_LEFT_CTRL, *KEY_RIGHT_CTRL, *KEY_LEFT_ALT, *KEY_RIGHT_ALT, *KEY_LEFT_SHIFT, *KEY_RIGHT_SHIFT, *KEY_LEFT_META, *KEY_RIGHT_META]
-    //         .contains(&action.key) {
-    //         return Err(PyValueError::new_err("key action needs to be a modifier event"));
-    //     }
-    //
-    //     // self.msg_tx.send(ReaderMessage::SendRawEvent(action.to_input_ev())).unwrap();
-    //
-    //     Ok(())
-    // }
+    pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
+}
+
+impl VirtualReader {
+    linkable!();
 }

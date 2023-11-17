@@ -73,27 +73,21 @@ impl Subscribable for Inner {
         if let Some(subscriber) = self.subscriber.load().deref() {
             let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
 
-            if let Some(relative_handler) = self.relative_handler.read().unwrap().as_ref() {
-                match ev {
-                    EvdevInputEvent {
-                        event_code: EventCode::EV_REL(key),
-                        value,
-                        ..
-                    } => {
-                        let name = match key {
-                            EV_REL::REL_X => "X",
-                            EV_REL::REL_Y => "Y",
-                            _ => { return; }
-                        }.to_string();
+            if let EvdevInputEvent { event_code: EventCode::EV_REL(key), value, .. } = ev {
+                match key {
+                    EV_REL::REL_X | EV_REL::REL_Y => {
+                        if let Some(relative_handler) = self.relative_handler.read().unwrap().as_ref() {
+                            let name = if *key == EV_REL::REL_X { "X" } else { "Y" }.to_string();
 
-                        EVENT_LOOP.lock().unwrap().execute(relative_handler.clone(), Some(vec![
-                            PythonArgument::String(name),
-                            PythonArgument::Number(*value),
-                        ]));
+                            EVENT_LOOP.lock().unwrap().execute(relative_handler.clone(), Some(vec![
+                                PythonArgument::String(name),
+                                PythonArgument::Number(*value),
+                            ]));
+                            return;
+                        }
                     }
-                    &_ => {}
+                    _ => {}
                 }
-                return;
             }
 
             subscriber.handle("", raw_ev);
@@ -138,6 +132,17 @@ impl MotionMapper {
     }
 
     pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
+
+    pub fn snapshot(&self, existing: Option<&MotionMapperSnapshot>) -> PyResult<Option<MotionMapperSnapshot>> {
+        if let Some(existing) = existing {
+            *self.inner.relative_handler.write().unwrap() = existing.relative_handler.clone();
+            return Ok(None);
+        }
+
+        Ok(Some(MotionMapperSnapshot {
+            relative_handler: self.inner.relative_handler.read().unwrap().clone(),
+        }))
+    }
 }
 
 impl MotionMapper {
@@ -146,4 +151,9 @@ impl MotionMapper {
     pub fn subscribe(&self) -> Subscriber {
         self.inner.clone()
     }
+}
+
+#[pyclass]
+pub struct MotionMapperSnapshot {
+    relative_handler: Option<PyObject>,
 }

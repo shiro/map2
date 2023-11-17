@@ -93,7 +93,9 @@ impl Writer {
                     let _ = output_device.send(&syn);
 
                     // this is a hack that stops successive events to not get registered
-                    thread::sleep(Duration::from_millis(1));
+                    if let EventCode::EV_KEY(_) = ev.event_code {
+                        thread::sleep(Duration::from_millis(1));
+                    }
                 }
 
                 thread::sleep(Duration::from_millis(10));
