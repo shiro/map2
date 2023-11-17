@@ -83,12 +83,11 @@ fn grab_device
 (
     fd_path: &Path,
     ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
-)
-    -> Result<oneshot::Sender<()>> {
+) -> Result<oneshot::Sender<()>> {
     let fd_file = fs::OpenOptions::new()
         .read(true)
         .open(&fd_path)
-        .expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
+        .map_err(|err| anyhow!("failed to open fd '{}': {err}", fd_path.to_str().unwrap_or("...")))?;
 
     let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
     let mut device = Device::new_from_file(fd_file_nb).expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
@@ -136,7 +135,7 @@ pub fn grab_udev_inputs
                 Ok(v) => v,
                 Err(err) => {
                     eprintln!("{}", err);
-                    continue;
+                    std::process::exit(1);
                 }
             };
 
