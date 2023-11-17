@@ -186,14 +186,14 @@ impl Subscribable for Inner {
 
 
 #[pyclass]
-pub struct Mapper {
+pub struct KeyMapper {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     inner: Arc<Inner>,
     transformer: UTFToRawInputTransformer,
 }
 
 #[pymethods]
-impl Mapper {
+impl KeyMapper {
     #[new]
     #[pyo3(signature = (* * kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
@@ -280,21 +280,21 @@ impl Mapper {
 
     pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
 
-    pub fn snapshot(&self, existing: Option<&MapperSnapshot>) -> PyResult<Option<MapperSnapshot>> {
+    pub fn snapshot(&self, existing: Option<&KeyMapperSnapshot>) -> PyResult<Option<KeyMapperSnapshot>> {
         if let Some(existing) = existing {
             *self.inner.mappings.write().unwrap() = existing.mappings.clone();
             *self.inner.fallback_handler.write().unwrap() = existing.fallback_handler.clone();
             return Ok(None);
         }
 
-        Ok(Some(MapperSnapshot {
+        Ok(Some(KeyMapperSnapshot {
             mappings: self.inner.mappings.read().unwrap().clone(),
             fallback_handler: self.inner.fallback_handler.read().unwrap().clone(),
         }))
     }
 }
 
-impl Mapper {
+impl KeyMapper {
     linkable!();
 
     pub fn subscribe(&self) -> Subscriber {
@@ -386,7 +386,7 @@ impl Mapper {
 
 
 #[pyclass]
-pub struct MapperSnapshot {
+pub struct KeyMapperSnapshot {
     mappings: Mappings,
     fallback_handler: Option<PyObject>,
 }

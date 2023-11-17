@@ -1,5 +1,5 @@
-pub mod mapper;
+pub mod key_mapper;
 mod mapping_functions;
 
-use mapper::Mapper;
+use key_mapper::KeyMapper;
 pub use mapping_functions::*;

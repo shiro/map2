@@ -27,7 +27,7 @@ pub use uuid::Uuid;
 
 use motion_mapper::MotionMapper;
 use event_loop::EVENT_LOOP;
-pub use mapper::mapper::Mapper;
+pub use mapper::key_mapper::KeyMapper;
 pub use python::err_to_py;
 use reader::Reader;
 use writer::Writer;

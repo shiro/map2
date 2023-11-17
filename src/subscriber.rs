@@ -10,7 +10,7 @@ pub type Subscriber = Arc<dyn Subscribable + Send + Sync>;
 
 
 pub fn add_event_subscription(target: &PyAny) -> Option<Subscriber> {
-    if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
+    if let Ok(mut target) = target.extract::<PyRefMut<KeyMapper>>() {
         return Some(target.subscribe());
     }
     if let Ok(mut target) = target.extract::<PyRefMut<MotionMapper>>() {
