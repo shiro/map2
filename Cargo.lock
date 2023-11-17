@@ -737,6 +737,7 @@ dependencies = [
  "libc",
  "man",
  "ncurses",
+ "nix 0.26.4",
  "nom",
  "notify",
  "oneshot",
@@ -929,6 +930,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "memoffset 0.7.1",
+ "pin-utils",
 ]
 
 [[package]]

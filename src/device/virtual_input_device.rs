@@ -65,9 +65,8 @@ pub fn read_from_device_input_fd_thread_handler(
                     continue;
                 }
                 _ => {
-                    println!("{:?}", err);
-                    println!("reader loop err: {}", err);
-                    return;
+                    println!("Reader event polling loop error: {}", err);
+                    std::process::exit(1);
                 }
             }
         }
@@ -89,8 +88,13 @@ fn grab_device
         .open(&fd_path)
         .map_err(|err| anyhow!("failed to open fd '{}': {err}", fd_path.to_str().unwrap_or("...")))?;
 
-    let fd_file_nb = tokio_file_unix::File::new_nb(fd_file).unwrap();
-    let mut device = Device::new_from_file(fd_file_nb).expect(&*format!("failed to open fd '{}'", fd_path.to_str().unwrap_or("...")));
+    use nix::fcntl::{FcntlArg, OFlag};
+    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+
+    nix::fcntl::fcntl(fd_file.as_raw_fd(), FcntlArg::F_SETFL(OFlag::O_NONBLOCK))?;
+
+    let mut device = Device::new_from_file(fd_file)
+        .map_err(|err| anyhow!("failed to open fd '{}': {err}", fd_path.to_str().unwrap_or("...")))?;
     device.grab(GrabMode::Grab)
         .map_err(|err| anyhow!("failed to grab device '{}': {}", fd_path.to_string_lossy(), err))?;
 
