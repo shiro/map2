@@ -11,7 +11,7 @@ pub use std::{fs, io, time};
 pub use std::borrow::BorrowMut;
 pub use std::io::Write;
 pub use std::ops::{Deref, DerefMut};
-pub use std::sync::Arc;
+pub use std::sync::{Arc, Weak, RwLock};
 pub use std::sync::mpsc;
 pub use std::sync::Mutex;
 pub use std::thread;
@@ -56,6 +56,7 @@ pub mod event;
 pub mod subscriber;
 pub mod encoding;
 pub mod xkb;
+pub mod xkb_transformer_registry;
 
 #[cfg(test)]
 pub mod tests;

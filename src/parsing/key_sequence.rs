@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::xkb::UTFToRawInputTransformer;
+use crate::xkb::XKBTransformer;
 
 use super::*;
 
@@ -9,7 +9,7 @@ pub fn key_sequence(input: &str) -> ResNew2<&str, Vec<ParsedKeyAction>> {
 }
 
 pub fn key_sequence_utf<'a>(
-    transformer: Option<&'a UTFToRawInputTransformer>
+    transformer: Option<&'a XKBTransformer>
 ) -> impl Fn(&'a str) -> ResNew2<&'a str, Vec<ParsedKeyAction>> + 'a {
     move |input: &str| {
         many1(key_action_utf(transformer))(input)
@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn sequence_escaped_special_chars() {
-        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new(None, Some("us"), None, None);
 
         assert_eq!(key_sequence_utf(Some(&t))("\\{"), nom_ok(vec![
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn sequence_invalid_multiple_keys_in_special_group() {
-        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new(None, Some("us"), None, None);
 
         assert_nom_err(key_sequence_utf(Some(&t))("{abc}"), "{abc}");
     }

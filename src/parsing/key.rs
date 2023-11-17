@@ -1,6 +1,6 @@
 use evdev_rs::enums::EV_KEY;
 
-use crate::xkb::UTFToRawInputTransformer;
+use crate::xkb::XKBTransformer;
 
 use super::*;
 
@@ -25,7 +25,7 @@ pub fn key(input: &str) -> ResNew2<&str, (Key, KeyModifierFlags)> {
 }
 
 pub fn key_utf<'a>(
-    transformer: Option<&'a UTFToRawInputTransformer>
+    transformer: Option<&'a XKBTransformer>
 ) -> impl Fn(&'a str) -> ResNew2<&'a str, (Key, KeyModifierFlags)> + 'a {
     move |input: &str| {
         alt((
@@ -102,7 +102,7 @@ pub fn key_with_state(input: &str) -> ResNew2<&str, ((Key, KeyModifierFlags), i3
 }
 
 pub fn key_with_state_utf<'a>(
-    transformer: Option<&'a UTFToRawInputTransformer>
+    transformer: Option<&'a XKBTransformer>
 ) -> impl Fn(&'a str) -> ResNew2<&'a str, ((Key, KeyModifierFlags), i32)> + 'a {
     move |input: &str| {
         map(
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_utf_key() {
-        let t = UTFToRawInputTransformer::new(None, Some("rabbit"), None, None);
+        let t = XKBTransformer::new(None, Some("rabbit"), None, None);
 
         assert_eq!(key_utf(Some(&t))("š"), nom_ok((
             Key::from_str(&EventType::EV_KEY, "KEY_S").unwrap(),
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn invalid_key_multiple_chars() {
-        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new(None, Some("us"), None, None);
 
         // assert_eq!(key_utf(Some(&t))("ab"), nom_err("ab"));
         assert_nom_err(key_utf(Some(&t))("ab"), "ab");

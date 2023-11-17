@@ -11,9 +11,8 @@ use crate::event::InputEvent;
 use crate::parsing::key_action::ParsedKeyActionVecExt;
 use crate::parsing::python::parse_key_sequence_py;
 use crate::subscriber::Subscriber;
-use crate::virtual_writer::VirtualWriter;
-use crate::writer::Writer;
-use crate::xkb::UTFToRawInputTransformer;
+use crate::xkb::XKBTransformer;
+use crate::xkb_transformer_registry::XKB_TRANSFORMER_REGISTRY;
 
 pub enum ReaderMessage {
     AddSubscriber(Subscriber),
@@ -21,21 +20,13 @@ pub enum ReaderMessage {
     SendRawEvent(EvdevInputEvent),
 }
 
-// bitflags! {
-//     pub struct TransformerFlags: u8 {
-//         // do not remap the event, pretend that mappings do not exist
-//         const RAW_MODE = 0x01;
-//     }
-// }
-
 
 #[pyclass]
 pub struct VirtualReader {
     id: String,
     subscriber: Arc<ArcSwapOption<Subscriber>>,
-    transformer: UTFToRawInputTransformer,
+    transformer: Option<Arc<XKBTransformer>>,
 }
-
 
 #[pymethods]
 impl VirtualReader {
@@ -49,12 +40,20 @@ impl VirtualReader {
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
 
-        let transformer = UTFToRawInputTransformer::new(
-            options.get("model").and_then(|x| x.extract().ok()),
-            options.get("layout").and_then(|x| x.extract().ok()),
-            options.get("variant").and_then(|x| x.extract().ok()),
-            options.get("options").and_then(|x| x.extract().ok()),
-        );
+        let kbd_model = options.get("model").and_then(|x| x.extract().ok());
+        let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
+        let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
+        let kbd_options = options.get("options").and_then(|x| x.extract().ok());
+
+        let transformer = if kbd_model.is_some()
+            || kbd_layout.is_some()
+            || kbd_variant.is_some()
+            || kbd_options.is_some() {
+            Some(
+                XKB_TRANSFORMER_REGISTRY.get(kbd_model, kbd_layout, kbd_variant, kbd_options)
+                    .map_err(|err| PyRuntimeError::new_err(err.to_string()))?
+            )
+        } else { None };
 
         Ok(Self {
             id: Uuid::new_v4().to_string(),
@@ -63,14 +62,19 @@ impl VirtualReader {
         })
     }
 
-    pub fn send(&mut self, val: String) {
+    pub fn send(&mut self, val: String) -> PyResult<()> {
         if let Some(subscriber) = self.subscriber.load().deref() {
-            let actions = parse_key_sequence_py(val.as_str(), &self.transformer).unwrap().to_key_actions();
+            let actions = parse_key_sequence_py(val.as_str(), self.transformer.as_deref())
+                .map_err(|err| PyRuntimeError::new_err(
+                    format!("key sequence parse error: {}", err.to_string())
+                ))?
+                .to_key_actions();
 
             for action in actions {
                 subscriber.handle(&self.id, InputEvent::Raw(action.to_input_ev()));
             }
         }
+        Ok(())
     }
 
     pub fn send_rel(&mut self, axis: &str, delta: i32) -> PyResult<()> {

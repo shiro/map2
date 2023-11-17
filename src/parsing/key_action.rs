@@ -1,4 +1,4 @@
-use crate::xkb::UTFToRawInputTransformer;
+use crate::xkb::XKBTransformer;
 
 use super::*;
 
@@ -52,7 +52,7 @@ pub fn key_action(input: &str) -> ResNew2<&str, ParsedKeyAction> {
 }
 
 pub fn key_action_utf<'a>(
-    transformer: Option<&'a UTFToRawInputTransformer>
+    transformer: Option<&'a XKBTransformer>
 ) -> impl Fn(&'a str) -> ResNew2<&'a str, ParsedKeyAction> {
     move |input: &str| {
         map_res(
@@ -98,7 +98,7 @@ pub fn key_action_with_flags(input: &str) -> ResNew2<&str, ParsedKeyAction> {
 }
 
 pub fn key_action_with_flags_utf<'a>(
-    transformer: Option<&'a UTFToRawInputTransformer>,
+    transformer: Option<&'a XKBTransformer>,
 ) -> Box<dyn Fn(&'a str) -> ResNew2<&'a str, ParsedKeyAction> + 'a> {
     Box::new(move |input: &str| {
         map_res(
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn action_utf() {
-        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new(None, Some("us"), None, None);
 
         assert_eq!(key_action_utf(Some(&t))("{: down}"), nom_ok(ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(*KEY_SEMICOLON, 1,
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn action_handle_special_chars() {
-        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new(None, Some("us"), None, None);
 
         assert_nom_err(key_action_utf(Some(&t))("{"), "{");
 
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn invalid_action_multiple_keys_in_special_group() {
-        let t = UTFToRawInputTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new(None, Some("us"), None, None);
 
         assert_nom_err(key_action_utf(Some(&t))("{abc}"), "{abc}");
     }

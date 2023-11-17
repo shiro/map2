@@ -11,24 +11,24 @@ use crate::*;
 use crate::{encoding, Key};
 
 #[derive(Clone)]
-pub struct UTFToRawInputTransformer {
+pub struct XKBTransformer {
     utf_to_raw_map: HashMap<Keysym, Vec<u32>>,
     raw_to_utf_map: HashMap<(EV_KEY, KeyModifierState), String>,
 }
 
-impl UTFToRawInputTransformer {
-    pub fn new(model: Option<&str>, layout: Option<&str>, variant: Option<&str>, options: Option<String>) -> Self {
+impl XKBTransformer {
+    pub fn new(model: &str, layout: &str, variant: Option<&str>, options: Option<String>) -> Result<Self> {
         let context = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
         let keymap = xkb::Keymap::new_from_names(
             &context,
             "evdev", // rules
-            model.unwrap_or("pc105"),
-            layout.unwrap_or("us"),
+            model,
+            layout,
             variant.unwrap_or_default(),
             options,
             // Some("terminate:ctrl_alt_bksp".to_string()), // options
             xkb::COMPILE_NO_FLAGS,
-        ).unwrap();
+        ).ok_or_else(|| anyhow!("failed to initialize XKB keyboard"))?;
         let mut xkb_state = xkb::State::new(&keymap);
 
         let mut utf_to_raw_map: HashMap<Keysym, Vec<u32>> = HashMap::new();
@@ -92,10 +92,10 @@ impl UTFToRawInputTransformer {
             }
         });
 
-        Self {
+        Ok(Self {
             utf_to_raw_map,
             raw_to_utf_map,
-        }
+        })
     }
 
     pub fn utf_to_raw(&self, key: String) -> Result<Vec<Key>> {
