@@ -83,13 +83,13 @@ fn grab_device
     fd_path: &Path,
     ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
 ) -> Result<oneshot::Sender<()>> {
+    use nix::fcntl::{FcntlArg, OFlag};
+    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+
     let fd_file = fs::OpenOptions::new()
         .read(true)
         .open(&fd_path)
         .map_err(|err| anyhow!("failed to open fd '{}': {err}", fd_path.to_str().unwrap_or("...")))?;
-
-    use nix::fcntl::{FcntlArg, OFlag};
-    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 
     nix::fcntl::fcntl(fd_file.as_raw_fd(), FcntlArg::F_SETFL(OFlag::O_NONBLOCK))?;
 
