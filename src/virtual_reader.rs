@@ -25,7 +25,7 @@ pub enum ReaderMessage {
 pub struct VirtualReader {
     id: String,
     subscriber: Arc<ArcSwapOption<Subscriber>>,
-    transformer: Option<Arc<XKBTransformer>>,
+    transformer: Arc<XKBTransformer>,
 }
 
 #[pymethods]
@@ -45,15 +45,8 @@ impl VirtualReader {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
 
-        let transformer = if kbd_model.is_some()
-            || kbd_layout.is_some()
-            || kbd_variant.is_some()
-            || kbd_options.is_some() {
-            Some(
-                XKB_TRANSFORMER_REGISTRY.get(kbd_model, kbd_layout, kbd_variant, kbd_options)
-                    .map_err(|err| PyRuntimeError::new_err(err.to_string()))?
-            )
-        } else { None };
+        let transformer = XKB_TRANSFORMER_REGISTRY.get(kbd_model, kbd_layout, kbd_variant, kbd_options)
+            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
         Ok(Self {
             id: Uuid::new_v4().to_string(),
@@ -64,7 +57,7 @@ impl VirtualReader {
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
         if let Some(subscriber) = self.subscriber.load().deref() {
-            let actions = parse_key_sequence_py(val.as_str(), self.transformer.as_deref())
+            let actions = parse_key_sequence_py(val.as_str(), Some(&self.transformer))
                 .map_err(|err| PyRuntimeError::new_err(
                     format!("key sequence parse error: {}", err.to_string())
                 ))?

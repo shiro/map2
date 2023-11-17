@@ -77,7 +77,7 @@ fn release_restore_modifiers(
 struct Inner {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     state_map: RwLock<HashMap<String, RwLock<State>>>,
-    transformer: Option<Arc<XKBTransformer>>,
+    transformer: Arc<XKBTransformer>,
     mappings: RwLock<Mappings>,
     fallback_handler: RwLock<Option<PyObject>>,
 }
@@ -162,7 +162,7 @@ impl Subscribable for Inner {
                 if was_modifier { return; }
                 match ev {
                     EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-                        if let Some(key) = self.transformer.as_ref().and_then(|x| x.raw_to_utf(key, &*state.modifiers)) {
+                        if let Some(key) = self.transformer.raw_to_utf(key, &*state.modifiers) {
                             EVENT_LOOP.lock().unwrap().execute(fallback_handler.clone(), Some(vec![
                                 PythonArgument::String(key),
                                 PythonArgument::Number(*value),
@@ -191,7 +191,7 @@ impl Subscribable for Inner {
 pub struct KeyMapper {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     inner: Arc<Inner>,
-    transformer: Option<Arc<XKBTransformer>>,
+    transformer: Arc<XKBTransformer>,
 }
 
 #[pymethods]
@@ -209,15 +209,8 @@ impl KeyMapper {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
 
-        let transformer = if kbd_model.is_some()
-            || kbd_layout.is_some()
-            || kbd_variant.is_some()
-            || kbd_options.is_some() {
-            Some(
-                XKB_TRANSFORMER_REGISTRY.get(kbd_model, kbd_layout, kbd_variant, kbd_options)
-                    .map_err(|err| PyRuntimeError::new_err(err.to_string()))?
-            )
-        } else { None };
+        let transformer = XKB_TRANSFORMER_REGISTRY.get(kbd_model, kbd_layout, kbd_variant, kbd_options)
+            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
 
@@ -237,13 +230,13 @@ impl KeyMapper {
     }
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from, self.transformer.as_deref())
+        let from = parse_key_action_with_mods_py(&from, Some(&self.transformer))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("mapping error on the 'from' side: {}", err.to_string())
             ))?;
 
         if let Ok(to) = to.extract::<String>(py) {
-            let to = parse_key_sequence_py(&to, self.transformer.as_deref())
+            let to = parse_key_sequence_py(&to, Some(&self.transformer))
                 .map_err(|err| PyRuntimeError::new_err(
                     format!("mapping error on the 'to' side: {}", err.to_string())
                 ))?;
@@ -263,12 +256,12 @@ impl KeyMapper {
     }
 
     pub fn map_key(&mut self, from: String, to: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from, self.transformer.as_deref())
+        let from = parse_key_action_with_mods_py(&from, Some(&self.transformer))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("mapping error on the 'from' side: {}", err.to_string())
             ))?;
 
-        let to = parse_key_action_with_mods_py(&to, self.transformer.as_deref())
+        let to = parse_key_action_with_mods_py(&to, Some(&self.transformer))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("mapping error on the 'to' side: {}", err.to_string())
             ))?;
