@@ -1,14 +1,10 @@
-use std::thread;
-
 use ::oneshot;
-use pyo3::exceptions::PyRuntimeError;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 use crate::*;
+use crate::python::*;
 use crate::event::InputEvent;
-use crate::mapper::Mapper;
-use crate::subscriber::Subscriber;
+use crate::subscriber::{Subscriber, add_event_subscription};
+
 
 #[pyclass]
 pub struct Reader {
@@ -21,7 +17,7 @@ pub struct Reader {
 #[pymethods]
 impl Reader {
     #[new]
-    #[pyo3(signature = (**kwargs))]
+    #[pyo3(signature = (* * kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = kwargs
             .ok_or_else(|| PyRuntimeError::new_err("no options provided"))?
@@ -57,11 +53,9 @@ impl Reader {
         })
     }
 
-    pub fn link(&mut self, target: &PyAny) {
-        if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
-            self.subscriber.store(
-                Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
-            );
-        }
-    }
+    pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
+}
+
+impl Reader {
+    linkable!();
 }

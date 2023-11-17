@@ -1,31 +1,12 @@
 use std::sync::RwLock;
-use evdev_rs::enums::EV_REL;
 
-use pyo3::exceptions::{PyRuntimeError, PyTypeError};
-use pyo3::impl_::wrap::OkWrap;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use evdev_rs::enums::EV_REL;
 
 use crate::*;
 use crate::event::InputEvent;
-use crate::event_loop::{EventLoop, PythonArgument};
-use crate::parsing::key_action::*;
-use crate::parsing::python::*;
+use crate::event_loop::PythonArgument;
 use crate::python::*;
-use crate::subscriber::Subscriber;
-use crate::writer::Writer;
-use crate::xkb::UTFToRawInputTransformer;
-
-lazy_static! {
-    static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
-}
-
-
-#[derive(Debug)]
-pub enum ControlMessage {
-    AddMapping(KeyActionWithMods, RuntimeAction),
-}
-
+use crate::subscriber::{Subscribable, Subscriber, add_event_subscription};
 
 fn release_restore_modifiers(
     state: &mut State,
@@ -87,8 +68,8 @@ pub struct DirectionMapperInner {
     relative_handler: RwLock<Option<PyObject>>,
 }
 
-impl DirectionMapperInner {
-    pub fn handle(&self, id: &str, raw_ev: InputEvent) {
+impl Subscribable for DirectionMapperInner {
+    fn handle(&self, id: &str, raw_ev: InputEvent) {
         if let Some(subscriber) = self.subscriber.load().deref() {
             let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
 
@@ -102,7 +83,7 @@ impl DirectionMapperInner {
                         let name = match key {
                             EV_REL::REL_X => "X",
                             EV_REL::REL_Y => "Y",
-                            _ => {return;}
+                            _ => { return; }
                         }.to_string();
 
                         EVENT_LOOP.lock().unwrap().execute(relative_handler.clone(), Some(vec![
@@ -124,7 +105,7 @@ impl DirectionMapperInner {
 #[pyclass]
 pub struct DirectionMapper {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
-    pub inner: Arc<DirectionMapperInner>,
+    inner: Arc<DirectionMapperInner>,
 }
 
 #[pymethods]
@@ -156,15 +137,13 @@ impl DirectionMapper {
         Err(PyRuntimeError::new_err("expected a callable object"))
     }
 
-    pub fn link(&mut self, target: &PyAny) {
-        if let Ok(mut target) = target.extract::<PyRefMut<Writer>>() {
-            self.subscriber.store(
-                Some(Arc::new(Subscriber::Writer(target.inner.clone())))
-            );
-        } else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
-            self.subscriber.store(
-                Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
-            );
-        }
+    pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
+}
+
+impl DirectionMapper {
+    linkable!();
+
+    pub fn subscribe(&self) -> Subscriber {
+        self.inner.clone()
     }
 }

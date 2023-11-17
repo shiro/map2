@@ -1,20 +1,18 @@
 use std::sync::mpsc;
-use std::thread;
 
-use pyo3::exceptions::{PyRuntimeError, PyTypeError};
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use python::*;
 
 use crate::*;
 use crate::device::*;
 use crate::device::virt_device::DeviceCapabilities;
+use crate::subscriber::{Subscribable, Subscriber};
 
 pub struct WriterInner {
     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
 }
 
-impl WriterInner {
-    pub fn handle(&self, id: &str, ev: InputEvent) {
+impl Subscribable for WriterInner {
+    fn handle(&self, id: &str, ev: InputEvent) {
         match ev {
             InputEvent::Raw(ev) => {
                 self.out_ev_tx.send(ev).unwrap();
@@ -35,7 +33,7 @@ pub struct Writer {
 #[pymethods]
 impl Writer {
     #[new]
-    #[pyo3(signature = (**kwargs))]
+    #[pyo3(signature = (* * kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract()?,
@@ -44,14 +42,14 @@ impl Writer {
 
         let device_name = match options.get("name") {
             Some(option) => option.extract::<String>()
-                .map_err(|_| PyTypeError::new_err("'name' must be a string"))?,
+                .map_err(|_| PyRuntimeError::new_err("'name' must be a string"))?,
             None => "Virtual map2 output".to_string()
         };
 
         let mut capabilities = DeviceCapabilities::new();
         if let Some(capabilities_input) = options.get("capabilities") {
             let capabilities_options: HashMap<&str, &PyAny> = capabilities_input.extract()
-                .map_err(|_| PyTypeError::new_err("the 'capabilities' object must be a dict"))?;
+                .map_err(|_| PyRuntimeError::new_err("the 'capabilities' object must be a dict"))?;
 
             if capabilities_options.contains_key("keyboard") { capabilities.enable_keyboard(); }
             if capabilities_options.contains_key("buttons") { capabilities.enable_buttons(); }
@@ -118,10 +116,16 @@ impl Writer {
     }
 }
 
+impl Writer {
+    pub fn subscribe(&self) -> Subscriber {
+        self.inner.clone()
+    }
+}
+
 impl Drop for Writer {
     fn drop(&mut self) {
         if let Some(exit_tx) = self.exit_tx.take() {
-            let _ =exit_tx.send(());
+            let _ = exit_tx.send(());
             let _ = self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000));
         }
     }

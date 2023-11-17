@@ -12,8 +12,9 @@ pub use std::borrow::BorrowMut;
 pub use std::io::Write;
 pub use std::ops::{Deref, DerefMut};
 pub use std::sync::Arc;
-use std::sync::mpsc;
+pub use std::sync::mpsc;
 pub use std::sync::Mutex;
+pub use std::thread;
 pub use std::time::Duration;
 
 pub use anyhow::{anyhow, Result};
@@ -24,6 +25,13 @@ pub use nom::lib::std::collections::HashMap;
 use thread_tryjoin::TryJoinHandle;
 pub use uuid::Uuid;
 
+use direction_mapper::DirectionMapper;
+use event_loop::EVENT_LOOP;
+pub use mapper::mapper::Mapper;
+pub use python::err_to_py;
+use reader::Reader;
+use writer::Writer;
+
 pub use crate::device::virtual_input_device::grab_udev_inputs;
 use crate::event::InputEvent;
 pub use crate::key_defs::*;
@@ -31,12 +39,9 @@ pub use crate::key_primitives::*;
 pub use crate::state::*;
 pub use crate::x11::{get_window_info_x11, x11_initialize};
 pub use crate::x11::ActiveWindowInfo;
-pub use python::err_to_py;
 
-use reader::Reader;
-use writer::Writer;
-use mapper::Mapper;
-use direction_mapper::DirectionMapper;
+// #[macro_use]
+// use subscriber::linkable;
 
 pub mod x11;
 pub mod key_defs;

@@ -8,7 +8,6 @@ use pyo3::types::PyDict;
 use crate::*;
 use crate::device::virtual_input_device::Sendable;
 use crate::event::InputEvent;
-use crate::mapper::Mapper;
 use crate::parsing::key_action::ParsedKeyActionVecExt;
 use crate::parsing::python::parse_key_sequence_py;
 use crate::subscriber::Subscriber;
@@ -64,15 +63,15 @@ impl VirtualReader {
     }
 
     pub fn link(&mut self, target: &PyAny) {
-        if let Ok(mut target) = target.extract::<PyRefMut<Writer>>() {
-            self.subscriber.store(
-                Some(Arc::new(Subscriber::Writer(target.inner.clone())))
-            );
-        } else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
-            self.subscriber.store(
-                Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
-            );
-        }
+        // if let Ok(mut target) = target.extract::<PyRefMut<Writer>>() {
+        //     self.subscriber.store(
+        //         Some(Arc::new(Subscriber::Writer(target.inner.clone())))
+        //     );
+        // } else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
+        //     self.subscriber.store(
+        //         Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
+        //     );
+        // }
     }
 
     pub fn send(&mut self, val: String) {

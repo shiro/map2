@@ -1,6 +1,7 @@
 use crate::*;
 use crate::device::virtual_output_device::VirtualOutputDevice;
 use crate::event_loop::EventLoop;
+use crate::mapper::*;
 use crate::python::*;
 
 pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) -> bool {

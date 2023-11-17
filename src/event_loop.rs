@@ -1,7 +1,9 @@
 use std::thread;
 
 use pyo3::{IntoPy, Py, PyAny, Python};
-use pyo3::types::{PyTuple};
+use pyo3::types::PyTuple;
+
+use crate::*;
 
 #[derive(Debug)]
 pub enum PythonArgument {
@@ -95,4 +97,8 @@ impl EventLoop {
             )
         ).unwrap();
     }
+}
+
+lazy_static! {
+    pub static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
 }

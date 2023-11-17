@@ -1,25 +1,15 @@
-use std::ops::Add;
 use std::sync::RwLock;
 
-use pyo3::exceptions::PyRuntimeError;
-use pyo3::impl_::wrap::OkWrap;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-
 use crate::*;
+use crate::python::*;
 use crate::event::InputEvent;
-use crate::event_loop::{EventLoop, PythonArgument};
+use crate::event_loop::PythonArgument;
+use crate::mapper::{RuntimeAction, RuntimeKeyAction};
+use crate::mapper::mapping_functions::*;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
-use crate::python::*;
-use crate::subscriber::Subscriber;
-use crate::writer::Writer;
+use crate::subscriber::{Subscribable, Subscriber};
 use crate::xkb::UTFToRawInputTransformer;
-
-lazy_static! {
-    static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
-}
-
 
 #[derive(Debug)]
 pub enum ControlMessage {
@@ -90,8 +80,8 @@ pub struct MapperInner {
     fallback_handler: RwLock<Option<PyObject>>,
 }
 
-impl MapperInner {
-    pub fn handle(&self, id: &str, raw_ev: InputEvent) {
+impl Subscribable for MapperInner {
+    fn handle(&self, id: &str, raw_ev: InputEvent) {
         if let Some(subscriber) = self.subscriber.load().deref() {
             let mut state_map = self.state_map.read().unwrap();
             let mut state_guard = state_map.get(id);
@@ -197,7 +187,7 @@ impl MapperInner {
 #[pyclass]
 pub struct Mapper {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
-    pub inner: Arc<MapperInner>,
+    inner: Arc<MapperInner>,
     transformer: UTFToRawInputTransformer,
 }
 
@@ -276,24 +266,16 @@ impl Mapper {
         Err(PyRuntimeError::new_err("expected a callable object"))
     }
 
-    pub fn link(&mut self, target: &PyAny) {
-        if let Ok(mut target) = target.extract::<PyRefMut<Writer>>() {
-            self.subscriber.store(
-                Some(Arc::new(Subscriber::Writer(target.inner.clone())))
-            );
-        } else if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
-            self.subscriber.store(
-                Some(Arc::new(Subscriber::Mapper(target.inner.clone())))
-            );
-        } else if let Ok(mut target) = target.extract::<PyRefMut<DirectionMapper>>() {
-            self.subscriber.store(
-                Some(Arc::new(Subscriber::DirectionMapper(target.inner.clone())))
-            );
-        }
-    }
+    pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
 }
 
 impl Mapper {
+    linkable!();
+
+    pub fn subscribe(&self) -> Subscriber {
+        self.inner.clone()
+    }
+
     fn _map_callback(&mut self, from: String, to: PyObject) -> PyResult<()> {
         let from = parse_key_action_with_mods_py(&from, &self.transformer).unwrap();
 
