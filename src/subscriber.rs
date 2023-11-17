@@ -28,6 +28,11 @@ macro_rules! linkable {
         pub fn _link(&mut self, target: &PyAny) -> PyResult<()> {
             use crate::subscriber::*;
 
+            if target.is_none() {
+                self.subscriber.store(None);
+                return Ok(());
+            }
+
             let target = match add_event_subscription(target) {
                 Some(target) => target,
                 None => { return Err(PyRuntimeError::new_err("unsupported link target")); }

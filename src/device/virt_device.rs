@@ -135,7 +135,7 @@ pub(crate) fn clone_virtual_device(mut dev: &mut Device, existing_device_fd_path
     let fd_file = fs::OpenOptions::new()
         .read(true)
         .open(existing_device_fd_path)?;
-    let mut device = Device::new_from_file(fd_file).unwrap();
+    let device = Device::new_from_file(fd_file).unwrap();
 
     clone_device_props(&device, dev);
     clone_device_bits(&device, dev).unwrap();

@@ -47,14 +47,14 @@ impl Writer {
         };
 
         let mut capabilities = DeviceCapabilities::new();
-        if let Some(capabilities_input) = options.get("capabilities") {
-            let capabilities_options: HashMap<&str, &PyAny> = capabilities_input.extract()
+        if let Some(_capabilities) = options.get("capabilities") {
+            let _capabilities: HashMap<&str, &PyAny> = _capabilities.extract()
                 .map_err(|_| PyRuntimeError::new_err("the 'capabilities' object must be a dict"))?;
 
-            if capabilities_options.contains_key("keyboard") { capabilities.enable_keyboard(); }
-            if capabilities_options.contains_key("buttons") { capabilities.enable_buttons(); }
-            if capabilities_options.contains_key("rel") { capabilities.enable_rel(); }
-            if capabilities_options.contains_key("abs") { capabilities.enable_abs(); }
+            if _capabilities.contains_key("keyboard") { capabilities.enable_keyboard(); }
+            if _capabilities.contains_key("buttons") { capabilities.enable_buttons(); }
+            if _capabilities.contains_key("rel") { capabilities.enable_rel(); }
+            if _capabilities.contains_key("abs") { capabilities.enable_abs(); }
         } else {
             capabilities.enable_keyboard();
             capabilities.enable_buttons();
@@ -65,6 +65,10 @@ impl Writer {
             Some(_existing_dev_fd) => {
                 let existing_dev_fd = _existing_dev_fd.extract::<String>()
                     .map_err(|_| PyRuntimeError::new_err("the 'clone_from' option must be a string"))?;
+
+                if options.get("capabilities").is_some() {
+                    return Err(PyRuntimeError::new_err("expected only one of: 'clone_from', 'capabilities'"));
+                }
 
                 virtual_output_device::DeviceInitPolicy::CloneExistingDevice(existing_dev_fd)
             }
