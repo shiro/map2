@@ -7,38 +7,36 @@ extern crate core;
 extern crate lazy_static;
 extern crate regex;
 
-pub use std::{fs, io, time};
-pub use std::borrow::BorrowMut;
-pub use std::io::Write;
-pub use std::ops::{Deref, DerefMut};
-pub use std::sync::{Arc, Weak, RwLock};
-pub use std::sync::mpsc;
-pub use std::sync::Mutex;
-pub use std::thread;
-pub use std::time::Duration;
+use std::{fs, io};
+use std::borrow::BorrowMut;
+use std::io::Write;
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, mpsc, Mutex, RwLock, Weak};
+use std::thread;
+use std::time::Duration;
 
-pub use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result};
 use arc_swap::ArcSwapOption;
-pub use evdev_rs::enums::EventCode;
-pub use evdev_rs::InputEvent as EvdevInputEvent;
-pub use nom::lib::std::collections::HashMap;
+use evdev_rs::enums::EventCode;
+use evdev_rs::InputEvent as EvdevInputEvent;
+use nom::lib::std::collections::HashMap;
 use thread_tryjoin::TryJoinHandle;
-pub use uuid::Uuid;
+use uuid::Uuid;
 
-use motion_mapper::MotionMapper;
 use event_loop::EVENT_LOOP;
 pub use mapper::key_mapper::KeyMapper;
+use motion_mapper::MotionMapper;
 pub use python::err_to_py;
 use reader::Reader;
 use writer::Writer;
 
-pub use crate::device::virtual_input_device::grab_udev_inputs;
+use crate::device::virtual_input_device::grab_udev_inputs;
 use crate::event::InputEvent;
-pub use crate::key_defs::*;
-pub use crate::key_primitives::*;
-pub use crate::state::*;
-pub use crate::x11::{get_window_info_x11, x11_initialize};
-pub use crate::x11::ActiveWindowInfo;
+use crate::key_defs::*;
+use crate::key_primitives::*;
+use crate::state::*;
+use crate::x11::ActiveWindowInfo;
+use crate::error::*;
 
 // #[macro_use]
 // use subscriber::linkable;
@@ -57,6 +55,7 @@ pub mod subscriber;
 pub mod encoding;
 pub mod xkb;
 pub mod xkb_transformer_registry;
+pub mod error;
 
 #[cfg(test)]
 pub mod tests;

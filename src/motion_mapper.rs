@@ -8,33 +8,44 @@ use crate::event_loop::PythonArgument;
 use crate::python::*;
 use crate::subscriber::{add_event_subscription, Subscribable, Subscriber};
 
+#[derive(Default)]
 struct Inner {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     relative_handler: RwLock<Option<PyObject>>,
+    fallback_handler: RwLock<Option<PyObject>>,
 }
 
 impl Subscribable for Inner {
     fn handle(&self, id: &str, raw_ev: InputEvent) {
-        if let Some(subscriber) = self.subscriber.load().deref() {
-            let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
+        let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
 
-            if let EvdevInputEvent { event_code: EventCode::EV_REL(key), value, .. } = ev {
-                match key {
-                    EV_REL::REL_X | EV_REL::REL_Y => {
-                        if let Some(relative_handler) = self.relative_handler.read().unwrap().as_ref() {
-                            let name = if *key == EV_REL::REL_X { "X" } else { "Y" }.to_string();
+        if let EvdevInputEvent { event_code: EventCode::EV_REL(key), value, .. } = ev {
+            match key {
+                EV_REL::REL_X | EV_REL::REL_Y => {
+                    if let Some(handler) = self.relative_handler.read().unwrap().as_ref() {
+                        // let name = if *key == EV_REL::REL_X { "X" } else { "Y" }.to_string();
+                        let name = format!("{key:?}").to_string();
 
-                            EVENT_LOOP.lock().unwrap().execute(relative_handler.clone(), Some(vec![
-                                PythonArgument::String(name),
-                                PythonArgument::Number(*value),
-                            ]));
-                            return;
-                        }
+                        EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(vec![
+                            PythonArgument::String(name),
+                            PythonArgument::Number(*value),
+                        ]));
+                        return;
                     }
-                    _ => {}
                 }
+                _ => {}
             }
+        }
 
+        if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
+            let name = format!("{:?}", ev.event_code).to_string();
+            EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(vec![
+                PythonArgument::String(name),
+                PythonArgument::Number(ev.value),
+            ]));
+        }
+
+        if let Some(subscriber) = self.subscriber.load().deref() {
             subscriber.handle("", raw_ev);
         }
     }
@@ -56,7 +67,7 @@ impl MotionMapper {
 
         let inner = Arc::new(Inner {
             subscriber: subscriber.clone(),
-            relative_handler: RwLock::new(None),
+            ..Default::default()
         });
 
         Ok(Self {
@@ -65,15 +76,20 @@ impl MotionMapper {
         })
     }
 
-    pub fn map_relative(&mut self, py: Python, relative_handler: PyObject) -> PyResult<()> {
-        let is_callable = relative_handler.as_ref(py).is_callable();
-
-        if is_callable {
-            *self.inner.relative_handler.write().unwrap() = Some(relative_handler);
+    pub fn map_relative(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
+        if handler.as_ref(py).is_callable() {
+            *self.inner.relative_handler.write().unwrap() = Some(handler);
             return Ok(());
         }
+        Err(InputError::NotCallable.into())
+    }
 
-        Err(PyRuntimeError::new_err("expected a callable object"))
+    pub fn map_fallback(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
+        if handler.as_ref(py).is_callable() {
+            *self.inner.fallback_handler.write().unwrap() = Some(handler);
+            return Ok(());
+        }
+        Err(InputError::NotCallable.into())
     }
 
     pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
