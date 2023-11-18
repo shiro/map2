@@ -177,17 +177,13 @@ impl Subscribable for Inner {
                     let _transformer = self.transformer.read().unwrap();
                     let transformer = _transformer.as_ref().unwrap();
 
-                    if let Some(key) = transformer.raw_to_utf(key, &*state.modifiers) {
-                        EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(vec![
-                            PythonArgument::String(key),
-                            PythonArgument::Number(*value),
-                        ]));
-                    } else {
-                        EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(vec![
-                            PythonArgument::String(format!("{key:?}").to_string()),
-                            PythonArgument::Number(*value),
-                        ]));
-                    }
+                    let name = transformer.raw_to_utf(key, &*state.modifiers)
+                        .unwrap_or_else(|| format!("{key:?}").to_string());
+
+                    EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(vec![
+                        PythonArgument::String(name),
+                        PythonArgument::Number(*value),
+                    ]));
                     return;
                 }
             }
