@@ -20,6 +20,21 @@ struct PyKey {
 }
 
 
+#[pyfunction]
+fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
+    let mut prev: Option<PyObject> = None;
+
+    for target in chain.into_iter() {
+        if let Some(source) = prev {
+            if let Ok(mut source) = source.extract::<PyRefMut<Reader>>(py) { source.link(target.as_ref(py))?; }
+            if let Ok(mut source) = source.extract::<PyRefMut<Mapper>>(py) { source.link(target.as_ref(py))?; }
+        }
+        prev = Some(target);
+    }
+
+    Ok(())
+}
+
 pub fn err_to_py(err: anyhow::Error) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
@@ -41,6 +56,7 @@ fn exit(exit_code: Option<i32>) { std::process::exit(exit_code.unwrap_or(0)); }
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(wait, m)?)?;
     m.add_function(wrap_pyfunction!(exit, m)?)?;
+    m.add_function(wrap_pyfunction!(link, m)?)?;
     m.add_class::<Reader>()?;
     m.add_class::<Mapper>()?;
     m.add_class::<KeyMapperSnapshot>()?;
@@ -48,7 +64,6 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Writer>()?;
     m.add_class::<VirtualWriter>()?;
     m.add_class::<VirtualReader>()?;
-    // m.add_class::<EventRoute>()?;
     m.add_class::<Window>()?;
 
     Ok(())

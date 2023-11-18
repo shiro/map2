@@ -169,8 +169,11 @@ impl Subscribable for Inner {
                 }
 
                 let was_modifier = event_handlers::update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
-                if was_modifier { return; }
+
                 if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
+                    // don't trigger the fallback handler with modifier keys
+                    if was_modifier { return; }
+
                     let _transformer = self.transformer.read().unwrap();
                     let transformer = _transformer.as_ref().unwrap();
 
@@ -185,8 +188,8 @@ impl Subscribable for Inner {
                             PythonArgument::Number(*value),
                         ]));
                     }
+                    return;
                 }
-                return;
             }
             // rel event
             EvdevInputEvent { event_code: EventCode::EV_REL(key), value, .. } => {
