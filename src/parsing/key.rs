@@ -29,7 +29,7 @@ pub fn key_utf<'a>(
 ) -> impl Fn(&'a str) -> ResNew2<&'a str, (Key, KeyModifierFlags)> + 'a {
     move |input: &str| {
         alt((
-            // multiple asci chars
+            // multiple ASCII chars
             ident,
 
             // one arbitrary char
@@ -158,30 +158,34 @@ mod tests {
 
     #[test]
     fn test_utf_key() {
-        let t = XKBTransformer::new(None, Some("rabbit"), None, None);
-
-        assert_eq!(key_utf(Some(&t))("š"), nom_ok((
-            Key::from_str(&EventType::EV_KEY, "KEY_S").unwrap(),
-            KeyModifierFlags::new()
-                .tap_mut(|x| x.right_alt())
-        )));
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         assert_eq!(key_utf(Some(&t))(":"), nom_ok((
-            Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap(),
-            KeyModifierFlags::new()
-                .tap_mut(|x| x.shift())
+            *KEY_SEMICOLON,
+            KeyModifierFlags::new().tap_mut(|x| x.shift())
         )));
 
         assert_eq!(key_utf(Some(&t))("^"), nom_ok((
-            Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap(),
-            KeyModifierFlags::new()
-                .tap_mut(|x| x.shift())
+            *KEY_6,
+            KeyModifierFlags::new().tap_mut(|x| x.shift())
         )));
     }
 
     #[test]
+    fn key_special() {
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
+
+        assert_eq!(key_utf(Some(&t))("SHIFT"), nom_ok((*KEY_LEFTSHIFT, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("BACKSPACE"), nom_ok((*KEY_BACKSPACE, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("LEFT"), nom_ok((*KEY_LEFT, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("RIGHT"), nom_ok((*KEY_RIGHT, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("UP"), nom_ok((*KEY_UP, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("DOWN"), nom_ok((*KEY_DOWN, KeyModifierFlags::new())));
+    }
+
+    #[test]
     fn invalid_key_multiple_chars() {
-        let t = XKBTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         // assert_eq!(key_utf(Some(&t))("ab"), nom_err("ab"));
         assert_nom_err(key_utf(Some(&t))("ab"), "ab");

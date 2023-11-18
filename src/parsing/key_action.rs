@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn action_utf() {
-        let t = XKBTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         assert_eq!(key_action_utf(Some(&t))("{: down}"), nom_ok(ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(*KEY_SEMICOLON, 1,
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn action_handle_special_chars() {
-        let t = XKBTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         assert_nom_err(key_action_utf(Some(&t))("{"), "{");
 
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn invalid_action_multiple_keys_in_special_group() {
-        let t = XKBTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         assert_nom_err(key_action_utf(Some(&t))("{abc}"), "{abc}");
     }

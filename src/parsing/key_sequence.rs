@@ -51,7 +51,7 @@ mod tests {
 
     #[test]
     fn sequence_escaped_special_chars() {
-        let t = XKBTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         assert_eq!(key_sequence_utf(Some(&t))("\\{"), nom_ok(vec![
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
@@ -68,7 +68,7 @@ mod tests {
 
     #[test]
     fn sequence_invalid_multiple_keys_in_special_group() {
-        let t = XKBTransformer::new(None, Some("us"), None, None);
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         assert_nom_err(key_sequence_utf(Some(&t))("{abc}"), "{abc}");
     }
