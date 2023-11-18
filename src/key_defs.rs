@@ -68,6 +68,8 @@ pub static ref KEY_BACKSPACE: Key = Key::from_str(&EventType::EV_KEY, "KEY_BACKS
 pub static ref KEY_GRAVE: Key = Key::from_str(&EventType::EV_KEY, "KEY_GRAVE").unwrap();
 pub static ref KEY_LEFTSHIFT: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap();
 pub static ref KEY_RIGHTSHIFT: Key = Key::from_str(&EventType::EV_KEY, "KEY_RIGHTSHIFT").unwrap();
+pub static ref KEY_PAGEUP: Key = Key::from_str(&EventType::EV_KEY, "KEY_PAGEUP").unwrap();
+pub static ref KEY_PAGEDOWN: Key = Key::from_str(&EventType::EV_KEY, "KEY_PAGEDOWN").unwrap();
 pub static ref KEY_LEFTBRACE: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTBRACE").unwrap();
 pub static ref KEY_RIGHTBRACE: Key = Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap();
 pub static ref KEY_SEMICOLON: Key = Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap();
@@ -87,6 +89,8 @@ lazy_static! {
         m.insert("RIGHT", (*KEY_RIGHT, KeyModifierFlags::new()));
         m.insert("UP", (*KEY_UP, KeyModifierFlags::new()));
         m.insert("DOWN", (*KEY_DOWN, KeyModifierFlags::new()));
+        m.insert("PAGE_UP", (*KEY_PAGEUP, KeyModifierFlags::new()));
+        m.insert("PAGE_DOWN", (*KEY_PAGEDOWN, KeyModifierFlags::new()));
         m.insert("ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("LEFT_ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("RIGHT_ALT", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTALT").unwrap(), KeyModifierFlags::new()));

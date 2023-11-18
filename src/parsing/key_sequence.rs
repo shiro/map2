@@ -21,7 +21,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_key_sequence() {
+    fn sequence_input() {
         assert_eq!(key_sequence("abc"), nom_ok(vec![
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_A, modifiers: KeyModifierFlags::new() }),
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_B, modifiers: KeyModifierFlags::new() }),
@@ -35,7 +35,7 @@ mod tests {
     }
 
     #[test]
-    fn test_key_sequence_mixed() {
+    fn sequence_mixed() {
         assert_eq!(key_sequence("a{b down}c"), nom_ok(vec![
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_A, modifiers: KeyModifierFlags::new() }),
             ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_B, TYPE_DOWN, KeyModifierFlags::new())),

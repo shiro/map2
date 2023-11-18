@@ -14,6 +14,7 @@ use custom_combinators::*;
 use error::*;
 use identifier::*;
 use key::*;
+use action::*;
 use key_action::*;
 use key_sequence::*;
 
@@ -60,6 +61,7 @@ pub(super) fn nom_no_last_err<'a, T>(value: ResNew<&str, T>) -> ResNew<&str, T> 
 mod custom_combinators;
 mod identifier;
 mod key;
+mod action;
 pub mod key_action;
 mod key_sequence;
 mod error;

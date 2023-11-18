@@ -1,4 +1,5 @@
 #![feature(fn_traits)]
+#![recursion_limit = "256"]
 
 #![allow(warnings)]
 

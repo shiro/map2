@@ -181,6 +181,8 @@ mod tests {
         assert_eq!(key_utf(Some(&t))("RIGHT"), nom_ok((*KEY_RIGHT, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("UP"), nom_ok((*KEY_UP, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("DOWN"), nom_ok((*KEY_DOWN, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("PAGE_DOWN"), nom_ok((*KEY_PAGEDOWN, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("PAGE_UP"), nom_ok((*KEY_PAGEUP, KeyModifierFlags::new())));
     }
 
     #[test]
