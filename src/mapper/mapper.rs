@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::fmt::format;
 use std::sync::RwLock;
+use pyo3::types::PyTuple;
 
 use crate::*;
 use crate::python::*;
@@ -72,6 +73,42 @@ fn release_restore_modifiers(
     output_events
 
     // TODO eat keys we just released, un-eat keys we just restored
+}
+
+fn run_python_handler(
+    handler: &PyObject,
+    args: Option<Vec<PythonArgument>>,
+) -> Option<String> {
+    Python::with_gil(|py| -> Option<String> {
+        let asyncio = py.import("asyncio")
+            .expect("python runtime error: failed to import 'asyncio', is it installed?");
+
+        let is_async_callback: bool = asyncio
+            .call_method1("iscoroutinefunction", (handler.as_ref(py), ))
+            .expect("python runtime error: 'iscoroutinefunction' lookup failed")
+            .extract()
+            .expect("python runtime error: 'iscoroutinefunction' call failed");
+
+        if is_async_callback {
+            EVENT_LOOP.lock().unwrap().execute(handler.clone(), args);
+            None
+        } else {
+            let args = args_to_py(py, args.unwrap_or(vec![]));
+            let res = handler.call(py, args, None)
+                .and_then(|ret| {
+                    if ret.is_none(py) { return Ok(None); }
+                    Ok(Some(ret.extract::<String>(py)?.clone()))
+                });
+
+            match res {
+                Ok(ret) => ret,
+                Err(err) => {
+                    eprintln!("{err}");
+                    std::process::exit(1);
+                }
+            }
+        }
+    })
 }
 
 
@@ -153,14 +190,29 @@ impl Subscribable for Inner {
                                 }
                             }
                         }
-                        RuntimeAction::PythonCallback(from_modifiers, callback_object) => {
+                        RuntimeAction::PythonCallback(from_modifiers, handler) => {
                             // always release all trigger mods before running the callback
                             let mut new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
                             for ev in new_events {
                                 subscriber.handle("", InputEvent::Raw(ev));
                             }
 
-                            EVENT_LOOP.lock().unwrap().execute(callback_object.clone(), None);
+                            let ret = run_python_handler(&handler, None);
+                            if let Some(ret) = ret {
+                                let _transformer = self.transformer.read().unwrap();
+                                let transformer = _transformer.as_ref().unwrap();
+
+                                let seq = parse_key_sequence_py(&ret, Some(transformer)).unwrap_or_else(|err| {
+                                    eprintln!("{err}");
+                                    std::process::exit(1);
+                                });
+
+                                if let Some(subscriber) = self.subscriber.load().deref() {
+                                    for action in seq.to_key_actions() {
+                                        subscriber.handle("", InputEvent::Raw(action.to_input_ev()));
+                                    }
+                                }
+                            }
                         }
                         RuntimeAction::NOP => {}
                     }
@@ -185,40 +237,19 @@ impl Subscribable for Inner {
                         PythonArgument::Number(*value),
                     ];
 
-                    Python::with_gil(|py| {
-                        let asyncio = py.import("asyncio")
-                            .expect("python runtime error: failed to import 'asyncio', is it installed?");
+                    let ret = run_python_handler(&handler, Some(args));
+                    if let Some(ret) = ret {
+                        let seq = parse_key_sequence_py(&ret, Some(transformer)).unwrap_or_else(|err| {
+                            eprintln!("{err}");
+                            std::process::exit(1);
+                        });
 
-                        let is_async_callback: bool = asyncio
-                            .call_method1("iscoroutinefunction", (handler.as_ref(py), ))
-                            .expect("python runtime error: 'iscoroutinefunction' lookup failed")
-                            .extract()
-                            .expect("python runtime error: 'iscoroutinefunction' call failed");
-
-                        if is_async_callback {
-                            EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(args));
-                        } else {
-                            let res = handler.call(py, args_to_py(py, args), None)
-                                .and_then(|ret| {
-                                    let ret = ret.extract::<String>(py).unwrap();
-                                    let seq = parse_key_sequence_py(&ret, Some(transformer))
-                                        .map_err(|err| { PyRuntimeError::new_err(err.to_string()) })?;
-
-                                    if let Some(subscriber) = self.subscriber.load().deref() {
-                                        for action in seq.to_key_actions() {
-                                            subscriber.handle("", InputEvent::Raw(action.to_input_ev()));
-                                        }
-                                    }
-
-                                    Ok(())
-                                });
-
-                            if let Err(err) = res {
-                                eprintln!("{err}");
-                                std::process::exit(1);
+                        if let Some(subscriber) = self.subscriber.load().deref() {
+                            for action in seq.to_key_actions() {
+                                subscriber.handle("", InputEvent::Raw(action.to_input_ev()));
                             }
                         }
-                    });
+                    }
 
                     return;
                 }

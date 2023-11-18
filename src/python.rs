@@ -1,6 +1,7 @@
 pub use pyo3::exceptions::PyRuntimeError;
 pub use pyo3::impl_::wrap::OkWrap;
 pub use pyo3::prelude::*;
+pub use pyo3::PyClass;
 pub use pyo3::types::PyDict;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 
