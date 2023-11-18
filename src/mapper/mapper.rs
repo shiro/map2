@@ -5,7 +5,7 @@ use std::sync::RwLock;
 use crate::*;
 use crate::python::*;
 use crate::event::InputEvent;
-use crate::event_loop::PythonArgument;
+use crate::event_loop::{args_to_py, PythonArgument};
 use crate::mapper::{RuntimeAction, RuntimeKeyAction};
 use crate::mapper::mapping_functions::*;
 use crate::parsing::key_action::*;
@@ -180,10 +180,46 @@ impl Subscribable for Inner {
                     let name = transformer.raw_to_utf(key, &*state.modifiers)
                         .unwrap_or_else(|| format!("{key:?}").to_string());
 
-                    EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(vec![
+                    let args = vec![
                         PythonArgument::String(name),
                         PythonArgument::Number(*value),
-                    ]));
+                    ];
+
+                    Python::with_gil(|py| {
+                        let asyncio = py.import("asyncio")
+                            .expect("python runtime error: failed to import 'asyncio', is it installed?");
+
+                        let is_async_callback: bool = asyncio
+                            .call_method1("iscoroutinefunction", (handler.as_ref(py), ))
+                            .expect("python runtime error: 'iscoroutinefunction' lookup failed")
+                            .extract()
+                            .expect("python runtime error: 'iscoroutinefunction' call failed");
+
+                        if is_async_callback {
+                            EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(args));
+                        } else {
+                            let res = handler.call(py, args_to_py(py, args), None)
+                                .and_then(|ret| {
+                                    let ret = ret.extract::<String>(py).unwrap();
+                                    let seq = parse_key_sequence_py(&ret, Some(transformer))
+                                        .map_err(|err| { PyRuntimeError::new_err(err.to_string()) })?;
+
+                                    if let Some(subscriber) = self.subscriber.load().deref() {
+                                        for action in seq.to_key_actions() {
+                                            subscriber.handle("", InputEvent::Raw(action.to_input_ev()));
+                                        }
+                                    }
+
+                                    Ok(())
+                                });
+
+                            if let Err(err) = res {
+                                eprintln!("{err}");
+                                std::process::exit(1);
+                            }
+                        }
+                    });
+
                     return;
                 }
             }

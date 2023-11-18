@@ -13,7 +13,7 @@ pub enum PythonArgument {
 
 type Args = Vec<PythonArgument>;
 
-fn args_to_py(py: Python<'_>, args: Args) -> &PyTuple {
+pub fn args_to_py(py: Python<'_>, args: Args) -> &PyTuple {
     PyTuple::new(py, args.into_iter().map(|x| {
         match x {
             PythonArgument::String(x) => { x.into_py(py) }
