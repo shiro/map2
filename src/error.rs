@@ -9,6 +9,4 @@ pub enum InputError {
     NotCallable
 }
 
-impl Into<PyErr> for InputError {
-    fn into(self) -> PyErr { PyRuntimeError::new_err(self.to_string()) }
-}
+impl Into<PyErr> for InputError { fn into(self) -> PyErr { PyRuntimeError::new_err(self.to_string()) } }

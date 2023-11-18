@@ -24,8 +24,7 @@ use thread_tryjoin::TryJoinHandle;
 use uuid::Uuid;
 
 use event_loop::EVENT_LOOP;
-pub use mapper::key_mapper::KeyMapper;
-use motion_mapper::MotionMapper;
+pub use mapper::mapper::Mapper;
 pub use python::err_to_py;
 use reader::Reader;
 use writer::Writer;
@@ -65,7 +64,6 @@ pub mod python;
 pub mod reader;
 pub mod virtual_reader;
 pub mod mapper;
-pub mod motion_mapper;
 pub mod writer;
 pub mod virtual_writer;
 pub mod text_mapper;

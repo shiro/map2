@@ -3,7 +3,7 @@ use crate::xkb::XKBTransformer;
 use crate::*;
 
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct TransformerParams {
     pub model: String,
     pub layout: String,
@@ -36,12 +36,8 @@ impl XKBTransformerRegistry {
 
     pub fn get(
         &self,
-        model: Option<String>,
-        layout: Option<String>,
-        variant: Option<String>,
-        options: Option<String>
+        params: &TransformerParams,
     ) -> Result<Arc<XKBTransformer>> {
-        let params = TransformerParams::new(model, layout, variant, options);
         let mut registry = self.registry.lock().unwrap();
         let res = registry.get(&params);
 
@@ -56,7 +52,7 @@ impl XKBTransformerRegistry {
                             params.variant.as_deref(),
                             params.options.clone(),
                         )?);
-                        registry.insert(params, Arc::downgrade(&transformer));
+                        registry.insert(params.clone(), Arc::downgrade(&transformer));
                         Ok(transformer)
                     }
                 }
@@ -68,7 +64,7 @@ impl XKBTransformerRegistry {
                     params.variant.as_deref(),
                     params.options.clone(),
                 )?);
-                registry.insert(params, Arc::downgrade(&transformer));
+                registry.insert(params.clone(), Arc::downgrade(&transformer));
                 Ok(transformer)
             }
         }

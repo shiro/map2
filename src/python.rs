@@ -1,16 +1,15 @@
 pub use pyo3::exceptions::PyRuntimeError;
 pub use pyo3::impl_::wrap::OkWrap;
 pub use pyo3::prelude::*;
-pub use pyo3::types::{PyDict};
+pub use pyo3::types::PyDict;
+use signal_hook::{consts::SIGINT, iterator::Signals};
 
+use crate::*;
+use crate::mapper::mapper::KeyMapperSnapshot;
 use crate::text_mapper::TextMapper;
 use crate::virtual_reader::VirtualReader;
 use crate::virtual_writer::VirtualWriter;
 use crate::window::Window;
-use crate::*;
-
-use signal_hook::{consts::SIGINT, iterator::Signals};
-use crate::mapper::key_mapper::KeyMapperSnapshot;
 
 #[pyclass]
 struct PyKey {
@@ -43,9 +42,8 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(wait, m)?)?;
     m.add_function(wrap_pyfunction!(exit, m)?)?;
     m.add_class::<Reader>()?;
-    m.add_class::<KeyMapper>()?;
+    m.add_class::<Mapper>()?;
     m.add_class::<KeyMapperSnapshot>()?;
-    m.add_class::<MotionMapper>()?;
     m.add_class::<TextMapper>()?;
     m.add_class::<Writer>()?;
     m.add_class::<VirtualWriter>()?;
