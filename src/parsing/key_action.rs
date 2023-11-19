@@ -6,6 +6,7 @@ use super::*;
 pub enum ParsedKeyAction {
     KeyAction(KeyActionWithMods),
     KeyClickAction(KeyClickActionWithMods),
+    Action(KeyAction),
 }
 
 pub trait ParsedKeyActionVecExt {
@@ -42,6 +43,10 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
                     if action.modifiers.meta { acc.push(KeyAction::new(*KEY_LEFT_META, TYPE_UP)); }
                     acc
                 }
+                ParsedKeyAction::Action(action) => {
+                    acc.push(action);
+                    acc
+                }
             })
     }
 }
@@ -59,32 +64,40 @@ pub fn key_action_utf<'a>(
             alt((
                 // with state
                 map(surrounded_group("{", "}", key_with_state_utf(transformer)),
-                    |(key, state)| (key, Some(state)),
+                    |((key, mods), state)| ((key, Some(mods)), Some(state)),
                 ),
 
                 // no state - {KEY}
                 map(surrounded_group("{", "}", key_utf(transformer)),
-                    |key| (key, None),
+                    |(key, mods)| ((key, Some(mods)), None),
+                ),
+
+                // action
+                map(surrounded_group("{", "}", action),
+                    |action| ((action.key, None), Some(action.value)),
                 ),
 
                 // escaped special char
-                map(tuple((tag_custom("\\"), key_utf(transformer))), |(_, key)| (key, None)),
+                map(tuple((tag_custom("\\"), key_utf(transformer))), |(_, (key, mods))| ((key, Some(mods)), None)),
 
                 // any 1 char except special ones
                 map_res(
                     recognize(none_of("{}")),
                     |input| {
-                        let (_, key) = key_utf(transformer)(input)?;
-                        Ok::<_, nom::Err<CustomError<&str>>>((key, None))
+                        let (_, (key, mods)) = key_utf(transformer)(input)?;
+                        Ok::<_, nom::Err<CustomError<&str>>>(((key, Some(mods)), None))
                     },
                 ),
-            )), |((key, mods), state)| {
-                let action = match state {
-                    Some(state) => {
-                        ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, state, mods))
+            )), |((key, mods), value)| {
+                let action = match value {
+                    Some(value) => {
+                        match mods {
+                            Some(mods) => ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, value, mods)),
+                            None => { ParsedKeyAction::Action(KeyAction::new(key, value)) }
+                        }
                     }
                     None => {
-                        ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods))
+                        ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods.unwrap_or_default()))
                     }
                 };
 
@@ -113,6 +126,8 @@ pub fn key_action_with_flags_utf<'a>(
                 match &mut action {
                     ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags) }
                     ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags) }
+                    // TODO figure out how to not accept flags on this
+                    ParsedKeyAction::Action(_) => {}
                 }
 
                 Ok::<ParsedKeyAction, CustomError<&str>>(action)
@@ -124,6 +139,7 @@ pub fn key_action_with_flags_utf<'a>(
 
 #[cfg(test)]
 mod tests {
+    use evdev_rs::enums::EV_REL;
     use super::*;
 
     #[test]
@@ -138,6 +154,10 @@ mod tests {
 
         assert_eq!(key_action("{shift down}"), nom_ok(ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap(), 1, KeyModifierFlags::new())
+        )));
+
+        assert_eq!(key_action("{relative X 99}"), nom_ok(ParsedKeyAction::Action(
+            KeyAction { key: Key { event_code: EventCode::EV_REL(EV_REL::REL_X) }, value: 99 }
         )));
     }
 

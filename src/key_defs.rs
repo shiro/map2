@@ -74,6 +74,9 @@ pub static ref KEY_LEFTBRACE: Key = Key::from_str(&EventType::EV_KEY, "KEY_LEFTB
 pub static ref KEY_RIGHTBRACE: Key = Key::from_str(&EventType::EV_KEY, "KEY_RIGHTBRACE").unwrap();
 pub static ref KEY_SEMICOLON: Key = Key::from_str(&EventType::EV_KEY, "KEY_SEMICOLON").unwrap();
 pub static ref KEY_6: Key = Key::from_str(&EventType::EV_KEY, "KEY_6").unwrap();
+pub static ref BTN_LEFT: Key = Key::from_str(&EventType::EV_KEY, "BTN_LEFT").unwrap();
+pub static ref BTN_RIGHT: Key = Key::from_str(&EventType::EV_KEY, "BTN_RIGHT").unwrap();
+pub static ref BTN_MIDDLE: Key = Key::from_str(&EventType::EV_KEY, "BTN_MIDDLE").unwrap();
 }
 
 
@@ -81,6 +84,9 @@ lazy_static! {
     pub(crate) static ref KEY_ALIAS_TABLE: HashMap<&'static str, (Key, KeyModifierFlags)> = {
         let mut m = HashMap::new();
         m.insert(" ", (Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap(), KeyModifierFlags::new()));
+        m.insert("BTN_LEFT", (*BTN_LEFT, KeyModifierFlags::new()));
+        m.insert("BTN_RIGHT", (*BTN_RIGHT, KeyModifierFlags::new()));
+        m.insert("BTN_MIDDLE", (*BTN_MIDDLE, KeyModifierFlags::new()));
         m.insert("BACKSPACE", (*KEY_BACKSPACE, KeyModifierFlags::new()));
         m.insert("SHIFT", (*KEY_LEFTSHIFT, KeyModifierFlags::new()));
         m.insert("LEFT_SHIFT", (*KEY_LEFTSHIFT, KeyModifierFlags::new()));

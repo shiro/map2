@@ -257,12 +257,28 @@ impl Subscribable for Inner {
             // rel event
             EvdevInputEvent { event_code: EventCode::EV_REL(key), value, .. } => {
                 if let Some(handler) = self.relative_handler.read().unwrap().as_ref() {
+                    let _transformer = self.transformer.read().unwrap();
+                    let transformer = _transformer.as_ref().unwrap();
+
                     let name = format!("{key:?}");
                     let name = name["REL_".len()..name.len()].to_string();
-                    EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(vec![
+                    let args = vec![
                         PythonArgument::String(name),
                         PythonArgument::Number(*value),
-                    ]));
+                    ];
+                    let ret = run_python_handler(&handler, Some(args));
+                    if let Some(ret) = ret {
+                        let seq = parse_key_sequence_py(&ret, Some(transformer)).unwrap_or_else(|err| {
+                            eprintln!("{err}");
+                            std::process::exit(1);
+                        });
+
+                        if let Some(subscriber) = self.subscriber.load().deref() {
+                            for action in seq.to_key_actions() {
+                                subscriber.handle("", InputEvent::Raw(action.to_input_ev()));
+                            }
+                        }
+                    }
                     return;
                 }
             }
@@ -385,6 +401,8 @@ impl Mapper {
     }
 
     pub fn map_relative(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
+        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+
         if handler.as_ref(py).is_callable() {
             *self.inner.relative_handler.write().unwrap() = Some(handler);
             return Ok(());
@@ -446,6 +464,9 @@ impl Mapper {
                     RuntimeAction::NOP,
                 );
             }
+            ParsedKeyAction::Action(_) => {
+                return Err(PyRuntimeError::new_err(format!("this method accepts only button mappings")));
+            }
         }
 
         Ok(())
@@ -485,8 +506,16 @@ impl Mapper {
                                 self.inner.mappings.write().unwrap().insert(from, to);
                             });
                         }
-                        // click to action
+                        // click to key action
                         ParsedKeyAction::KeyAction(to) => {
+                            let mappings = map_click_to_action(&from, &to);
+                            IntoIterator::into_iter(mappings).for_each(|(from, to)| {
+                                self.inner.mappings.write().unwrap().insert(from, to);
+                            });
+                        }
+                        // click to action
+                        ParsedKeyAction::Action(to) => {
+                            let to = to.to_key_action_with_mods(Default::default());
                             let mappings = map_click_to_action(&from, &to);
                             IntoIterator::into_iter(mappings).for_each(|(from, to)| {
                                 self.inner.mappings.write().unwrap().insert(from, to);
@@ -501,6 +530,9 @@ impl Mapper {
                 IntoIterator::into_iter(mappings).for_each(|(from, to)| {
                     self.inner.mappings.write().unwrap().insert(from, to);
                 });
+            }
+            ParsedKeyAction::Action(_) => {
+                return Err(PyRuntimeError::new_err(format!("this method accepts only button mappings")));
             }
         }
 

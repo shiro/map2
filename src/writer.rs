@@ -15,7 +15,7 @@ impl Subscribable for Inner {
     fn handle(&self, id: &str, ev: InputEvent) {
         match ev {
             InputEvent::Raw(ev) => {
-                self.out_ev_tx.send(ev).unwrap();
+                let _ = self.out_ev_tx.send(ev);
             }
         }
     }

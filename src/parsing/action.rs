@@ -4,20 +4,27 @@ use evdev_rs::enums::{EV_ABS, EV_REL};
 use super::*;
 
 
-pub fn action_utf(input: &str) -> ResNew2<&str, (EventCode, i32)> {
+pub fn number(input: &str) -> ResNew2<&str, i32> {
+    map_res(
+        recognize(tuple((opt(tag_custom("-")), digit1))),
+        str::parse
+    )(input)
+}
+
+pub fn action(input: &str) -> ResNew2<&str, KeyAction> {
     map_res(
         tuple((
             alt((
                 tuple((ident, multispace1, ident)),
             )),
             multispace1,
-            digit1,
+            number,
         )),
         |((tag1, _, tag2), _, value)| {
-            let value = u32::from_str(value)
-                .map_err(|_| make_generic_nom_err_new(input))?;
+            // let value = u32::from_str(value)
+            //     .map_err(|_| make_generic_nom_err_new(input))?;
 
-            let f = match &*tag1 {
+            let event_code = match &*tag1 {
                 "relative" => {
                     match &*tag2 {
                         "X" => EventCode::EV_REL(EV_REL::REL_X),
@@ -89,7 +96,7 @@ pub fn action_utf(input: &str) -> ResNew2<&str, (EventCode, i32)> {
             };
 
 
-            Ok::<_, nom::Err<CustomError<_>>>((f, value as i32))
+            Ok::<_, nom::Err<CustomError<_>>>(KeyAction::new(Key { event_code }, value as i32))
         },
     )(input)
 }
@@ -101,15 +108,24 @@ mod tests {
 
     #[test]
     fn action_input() {
-        assert_eq!(action_utf("relative X 33"), nom_ok((EventCode::EV_REL(EV_REL::REL_X), 33)));
-        assert_eq!(action_utf("relative Y 99"), nom_ok((EventCode::EV_REL(EV_REL::REL_Y), 99)));
+        assert_eq!(action("relative X 33"), nom_ok(
+            KeyAction { key: Key { event_code: EventCode::EV_REL(EV_REL::REL_X) }, value: 33 }
+        ));
+        assert_eq!(action("relative Y 99"), nom_ok(
+            KeyAction { key: Key { event_code: EventCode::EV_REL(EV_REL::REL_Y) }, value: 99 }
+        ));
 
-        assert_eq!(action_utf("absolute Z 99"), nom_ok((EventCode::EV_ABS(EV_ABS::ABS_Z), 99)));
+        assert_eq!(action("absolute Z 99"), nom_ok(
+            KeyAction { key: Key { event_code: EventCode::EV_ABS(EV_ABS::ABS_Z) }, value: 99 }
+        ));
+
+        assert_eq!(action("absolute TILT_X -5"), nom_ok(
+            KeyAction { key: Key { event_code: EventCode::EV_ABS(EV_ABS::ABS_TILT_X) }, value: -5 }
+        ));
     }
 
     #[test]
     fn action_invalid_input() {
-        assert_eq!(action_utf("relative X 33"), nom_ok((EventCode::EV_REL(EV_REL::REL_X), 33)));
-        assert_nom_err(action_utf("relative foo 33"), "relative foo 33");
+        assert_nom_err(action("relative foo 33"), "relative foo 33");
     }
 }

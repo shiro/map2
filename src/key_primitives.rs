@@ -32,7 +32,7 @@ impl KeyValue {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct KeyModifierFlags {
     pub ctrl: bool,
     pub shift: bool,
@@ -103,6 +103,9 @@ impl KeyAction {
     pub fn from_input_ev(ev: &EvdevInputEvent) -> Self { KeyAction { key: Key { event_code: ev.event_code }, value: ev.value } }
     pub fn to_input_ev(&self) -> EvdevInputEvent {
         EvdevInputEvent { event_code: self.key.event_code, value: self.value, time: INPUT_EV_DUMMY_TIME }
+    }
+    pub fn to_key_action_with_mods(self, modifiers: KeyModifierFlags) -> KeyActionWithMods {
+        KeyActionWithMods{key: self.key, value: self.value, modifiers}
     }
 }
 

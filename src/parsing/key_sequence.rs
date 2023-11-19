@@ -18,6 +18,7 @@ pub fn key_sequence_utf<'a>(
 
 #[cfg(test)]
 mod tests {
+    use evdev_rs::enums::EV_REL;
     use super::*;
 
     #[test]
@@ -46,6 +47,13 @@ mod tests {
             ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_LEFT_SHIFT, TYPE_DOWN, KeyModifierFlags::new())),
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_A, modifiers: KeyModifierFlags::new() }),
             ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_LEFT_SHIFT, TYPE_UP, KeyModifierFlags::new())),
+        ]));
+    }
+
+    #[test]
+    fn sequence_special_chars() {
+        assert_eq!(key_sequence("{relative X 55}"), nom_ok(vec![
+            ParsedKeyAction::Action(KeyAction::new(Key{event_code: EventCode::EV_REL(EV_REL::REL_X)}, 55)),
         ]));
     }
 

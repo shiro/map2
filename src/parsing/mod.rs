@@ -3,18 +3,18 @@ use evdev_rs::enums::EventType;
 use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
-use nom::combinator::{map, map_res, recognize};
+use nom::combinator::{map, map_res, opt, recognize};
 use nom::Err as NomErr;
 use nom::IResult;
 use nom::multi::{many0, many1};
 use nom::sequence::terminated;
 use tap::Tap;
 
+use action::*;
 use custom_combinators::*;
 use error::*;
 use identifier::*;
 use key::*;
-use action::*;
 use key_action::*;
 use key_sequence::*;
 

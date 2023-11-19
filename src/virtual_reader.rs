@@ -1,5 +1,3 @@
-use evdev_rs::enums::EV_REL;
-use evdev_rs::TimeVal;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -67,21 +65,6 @@ impl VirtualReader {
             for action in actions {
                 subscriber.handle(&self.id, InputEvent::Raw(action.to_input_ev()));
             }
-        }
-        Ok(())
-    }
-
-    pub fn send_rel(&mut self, axis: &str, delta: i32) -> PyResult<()> {
-        let axis = match &*axis.to_uppercase() {
-            "X" => { EV_REL::REL_X }
-            "Y" => { EV_REL::REL_Y }
-            _ => { return Err(PyRuntimeError::new_err("axis must be one of: 'X', 'Y'")); }
-        };
-
-        if let Some(subscriber) = self.subscriber.load().deref() {
-            subscriber.handle(&self.id, InputEvent::Raw(
-                EvdevInputEvent::new(&TimeVal { tv_sec: 0, tv_usec: 0 }, &EventCode::EV_REL(axis), delta)
-            ));
         }
         Ok(())
     }
