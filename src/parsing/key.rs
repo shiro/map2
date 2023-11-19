@@ -86,43 +86,10 @@ pub fn key_utf<'a>(
     }
 }
 
-fn key_state(input: &str) -> ResNew2<&str, i32> {
-    alt((
-        tag("down"), tag("up"), tag("repeat"),
-    ))(input).map(|(next, v)| (next, match v.to_uppercase().as_str() {
-        "UP" => 0,
-        "DOWN" => 1,
-        "REPEAT" => 2,
-        _ => unreachable!()
-    }))
-}
-
-pub fn key_with_state(input: &str) -> ResNew2<&str, ((Key, KeyModifierFlags), i32)> {
-    key_with_state_utf(None)(input)
-}
-
-pub fn key_with_state_utf<'a>(
-    transformer: Option<&'a XKBTransformer>
-) -> impl Fn(&'a str) -> ResNew2<&'a str, ((Key, KeyModifierFlags), i32)> + 'a {
-    move |input: &str| {
-        map(
-            tuple((key_utf(transformer), multispace1, key_state)),
-            |(key, _, state)| (key, state),
-        )(input)
-    }
-}
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_special_key() {
-        assert_eq!(key_with_state("a down"), nom_ok((
-            (*KEY_A, KeyModifierFlags::new()), 1
-        )));
-    }
 
     #[test]
     fn test_key() {

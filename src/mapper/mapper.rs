@@ -1,16 +1,13 @@
-use std::cell::RefCell;
-use std::fmt::format;
 use std::sync::RwLock;
-use pyo3::types::PyTuple;
 
 use crate::*;
-use crate::python::*;
 use crate::event::InputEvent;
 use crate::event_loop::{args_to_py, PythonArgument};
 use crate::mapper::{RuntimeAction, RuntimeKeyAction};
 use crate::mapper::mapping_functions::*;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
+use crate::python::*;
 use crate::subscriber::{Subscribable, Subscriber};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};

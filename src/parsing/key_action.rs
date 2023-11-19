@@ -1,3 +1,4 @@
+use crate::parsing::action_state::*;
 use crate::xkb::XKBTransformer;
 
 use super::*;
@@ -62,22 +63,27 @@ pub fn key_action_utf<'a>(
     move |input: &str| {
         map_res(
             alt((
-                // with state
-                map(surrounded_group("{", "}", key_with_state_utf(transformer)),
-                    |((key, mods), state)| ((key, Some(mods)), Some(state)),
+                // key action with state {a down}
+                map(
+                    surrounded_group("{", "}", tuple((
+                        key_utf(transformer),
+                        multispace1,
+                        action_state,
+                    ))),
+                    |((key, mods), _, state)| ((key, Some(mods)), Some(state)),
                 ),
 
-                // no state - {KEY}
+                // key action without state - {a}
                 map(surrounded_group("{", "}", key_utf(transformer)),
                     |(key, mods)| ((key, Some(mods)), None),
                 ),
 
-                // action
+                // action - {relative X 20}
                 map(surrounded_group("{", "}", action),
                     |action| ((action.key, None), Some(action.value)),
                 ),
 
-                // escaped special char
+                // escaped special char - \\{
                 map(tuple((tag_custom("\\"), key_utf(transformer))), |(_, (key, mods))| ((key, Some(mods)), None)),
 
                 // any 1 char except special ones

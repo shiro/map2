@@ -32,7 +32,28 @@ pub fn tag_custom<T, Input, Error: FromTagError<Input>>(
     move |input: Input| {
         let tag_len = tag.input_len();
         let t = tag.clone();
+
         let res: IResult<_, _, Error> = match input.compare(t) {
+            CompareResult::Ok => Ok(input.take_split(tag_len)),
+            _ => { Err(Err::Error(Error::from_tag(input, tag.to_string()))) }
+        };
+        res
+    }
+}
+
+pub fn tag_custom_no_case<T, Input, Error: FromTagError<Input>>(
+    tag: T,
+) -> impl Fn(Input) -> IResult<Input, Input, Error>
+    where
+        Input: InputTake + Compare<T>,
+        T: InputLength + Clone + Display,
+{
+    // let tag = tag.to_string();
+    move |input: Input| {
+        let tag_len = tag.input_len();
+        let t = tag.clone();
+
+        let res: IResult<_, _, Error> = match input.compare_no_case(t) {
             CompareResult::Ok => Ok(input.take_split(tag_len)),
             _ => { Err(Err::Error(Error::from_tag(input, tag.to_string()))) }
         };
@@ -44,8 +65,8 @@ pub fn tag_custom<T, Input, Error: FromTagError<Input>>(
 pub fn surrounded_group<'a, Output>(
     from_token: &'a str,
     to_token: &'a str,
-    parser: impl Fn(&'a str) -> ResNew2<&'a str, Output> + 'a,
-) -> Box<dyn Fn(&'a str) -> ResNew2<&'a str, Output> + 'a> {
+    mut parser: impl FnMut(&'a str) -> ResNew2<&'a str, Output> + 'a,
+) -> Box<dyn FnMut(&'a str) -> ResNew2<&'a str, Output> + 'a> {
     Box::new(move |input| {
         map_res(
             tuple((
