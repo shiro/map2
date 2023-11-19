@@ -474,17 +474,25 @@ impl Mapper {
             ParsedKeyAction::KeyAction(from) => {
                 if to.len() == 1 {
                     let to = to.remove(0);
-                    // action to click
-                    if let ParsedKeyAction::KeyClickAction(to) = to {
-                        let mapping = map_action_to_click(&from, &to);
-                        self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
-                        return Ok(());
-                    }
-                    // action to action
-                    if let ParsedKeyAction::KeyAction(to) = to {
-                        let mapping = map_action_to_action(&from, &to);
-                        self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
-                        return Ok(());
+                    match to {
+                        // key action to click
+                        ParsedKeyAction::KeyClickAction(to) => {
+                            let mapping = map_action_to_click(&from, &to);
+                            self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
+                            return Ok(());
+                        }
+                        // key action to key action
+                        ParsedKeyAction::KeyAction(to) => {
+                            let mapping = map_action_to_action(&from, &to);
+                            self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
+                            return Ok(());
+                        }
+                        // key action to action
+                        ParsedKeyAction::Action(to) => {
+                            let mapping = map_action_to_action(&from, &to.to_key_action_with_mods(Default::default()));
+                            self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
+                            return Ok(());
+                        }
                     }
                 }
 
