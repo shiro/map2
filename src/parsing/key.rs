@@ -4,7 +4,7 @@ use crate::xkb::XKBTransformer;
 
 use super::*;
 
-pub fn key_flags(input: &str) -> ResNew2<&str, KeyModifierFlags> {
+pub fn key_flags(input: &str) -> ParseResult<&str, KeyModifierFlags> {
     many0(one_of("^!+#"))(input).and_then(|(next, val)| {
         let mut flags = KeyModifierFlags::new();
         for v in val {
@@ -20,13 +20,13 @@ pub fn key_flags(input: &str) -> ResNew2<&str, KeyModifierFlags> {
     })
 }
 
-pub fn key(input: &str) -> ResNew2<&str, (Key, KeyModifierFlags)> {
+pub fn key(input: &str) -> ParseResult<&str, (Key, KeyModifierFlags)> {
     key_utf(None)(input)
 }
 
 pub fn key_utf<'a>(
     transformer: Option<&'a XKBTransformer>
-) -> impl Fn(&'a str) -> ResNew2<&'a str, (Key, KeyModifierFlags)> + 'a {
+) -> impl Fn(&'a str) -> ParseResult<&str, (Key, KeyModifierFlags)> {
     move |input: &str| {
         alt((
             // multiple ASCII chars

@@ -5,8 +5,7 @@ use nom::InputLength;
 
 use super::*;
 
-pub type ResNew<I, O> = IResult<I, (O, Option<CustomError<I>>), CustomError<I>>;
-pub type ResNew2<I, O> = IResult<I, O, CustomError<I>>;
+pub type ParseResult<I, O> = IResult<I, O, CustomError<I>>;
 
 pub fn make_generic_nom_err_new<I>(input: I) -> NomErr<CustomError<I>> {
     NomErr::Error(CustomError { input, expected: vec![] })

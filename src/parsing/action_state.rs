@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn action_state(input: &str) -> ResNew2<&str, i32> {
+pub fn action_state(input: &str) -> ParseResult<&str, i32> {
     map(
         alt((
             tag_custom_no_case("down"),

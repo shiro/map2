@@ -53,13 +53,13 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
 }
 
 
-pub fn key_action(input: &str) -> ResNew2<&str, ParsedKeyAction> {
+pub fn key_action(input: &str) -> ParseResult<&str, ParsedKeyAction> {
     key_action_utf(None)(input)
 }
 
 pub fn key_action_utf<'a>(
     transformer: Option<&'a XKBTransformer>
-) -> impl Fn(&'a str) -> ResNew2<&'a str, ParsedKeyAction> {
+) -> impl Fn(&'a str) -> ParseResult<&str, ParsedKeyAction> {
     move |input: &str| {
         map_res(
             alt((
@@ -79,7 +79,7 @@ pub fn key_action_utf<'a>(
                 ),
 
                 // action - {relative X 20}
-                map(surrounded_group("{", "}", action),
+                map(surrounded_group("{", "}", motion_action),
                     |action| ((action.key, None), Some(action.value)),
                 ),
 
@@ -94,7 +94,8 @@ pub fn key_action_utf<'a>(
                         Ok::<_, nom::Err<CustomError<&str>>>(((key, Some(mods)), None))
                     },
                 ),
-            )), |((key, mods), value)| {
+            )),
+            |((key, mods), value)| {
                 let action = match value {
                     Some(value) => {
                         match mods {
@@ -108,27 +109,25 @@ pub fn key_action_utf<'a>(
                 };
 
                 Ok::<ParsedKeyAction, CustomError<&str>>(action)
-            })(input)
+            },
+        )(input)
     }
 }
 
-pub fn key_action_with_flags(input: &str) -> ResNew2<&str, ParsedKeyAction> {
+pub fn key_action_with_flags(input: &str) -> ParseResult<&str, ParsedKeyAction> {
     key_action_with_flags_utf(None)(input)
 }
 
 pub fn key_action_with_flags_utf<'a>(
     transformer: Option<&'a XKBTransformer>,
-) -> Box<dyn Fn(&'a str) -> ResNew2<&'a str, ParsedKeyAction> + 'a> {
+) -> Box<dyn Fn(&'a str) -> ParseResult<&str, ParsedKeyAction> + 'a> {
     Box::new(move |input: &str| {
         map_res(
             tuple((
                 key_flags,
                 key_action_utf(transformer),
             )),
-            |parts| {
-                let flags = parts.0;
-                let mut action = parts.1;
-
+            |(flags, mut action)| {
                 match &mut action {
                     ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags) }
                     ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags) }

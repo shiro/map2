@@ -4,13 +4,13 @@ use crate::xkb::XKBTransformer;
 
 use super::*;
 
-pub fn key_sequence(input: &str) -> ResNew2<&str, Vec<ParsedKeyAction>> {
+pub fn key_sequence(input: &str) -> ParseResult<&str, Vec<ParsedKeyAction>> {
     key_sequence_utf(None)(input)
 }
 
 pub fn key_sequence_utf<'a>(
     transformer: Option<&'a XKBTransformer>
-) -> impl Fn(&'a str) -> ResNew2<&'a str, Vec<ParsedKeyAction>> + 'a {
+) -> impl Fn(&'a str) -> ParseResult<&'a str, Vec<ParsedKeyAction>> + 'a {
     move |input: &str| {
         many1(key_action_utf(transformer))(input)
     }

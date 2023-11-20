@@ -2,7 +2,7 @@ use unicode_xid::UnicodeXID;
 
 use super::*;
 
-pub(super) fn ident(input: &str) -> ResNew2<&str, String> {
+pub(super) fn ident(input: &str) -> ParseResult<&str, String> {
     let (rest, id) = match word(input) {
         Ok((rest, id)) => (rest, id),
         Err(_) => return Err(make_generic_nom_err_options(input, vec!["identifier".to_string()])),
@@ -16,7 +16,7 @@ pub(super) fn ident(input: &str) -> ResNew2<&str, String> {
     }
 }
 
-pub(super) fn word(input: &str) -> ResNew2<&str, String> {
+pub(super) fn word(input: &str) -> ParseResult<&str, String> {
     let (input, _) = multispace0(input)?;
 
     let mut chars = input.char_indices();

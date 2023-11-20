@@ -4,14 +4,14 @@ use evdev_rs::enums::{EV_ABS, EV_REL};
 use super::*;
 
 
-pub fn number(input: &str) -> ResNew2<&str, i32> {
+pub fn number(input: &str) -> ParseResult<&str, i32> {
     map_res(
         recognize(tuple((opt(tag_custom("-")), digit1))),
         str::parse
     )(input)
 }
 
-pub fn action(input: &str) -> ResNew2<&str, KeyAction> {
+pub fn motion_action(input: &str) -> ParseResult<&str, KeyAction> {
     map_res(
         tuple((
             alt((
@@ -21,9 +21,6 @@ pub fn action(input: &str) -> ResNew2<&str, KeyAction> {
             number,
         )),
         |((tag1, _, tag2), _, value)| {
-            // let value = u32::from_str(value)
-            //     .map_err(|_| make_generic_nom_err_new(input))?;
-
             let event_code = match &*tag1 {
                 "relative" => {
                     match &*tag2 {
@@ -107,25 +104,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn action_input() {
-        assert_eq!(action("relative X 33"), nom_ok(
+    fn motion_action_input() {
+        assert_eq!(motion_action("relative X 33"), nom_ok(
             KeyAction { key: Key { event_code: EventCode::EV_REL(EV_REL::REL_X) }, value: 33 }
         ));
-        assert_eq!(action("relative Y 99"), nom_ok(
+        assert_eq!(motion_action("relative Y 99"), nom_ok(
             KeyAction { key: Key { event_code: EventCode::EV_REL(EV_REL::REL_Y) }, value: 99 }
         ));
 
-        assert_eq!(action("absolute Z 99"), nom_ok(
+        assert_eq!(motion_action("absolute Z 99"), nom_ok(
             KeyAction { key: Key { event_code: EventCode::EV_ABS(EV_ABS::ABS_Z) }, value: 99 }
         ));
 
-        assert_eq!(action("absolute TILT_X -5"), nom_ok(
+        assert_eq!(motion_action("absolute TILT_X -5"), nom_ok(
             KeyAction { key: Key { event_code: EventCode::EV_ABS(EV_ABS::ABS_TILT_X) }, value: -5 }
         ));
     }
 
     #[test]
-    fn action_invalid_input() {
-        assert_nom_err(action("relative foo 33"), "relative foo 33");
+    fn motion_action_invalid_input() {
+        assert_nom_err(motion_action("relative foo 33"), "relative foo 33");
     }
 }

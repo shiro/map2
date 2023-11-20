@@ -10,7 +10,7 @@ use super::*;
 
 pub fn tuple<I: Clone, O, List: Tuple<I, O, CustomError<I>>>(
     mut l: List,
-) -> impl FnMut(I) -> ResNew2<I, O> {
+) -> impl FnMut(I) -> ParseResult<I, O> {
     move |i: I| {
         let res = l.parse(i.clone());
         if res.is_err() {
@@ -65,8 +65,8 @@ pub fn tag_custom_no_case<T, Input, Error: FromTagError<Input>>(
 pub fn surrounded_group<'a, Output>(
     from_token: &'a str,
     to_token: &'a str,
-    mut parser: impl FnMut(&'a str) -> ResNew2<&'a str, Output> + 'a,
-) -> Box<dyn FnMut(&'a str) -> ResNew2<&'a str, Output> + 'a> {
+    mut parser: impl FnMut(&'a str) -> ParseResult<&'a str, Output> + 'a,
+) -> Box<dyn FnMut(&'a str) -> ParseResult<&'a str, Output> + 'a> {
     Box::new(move |input| {
         map_res(
             tuple((
