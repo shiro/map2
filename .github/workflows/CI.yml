@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/pyo3/maturin
+#      image: konstin2/maturin
     strategy:
       matrix:
         target: [x86_64
@@ -24,15 +25,23 @@ jobs:
         ]
     steps:
       - uses: actions/checkout@v3
+#        with:
+#          submodules: 'true'
         # checkout sets permissions on .git, so we have to fix it
       - name: Setup git config
         run: git config --global --add safe.directory '*'
+      - name: Git submodule init
+        run: git submodule sync --recursive && git submodule update --init --force; ls -la evdev-rs/evdev-sys/libevdev
+#      - name: foo
+#        run: apt-get update && apt-get install libc6
 #      - uses: actions/setup-python@v4
 #        with:
 #          python-version: '3.10'
+##          python-version: '3.7'
 
       - name: Setup build env
         run: rustup default stable
+
       - name: Build wheels
         run: maturin build --release --out dist --find-interpreter
 
