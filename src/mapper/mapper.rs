@@ -415,6 +415,32 @@ impl Mapper {
         Err(InputError::NotCallable.into())
     }
 
+    pub fn nop(&mut self, from: String) -> PyResult<()> {
+        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+
+        let from = parse_key_action_with_mods_py(&from, Some(&self.transformer.as_ref().unwrap()))
+            .map_err(|err| PyRuntimeError::new_err(
+                format!("mapping error on the 'from' side: {}", err.to_string())
+            ))?;
+
+        match from {
+            ParsedKeyAction::KeyAction(from) => {
+                self.inner.mappings.write().unwrap().insert(from, RuntimeAction::NOP);
+            }
+            ParsedKeyAction::KeyClickAction(from) => {
+                for value in 0..=2 {
+                    let from = KeyActionWithMods::new(from.key, value, from.modifiers);
+                    self.inner.mappings.write().unwrap().insert(from, RuntimeAction::NOP);
+                }
+            }
+            ParsedKeyAction::Action(_) => {
+                return Err(PyRuntimeError::new_err(format!("this method accepts only button mappings")));
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
 
     pub fn snapshot(&self, existing: Option<&KeyMapperSnapshot>) -> PyResult<Option<KeyMapperSnapshot>> {
@@ -479,21 +505,19 @@ impl Mapper {
                         ParsedKeyAction::KeyClickAction(to) => {
                             let mapping = map_action_to_click(&from, &to);
                             self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
-                            return Ok(());
                         }
                         // key action to key action
                         ParsedKeyAction::KeyAction(to) => {
                             let mapping = map_action_to_action(&from, &to);
                             self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
-                            return Ok(());
                         }
                         // key action to action
                         ParsedKeyAction::Action(to) => {
                             let mapping = map_action_to_action(&from, &to.to_key_action_with_mods(Default::default()));
                             self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
-                            return Ok(());
                         }
                     }
+                    return Ok(());
                 }
 
                 // action to seq
