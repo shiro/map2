@@ -1,12 +1,9 @@
-use pyo3::exceptions::PyRuntimeError;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
-
 use crate::*;
 use crate::device::virtual_input_device::Sendable;
 use crate::event::InputEvent;
 use crate::parsing::key_action::ParsedKeyActionVecExt;
 use crate::parsing::python::parse_key_sequence_py;
+use crate::python::*;
 use crate::subscriber::Subscriber;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -68,6 +65,22 @@ impl VirtualReader {
         }
         Ok(())
     }
+
+    // pub fn send_relative(&mut self, axis: &str, delta: i32) -> PyResult<()> {
+    //     // TODO support all types properly, prob. using nom, add send_absolute
+    //     let axis = match &*axis.to_uppercase() {
+    //         "X" => { EV_REL::REL_X }
+    //         "Y" => { EV_REL::REL_Y }
+    //         _ => { return Err(PyRuntimeError::new_err("axis must be one of: 'X', 'Y'")); }
+    //     };
+    //
+    //     if let Some(subscriber) = self.subscriber.load().deref() {
+    //         subscriber.handle(&self.id, InputEvent::Raw(
+    //             EvdevInputEvent::new(&evdev_rs::TimeVal { tv_sec: 0, tv_usec: 0 }, &EventCode::EV_REL(axis), delta)
+    //         ));
+    //     }
+    //     Ok(())
+    // }
 
     pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
 }
