@@ -17,7 +17,7 @@ fn format_err(err: NomErr<CustomError<&str>>, input: &str) -> Error {
 }
 
 pub fn parse_key_action_with_mods_py(raw: &str, transformer: Option<&XKBTransformer>) -> Result<ParsedKeyAction> {
-    let from = key_action_with_flags_utf(transformer)(raw)
+    let from = single_key_action_utf_with_flags_utf(transformer)(raw)
         .map_err(|err| format_err(err, raw))?;
 
     if !from.0.is_empty() { return Err(anyhow!("expected exactly 1 key action")); }

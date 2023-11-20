@@ -52,6 +52,100 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
     }
 }
 
+pub fn complex_key_action_utf<'a>(
+    transformer: Option<&'a XKBTransformer>
+) -> impl Fn(&'a str) -> ParseResult<&str, ((Key, Option<KeyModifierFlags>), Option<i32>)> {
+    move |input: &str| {
+        alt((
+            // key action with state - a down
+            map(
+                tuple((
+                    key_utf(transformer),
+                    multispace1,
+                    action_state,
+                )),
+                |((key, mods), _, state)| ((key, Some(mods)), Some(state)),
+            ),
+
+            // motion action - relative X 20
+            map(
+                motion_action,
+                |action| ((action.key, None), Some(action.value)),
+            ),
+        ))(input)
+    }
+}
+
+pub fn single_key_action_utf<'a>(
+    transformer: Option<&'a XKBTransformer>
+) -> impl Fn(&'a str) -> ParseResult<&str, ParsedKeyAction> {
+    move |input: &str| {
+        map_res(
+            alt((
+                // any complex action
+                complex_key_action_utf(transformer),
+
+                // escaped special char - \\{
+                map(tuple((tag_custom("\\"), key_utf(transformer))), |(_, (key, mods))| ((key, Some(mods)), None)),
+
+                // any 1 char except special ones
+                map_res(
+                    recognize(none_of("{}")),
+                    |input| {
+                        let (_, (key, mods)) = key_utf(transformer)(input)?;
+                        Ok::<_, nom::Err<CustomError<&str>>>(((key, Some(mods)), None))
+                    },
+                ),
+            )),
+            |((key, mods), value)| {
+                let action = match value {
+                    Some(value) => {
+                        match mods {
+                            Some(mods) => ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, value, mods)),
+                            None => { ParsedKeyAction::Action(KeyAction::new(key, value)) }
+                        }
+                    }
+                    None => {
+                        ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods.unwrap_or_default()))
+                    }
+                };
+
+                Ok::<ParsedKeyAction, CustomError<&str>>(action)
+            },
+        )(input)
+    }
+}
+
+pub fn single_key_action_with_flags(input: &str) -> ParseResult<&str, ParsedKeyAction> {
+    single_key_action_utf_with_flags_utf(None)(input)
+}
+
+pub fn single_key_action_utf_with_flags_utf<'a>(
+    transformer: Option<&'a XKBTransformer>,
+) -> Box<dyn Fn(&'a str) -> ParseResult<&str, ParsedKeyAction> + 'a> {
+    Box::new(move |input: &str| {
+        map_res(
+            tuple((
+                key_flags,
+                alt((
+                    single_key_action_utf(transformer),
+                    surrounded_group("{", "}", single_key_action_utf(transformer)),
+                )),
+            )),
+            |(flags, mut action)| {
+                match &mut action {
+                    ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags) }
+                    ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags) }
+                    // TODO figure out how to not accept flags on this
+                    ParsedKeyAction::Action(_) => {}
+                }
+
+                Ok::<ParsedKeyAction, CustomError<&str>>(action)
+            },
+        )(input)
+    })
+}
+
 
 pub fn key_action(input: &str) -> ParseResult<&str, ParsedKeyAction> {
     key_action_utf(None)(input)
@@ -64,23 +158,12 @@ pub fn key_action_utf<'a>(
         map_res(
             alt((
                 // key action with state {a down}
-                map(
-                    surrounded_group("{", "}", tuple((
-                        key_utf(transformer),
-                        multispace1,
-                        action_state,
-                    ))),
-                    |((key, mods), _, state)| ((key, Some(mods)), Some(state)),
-                ),
+                surrounded_group("{", "}", complex_key_action_utf(transformer)),
 
                 // key action without state - {a}
-                map(surrounded_group("{", "}", key_utf(transformer)),
+                map(
+                    surrounded_group("{", "}", key_utf(transformer)),
                     |(key, mods)| ((key, Some(mods)), None),
-                ),
-
-                // action - {relative X 20}
-                map(surrounded_group("{", "}", motion_action),
-                    |action| ((action.key, None), Some(action.value)),
                 ),
 
                 // escaped special char - \\{
@@ -114,33 +197,6 @@ pub fn key_action_utf<'a>(
     }
 }
 
-pub fn key_action_with_flags(input: &str) -> ParseResult<&str, ParsedKeyAction> {
-    key_action_with_flags_utf(None)(input)
-}
-
-pub fn key_action_with_flags_utf<'a>(
-    transformer: Option<&'a XKBTransformer>,
-) -> Box<dyn Fn(&'a str) -> ParseResult<&str, ParsedKeyAction> + 'a> {
-    Box::new(move |input: &str| {
-        map_res(
-            tuple((
-                key_flags,
-                key_action_utf(transformer),
-            )),
-            |(flags, mut action)| {
-                match &mut action {
-                    ParsedKeyAction::KeyAction(action) => { action.modifiers.apply_from(&flags) }
-                    ParsedKeyAction::KeyClickAction(action) => { action.modifiers.apply_from(&flags) }
-                    // TODO figure out how to not accept flags on this
-                    ParsedKeyAction::Action(_) => {}
-                }
-
-                Ok::<ParsedKeyAction, CustomError<&str>>(action)
-            },
-        )(input)
-    })
-}
-
 
 #[cfg(test)]
 mod tests {
@@ -168,11 +224,11 @@ mod tests {
 
     #[test]
     fn action_with_mods() {
-        assert_eq!(key_action_with_flags("+{a down}"), nom_ok(ParsedKeyAction::KeyAction(
+        assert_eq!(single_key_action_with_flags("+a down"), nom_ok(ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.shift()))
         )));
 
-        assert_eq!(key_action_with_flags("!{j down}"), nom_ok(ParsedKeyAction::KeyAction(
+        assert_eq!(single_key_action_with_flags("!j down"), nom_ok(ParsedKeyAction::KeyAction(
             KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_J").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.alt()))
         )));
     }
@@ -206,12 +262,12 @@ mod tests {
 
         assert_nom_err(key_action_utf(Some(&t))("{"), "{");
 
-        assert_eq!(key_action_with_flags_utf(Some(&t))("\\^"), nom_ok(ParsedKeyAction::KeyClickAction(
+        assert_eq!(single_key_action_utf_with_flags_utf(Some(&t))("\\^"), nom_ok(ParsedKeyAction::KeyClickAction(
             KeyClickActionWithMods::new_with_mods(*KEY_6,
                 KeyModifierFlags::new().tap_mut(|v| v.shift()))
         )));
 
-        assert_eq!(key_action_with_flags_utf(Some(&t))("\\{"), nom_ok(ParsedKeyAction::KeyClickAction(
+        assert_eq!(single_key_action_utf_with_flags_utf(Some(&t))("\\{"), nom_ok(ParsedKeyAction::KeyClickAction(
             KeyClickActionWithMods::new_with_mods(*KEY_LEFTBRACE,
                 KeyModifierFlags::new().tap_mut(|v| v.shift()))
         )));
