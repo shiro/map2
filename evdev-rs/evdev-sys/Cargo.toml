@@ -1,6 +1,6 @@
 [package]
 name = "evdev-sys"
-version = "0.2.2"
+version = "0.2.5"
 authors = ["Nayan Deshmukh <nayan26deshmukh@gmail.com"]
 build = "build.rs"
 license = "MIT/Apache-2.0"
@@ -13,6 +13,9 @@ Raw bindings to libevdev
 
 High level Rust bindings are available in the `evdev` crate
 """
+
+[features]
+libevdev-1-10 = []
 
 [dependencies]
 libc = "0.2.67"

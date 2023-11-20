@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - proto/rewrite
+    tags:
+      - '*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/pyo3/maturin
+    strategy:
+      matrix:
+        target: [x86_64
+#          , x86, aarch64, armv7, s390x, ppc64le
+        ]
+    steps:
+      - uses: actions/checkout@v3
+        # checkout sets permissions on .git, so we have to fix it
+      - name: Setup git config
+        run: git config --global --add safe.directory '*'
+#      - uses: actions/setup-python@v4
+#        with:
+#          python-version: '3.10'
+
+      - name: Setup build env
+        run: rustup default stable
+      - name: Build wheels
+        run: maturin build --release --out dist --find-interpreter
+
+#      - name: Build wheels
+#        uses: PyO3/maturin-action@v1
+#        with:
+#          target: ${{ matrix.target }}
+#          args: --release --out dist --find-interpreter
+#          sccache: 'true'
+#          manylinux: auto
+#          before-script-linux: "pwd; ls -la; git config --global --add safe.directory '*'"
+#      - name: Upload wheels
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: wheels
+#          path: dist
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/tags/')"
+    needs: [linux]
+    steps:
+      - name: debug print
+        run: whoami; pwd; ls -la
+      - uses: actions/download-artifact@v3
+        with:
+          name: wheels
+      - name: Publish to PyPI
+        uses: PyO3/maturin-action@v1
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        with:
+          command: upload
+          args: --non-interactive --skip-existing *

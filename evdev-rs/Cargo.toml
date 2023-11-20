@@ -17,10 +17,12 @@ a library interface to the callers, thus avoiding erroneous ioctls, etc.
 
 [features]
 default = []
+# Use features from libevdev version 1.10 and greater (libevdev_property_disable)
+libevdev-1-10 = ["evdev-sys/libevdev-1-10"]
 
 [dependencies]
 serde = { version = "1.0", default-features = false, features=["derive"], optional = true }
-evdev-sys = { path = "evdev-sys", version = "0.2.2" }
+evdev-sys = { path = "evdev-sys", version = "0.2.5" }
 libc = "0.2.67"
 bitflags = "1.2.1"
 log = "0.4.8"

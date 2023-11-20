@@ -15,7 +15,7 @@ proc-macro = true
 [dependencies]
 anyhow = "1.0"
 clap = "4.4.8"
-evdev-rs = { path = "evdev-rs", features = ["serde"] }
+evdev-rs = { path = "evdev-rs", features = ["serde", "libevdev-1-10"] }
 futures = "0.3"
 input-linux-sys = "0.3.1"
 itertools = "0.10.0"
