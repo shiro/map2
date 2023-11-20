@@ -1,8 +1,12 @@
 import map2
+import time
 
 map2.default(layout = "rabbit")
 
 writer = map2.Writer(capabilities = {"rel": True, "buttons": True})
 
+out = map2.VirtualReader()
+out.link(writer)
+out.send("h")
 
-print("hello world!")
+time.sleep(1)

@@ -23,7 +23,7 @@ struct PyKey {
 
 #[pyfunction]
 #[pyo3(signature = (* * options))]
-fn default(py: Python, options: Option<&PyDict>) -> PyResult<()> {
+fn default( options: Option<&PyDict>) -> PyResult<()> {
     let options: HashMap<&str, &PyAny> = match options {
         Some(py_dict) => py_dict.extract().unwrap(),
         None => HashMap::new()
@@ -77,12 +77,24 @@ fn wait(py: Python) {
 #[pyfunction]
 fn exit(exit_code: Option<i32>) { std::process::exit(exit_code.unwrap_or(0)); }
 
+#[cfg(feature = "integration")]
+#[pyfunction]
+fn __test() -> PyResult<Vec<String>> {
+    Ok(global::TEST_PIPE.lock().unwrap()
+        .iter()
+        .map(|x|serde_json::to_string(x).unwrap())
+        .collect()
+    )
+}
+
 #[pymodule]
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(wait, m)?)?;
     m.add_function(wrap_pyfunction!(exit, m)?)?;
     m.add_function(wrap_pyfunction!(default, m)?)?;
     m.add_function(wrap_pyfunction!(link, m)?)?;
+    #[cfg(feature = "integration")]
+    m.add_function(wrap_pyfunction!(__test, m)?)?;
     m.add_class::<Reader>()?;
     m.add_class::<Mapper>()?;
     m.add_class::<KeyMapperSnapshot>()?;

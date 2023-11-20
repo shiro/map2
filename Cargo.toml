@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["shiro <shiro@usagi.io>"]
 edition = "2018"
 
+[features]
+integration = []
+
 [lib]
 name = "map2"
 crate-type = ["lib","cdylib"]
@@ -12,7 +15,7 @@ proc-macro = true
 [dependencies]
 anyhow = "1.0"
 clap = "4.4.8"
-evdev-rs = { path = "evdev-rs" }
+evdev-rs = { path = "evdev-rs", features = ["serde"] }
 futures = "0.3"
 input-linux-sys = "0.3.1"
 itertools = "0.10.0"
@@ -45,8 +48,8 @@ byteorder = "1.5.0"
 tempfile = "3.8.1"
 nix = "0.26.4"
 thiserror = "1.0.50"
-
-pytests = { path = "./pytests" }
+serde = { version = "1.0.192", features = ["derive"] }
+serde_json = { version = "1.0.108" }
 
 # wayland
 wayland-client = "0.31.1"
@@ -57,6 +60,7 @@ xkbcommon = { version = "0.7.0", features = ["wayland"] }
 
 [dev-dependencies]
 automod = "1.0.13"
+pytests = { path = "./pytests" }
 
 [[bin]]
 name = "man-gen"
@@ -66,3 +70,4 @@ path = "src/man/man.rs"
 name = "integration-tests"
 path = "examples/tests/_setup_integration_tests/setup_integration_tests.rs"
 harness = false
+required-features = ["integration"]

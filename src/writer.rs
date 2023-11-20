@@ -94,8 +94,14 @@ impl Writer {
                     syn.time.tv_sec = ev.time.tv_sec;
                     syn.time.tv_usec = ev.time.tv_usec;
 
-                    let _ = output_device.send(&ev);
-                    let _ = output_device.send(&syn);
+
+                    #[cfg(not(feature = "integration"))]
+                    {
+                        let _ = output_device.send(&ev);
+                        let _ = output_device.send(&syn);
+                    }
+                    #[cfg(feature = "integration")]
+                    global::TEST_PIPE.lock().unwrap().push(testing::TestEvent::WriterOutEv(ev.clone()));
 
                     // this is a hack that stops successive events to not get registered
                     if let EventCode::EV_KEY(_) = ev.event_code {

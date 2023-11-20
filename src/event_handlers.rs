@@ -1,8 +1,6 @@
 use crate::*;
 use crate::device::virtual_output_device::VirtualOutputDevice;
-use crate::event_loop::EventLoop;
 use crate::mapper::*;
-use crate::python::*;
 
 pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) -> bool {
     // TODO find a way to do this with a single accessor function
@@ -78,10 +76,6 @@ fn release_restore_modifiers(state: &mut State, output_device: &mut VirtualOutpu
     }
 
     // TODO eat keys we just released, un-eat keys we just restored
-}
-
-lazy_static! {
-    static ref EVENT_LOOP: Mutex<EventLoop> = Mutex::new(EventLoop::new());
 }
 
 pub fn handle_stdin_ev(

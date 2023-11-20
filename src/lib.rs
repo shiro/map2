@@ -19,7 +19,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use arc_swap::ArcSwapOption;
 use evdev_rs::enums::EventCode;
-use evdev_rs::InputEvent as EvdevInputEvent;
+pub use evdev_rs::InputEvent as EvdevInputEvent;
 use nom::lib::std::collections::HashMap;
 use thread_tryjoin::TryJoinHandle;
 use uuid::Uuid;
@@ -32,7 +32,7 @@ use writer::Writer;
 
 use crate::device::virtual_input_device::grab_udev_inputs;
 use crate::event::InputEvent;
-use crate::key_defs::*;
+pub use crate::key_defs::*;
 use crate::key_primitives::*;
 use crate::state::*;
 use crate::x11::ActiveWindowInfo;
@@ -58,8 +58,8 @@ pub mod xkb_transformer_registry;
 pub mod error;
 pub mod global;
 
-#[cfg(test)]
-pub mod tests;
+#[cfg(feature = "integration")]
+pub mod testing;
 
 
 pub mod python;

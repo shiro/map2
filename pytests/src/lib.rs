@@ -1,7 +1,5 @@
 #![feature(proc_macro_span)]
 
-use std::path::Path;
-
 #[proc_macro]
 pub fn include_python(_item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let span = proc_macro::Span::call_site();
