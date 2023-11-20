@@ -22,6 +22,30 @@ struct PyKey {
 
 
 #[pyfunction]
+#[pyo3(signature = (* * options))]
+fn default(py: Python, options: Option<&PyDict>) -> PyResult<()> {
+    let options: HashMap<&str, &PyAny> = match options {
+        Some(py_dict) => py_dict.extract().unwrap(),
+        None => HashMap::new()
+    };
+
+    let kbd_model: Option<String> = options.get("model").and_then(|x| x.extract().ok());
+    let kbd_layout: Option<String> = options.get("layout").and_then(|x| x.extract().ok());
+    let kbd_variant: Option<Option<String>> = options.get("variant").and_then(|x| x.extract().ok());
+    let kbd_options: Option<Option<String>> = options.get("options").and_then(|x| x.extract().ok());
+
+    if kbd_model.is_some() || kbd_layout.is_some() || kbd_variant.is_some() || kbd_options.is_some() {
+        let mut default_params = global::DEFAULT_TRANSFORMER_PARAMS.write().unwrap();
+
+        if let Some(model) = kbd_model { default_params.model = model; }
+        if let Some(layout) = kbd_layout { default_params.layout = layout; }
+        if let Some(variant) = kbd_variant { default_params.variant = variant; }
+        if let Some(options) = kbd_options { default_params.options = options; }
+    }
+    Ok(())
+}
+
+#[pyfunction]
 fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
     let mut prev: Option<PyObject> = None;
 
@@ -57,6 +81,7 @@ fn exit(exit_code: Option<i32>) { std::process::exit(exit_code.unwrap_or(0)); }
 fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(wait, m)?)?;
     m.add_function(wrap_pyfunction!(exit, m)?)?;
+    m.add_function(wrap_pyfunction!(default, m)?)?;
     m.add_function(wrap_pyfunction!(link, m)?)?;
     m.add_class::<Reader>()?;
     m.add_class::<Mapper>()?;

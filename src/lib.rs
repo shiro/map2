@@ -56,6 +56,7 @@ pub mod encoding;
 pub mod xkb;
 pub mod xkb_transformer_registry;
 pub mod error;
+pub mod global;
 
 #[cfg(test)]
 pub mod tests;

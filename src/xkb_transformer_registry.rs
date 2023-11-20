@@ -24,6 +24,12 @@ impl TransformerParams {
     }
 }
 
+impl Default for TransformerParams{
+    fn default() -> Self {
+        Self { model: "pc105".to_string(), layout: "us".to_string(), variant: None, options: None }
+    }
+}
+
 
 pub struct XKBTransformerRegistry {
     registry: Mutex<HashMap<TransformerParams, Weak<XKBTransformer>>>,

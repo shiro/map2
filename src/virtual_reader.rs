@@ -39,7 +39,12 @@ impl VirtualReader {
         let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
-        let transformer_params = TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options);
+        let transformer_params =
+            if kbd_model.is_some() || kbd_layout.is_some() || kbd_variant.is_some() || kbd_options.is_some() {
+                TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options)
+            } else {
+                global::DEFAULT_TRANSFORMER_PARAMS.read().unwrap().clone()
+            };
 
         Ok(Self {
             id: Uuid::new_v4().to_string(),
