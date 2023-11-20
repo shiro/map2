@@ -93,6 +93,22 @@ For more examples check the [examples directory](examples/README.md).
 
 ## Install
 
+TODO this section
+
+- add `etc/udev/rules.d/10-my-udev.rules`
+
+```
+groupadd map2
+
+# create "map2" group
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{hid}=="MYDEV000", MODE="0644", GROUP="map2", SYMLINK+="input/mydevice"
+
+# add yourself to the "map2" group
+$ usermod -aG `whoami` map2
+```
+
+
+
 ### Arch Linux
 
 **Arch packages are not available yet for the python branch.**
