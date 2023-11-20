@@ -243,7 +243,7 @@ impl Subscribable for Inner {
 
                         if let Some(subscriber) = self.subscriber.load().deref() {
                             for action in seq.to_key_actions() {
-                                subscriber.handle("", InputEvent::Raw(action.to_input_ev()));
+                                subscriber.handle(id, InputEvent::Raw(action.to_input_ev()));
                             }
                         }
                     }
@@ -280,7 +280,7 @@ impl Subscribable for Inner {
 
                         if let Some(subscriber) = self.subscriber.load().deref() {
                             for action in seq.to_key_actions() {
-                                subscriber.handle("", InputEvent::Raw(action.to_input_ev()));
+                                subscriber.handle(id, InputEvent::Raw(action.to_input_ev()));
                             }
                         }
                     }
@@ -291,7 +291,7 @@ impl Subscribable for Inner {
         }
 
         if let Some(subscriber) = self.subscriber.load().deref() {
-            subscriber.handle("", raw_ev);
+            subscriber.handle(id, raw_ev);
         }
     }
 }
