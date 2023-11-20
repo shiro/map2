@@ -1,0 +1,10 @@
+[package]
+name = "pytests"
+version = "1.0.0"
+authors = ["shiro <shiro@usagi.io>"]
+edition = "2018"
+
+[lib]
+name = "pytests"
+crate-type = ["proc-macro"]
+proc-macro = true
