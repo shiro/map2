@@ -251,14 +251,22 @@ impl Subscribable for Inner {
                     return;
                 }
             }
-            // rel event
-            EvdevInputEvent { event_code: EventCode::EV_REL(key), value, .. } => {
-                if let Some(handler) = self.relative_handler.read().unwrap().as_ref() {
+            // rel/abs event
+            EvdevInputEvent { event_code, value, .. }
+            if matches!(event_code, EventCode::EV_REL(..)) || matches!(event_code, EventCode::EV_ABS(..))
+            => {
+                let (key, handler) = match event_code {
+                    EventCode::EV_REL(key) => (format!("{key:?}").to_string(), self.relative_handler.read().unwrap()),
+                    EventCode::EV_ABS(key) => (format!("{key:?}").to_string(), self.absolute_handler.read().unwrap()),
+                    _ => unreachable!()
+                };
+                if let Some(handler) = handler.as_ref() {
                     let _transformer = self.transformer.read().unwrap();
                     let transformer = _transformer.as_ref().unwrap();
 
                     let name = format!("{key:?}");
-                    let name = name["REL_".len()..name.len()].to_string();
+                    // remove prefix REL_ / ABS_
+                    let name = name[4..name.len()].to_string();
                     let args = vec![
                         PythonArgument::String(name),
                         PythonArgument::Number(*value),
@@ -276,18 +284,6 @@ impl Subscribable for Inner {
                             }
                         }
                     }
-                    return;
-                }
-            }
-            // abs event
-            EvdevInputEvent { event_code: EventCode::EV_ABS(key), value, .. } => {
-                if let Some(handler) = self.absolute_handler.read().unwrap().as_ref() {
-                    let name = format!("{key:?}");
-                    let name = name["ABS_".len()..name.len()].to_string();
-                    EVENT_LOOP.lock().unwrap().execute(handler.clone(), Some(vec![
-                        PythonArgument::String(name),
-                        PythonArgument::Number(*value),
-                    ]));
                     return;
                 }
             }
@@ -413,6 +409,8 @@ impl Mapper {
     }
 
     pub fn map_absolute(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
+        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+
         if handler.as_ref(py).is_callable() {
             *self.inner.absolute_handler.write().unwrap() = Some(handler);
             return Ok(());
@@ -421,8 +419,6 @@ impl Mapper {
     }
 
     pub fn nop(&mut self, from: String) -> PyResult<()> {
-        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
-
         let from = parse_key_action_with_mods_py(&from, Some(&self.transformer.as_ref().unwrap()))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("mapping error on the 'from' side: {}", err.to_string())
