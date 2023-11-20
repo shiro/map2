@@ -7,5 +7,5 @@ pub fn include_python(_item: proc_macro::TokenStream) -> proc_macro::TokenStream
 
     let py_filename = format!("{}.py", source.path().file_stem().unwrap().to_string_lossy());
 
-    format!("include_str!(\"../{py_filename}\")").parse().unwrap()
+    format!("PyModule::from_code(py, include_str!(\"../{py_filename}\"), \"\", \"\")?").parse().unwrap()
 }

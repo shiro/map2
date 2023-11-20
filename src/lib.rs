@@ -16,7 +16,7 @@ use std::sync::{Arc, mpsc, Mutex, RwLock, Weak};
 use std::thread;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+pub use anyhow::{anyhow, Result};
 use arc_swap::ArcSwapOption;
 use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent as EvdevInputEvent;

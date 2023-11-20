@@ -165,7 +165,7 @@ impl AbsInfo {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, Debug, PartialEq)]
+#[derive(Copy, Clone, Eq, Hash, PartialOrd, Ord, Debug, PartialEq, Default)]
 pub struct TimeVal {
     pub tv_sec: time_t,
     pub tv_usec: suseconds_t,

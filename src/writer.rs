@@ -1,4 +1,5 @@
 use std::sync::mpsc;
+use std::sync::mpsc::TryRecvError;
 
 use python::*;
 
@@ -24,10 +25,16 @@ impl Subscribable for Inner {
 
 #[pyclass]
 pub struct Writer {
-    exit_tx: Option<oneshot::Sender<()>>,
     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
-    thread_handle: Option<thread::JoinHandle<Result<()>>>,
     inner: Arc<Inner>,
+
+    #[cfg(not(feature = "integration"))]
+    exit_tx: Option<oneshot::Sender<()>>,
+    #[cfg(not(feature = "integration"))]
+    thread_handle: Option<thread::JoinHandle<Result<()>>>,
+
+    #[cfg(feature = "integration")]
+    out_ev_rx: mpsc::Receiver<EvdevInputEvent>,
 }
 
 #[pymethods]
@@ -78,10 +85,12 @@ impl Writer {
             }
         };
 
+        #[cfg(not(feature = "integration"))]
         let (exit_tx, exit_rx) = oneshot::channel();
         let (out_ev_tx, out_ev_rx) = mpsc::channel::<EvdevInputEvent>();
 
-        let thread_handle = thread::spawn(move || {
+        #[cfg(not(feature = "integration"))]
+            let thread_handle = thread::spawn(move || {
             // grab udev device
             let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
                 .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
@@ -100,8 +109,6 @@ impl Writer {
                         let _ = output_device.send(&ev);
                         let _ = output_device.send(&syn);
                     }
-                    #[cfg(feature = "integration")]
-                    global::TEST_PIPE.lock().unwrap().push(testing::TestEvent::WriterOutEv(ev.clone()));
 
                     // this is a hack that stops successive events to not get registered
                     if let EventCode::EV_KEY(_) = ev.event_code {
@@ -119,13 +126,25 @@ impl Writer {
         });
 
         let handle = Self {
-            exit_tx: Some(exit_tx),
             out_ev_tx,
-            thread_handle: Some(thread_handle),
             inner,
+            #[cfg(not(feature = "integration"))]
+            exit_tx: Some(exit_tx),
+            #[cfg(not(feature = "integration"))]
+            thread_handle: Some(thread_handle),
+            #[cfg(feature = "integration")]
+            out_ev_rx,
         };
 
         Ok(handle)
+    }
+
+    #[cfg(feature = "integration")]
+    pub fn try_recv(&mut self) -> PyResult<Option<String>> {
+        match self.out_ev_rx.try_recv().ok(){
+            Some(ev) => {Ok(Some(serde_json::to_string(&ev).unwrap()))}
+            None => {Ok(None)}
+        }
     }
 }
 
@@ -137,6 +156,7 @@ impl Writer {
 
 impl Drop for Writer {
     fn drop(&mut self) {
+        #[cfg(not(feature = "integration"))]
         if let Some(exit_tx) = self.exit_tx.take() {
             let _ = exit_tx.send(());
             let _ = self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000));
