@@ -6,3 +6,4 @@
 .env
 *.zst
 *.tar.gz
+/dist
