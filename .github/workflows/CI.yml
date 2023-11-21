@@ -1,5 +1,7 @@
 name: CI
 
+# https://github.com/messense/rjmespath-py/blob/main/.github/workflows/CI.yml
+
 on:
   push:
     branches:
@@ -15,9 +17,6 @@ permissions:
 jobs:
   linux:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/pyo3/maturin
-#      image: konstin2/maturin
     strategy:
       matrix:
         target: [x86_64
@@ -25,53 +24,58 @@ jobs:
         ]
     steps:
       - uses: actions/checkout@v3
-#        with:
-#          submodules: 'true'
-        # checkout sets permissions on .git, so we have to fix it
       - name: Setup git config
         run: git config --global --add safe.directory '*'
       - name: Git submodule init
         run: git submodule sync --recursive && git submodule update --init --force; ls -la evdev-rs/evdev-sys/libevdev
-#      - name: foo
-#        run: apt-get update && apt-get install libc6
-#      - uses: actions/setup-python@v4
-#        with:
-#          python-version: '3.10'
-##          python-version: '3.7'
 
-      - name: Setup build env
-        run: rustup default nightly && ./ci/prepare-ci.sh
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+          architecture: x64
 
       - name: Build wheels
-        run: maturin build --release --out dist --find-interpreter
-
-#      - name: Build wheels
-#        uses: PyO3/maturin-action@v1
-#        with:
-#          target: ${{ matrix.target }}
-#          args: --release --out dist --find-interpreter
-#          sccache: 'true'
-#          manylinux: auto
-#          before-script-linux: "pwd; ls -la; git config --global --add safe.directory '*'"
-#      - name: Upload wheels
-#        uses: actions/upload-artifact@v3
-#        with:
-#          name: wheels
-#          path: dist
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --find-interpreter
+          rust-toolchain: nightly
+          sccache: 'true'
+          manylinux: auto
+          before-script-linux: "./ci/prepare-ci.sh"
+      - name: foo
+        run: ls -la dist
+      - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
 
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
+    permissions:
+      contents: write
+#    if: "startsWith(github.ref, 'refs/tags/')"
     needs: [linux]
     steps:
       - uses: actions/download-artifact@v3
         with:
           name: wheels
-      - name: Publish to PyPI
-        uses: PyO3/maturin-action@v1
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
         with:
-          command: upload
-          args: --non-interactive --skip-existing *
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./*.whl
+#          tag: ${{ github.ref }}
+          tag: "test"
+          overwrite: true
+          file_glob: true
+          body: "This is my release text"
+#      - name: Publish to PyPI
+#        uses: PyO3/maturin-action@v1
+#        env:
+#          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+#        with:
+#          command: upload
+#          args: --non-interactive --skip-existing *
