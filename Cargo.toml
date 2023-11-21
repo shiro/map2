@@ -36,8 +36,8 @@ xdg = "2.2.0"
 atty = "0.2"
 indoc = "1.0"
 futures-intrusive = "0.4.0"
-ncurses = "5.101.0"
-pyo3 = { version = "0.20.0", extension-module = ["extension-module"], default = ["extension-module"] }
+#pyo3 = { version = "0.20.0", extension-module = ["extension-module"], default = ["extension-module"] }
+pyo3 = { version = "0.20.0", features = ["extension-module"] }
 pyo3-asyncio = { version = "0.20.0", features = ["attributes", "tokio-runtime", "testing"] }
 oneshot = "0.1.2"
 thread_tryjoin = "0.2.1"

@@ -288,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "evdev-sys"
-version = "0.2.2"
+version = "0.2.5"
 dependencies = [
  "cc",
  "libc",
@@ -754,7 +754,6 @@ dependencies = [
  "lazy_static",
  "libc",
  "man",
- "ncurses",
  "nix 0.26.4",
  "nom",
  "notify",
@@ -885,17 +884,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "ncurses"
-version = "5.101.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e2c5d34d72657dc4b638a1c25d40aae81e4f1c699062f72f467237920752032"
-dependencies = [
- "cc",
- "libc",
- "pkg-config",
 ]
 
 [[package]]

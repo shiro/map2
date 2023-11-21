@@ -40,7 +40,7 @@ jobs:
 ##          python-version: '3.7'
 
       - name: Setup build env
-        run: rustup default stable
+        run: rustup default nightly && ./ci/prepare-ci.sh
 
       - name: Build wheels
         run: maturin build --release --out dist --find-interpreter
@@ -65,8 +65,6 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [linux]
     steps:
-      - name: debug print
-        run: whoami; pwd; ls -la
       - uses: actions/download-artifact@v3
         with:
           name: wheels
