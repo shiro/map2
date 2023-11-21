@@ -735,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "map2"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -768,7 +768,6 @@ dependencies = [
  "tap",
  "tempfile",
  "thiserror",
- "thread_tryjoin",
  "tokio",
  "unicode-segmentation",
  "unicode-xid",
@@ -1488,15 +1487,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.38",
-]
-
-[[package]]
-name = "thread_tryjoin"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff22652fd908448726e796901aca371c4b2137a3633f33bf4ddf7c6e5333906a"
-dependencies = [
- "libc",
 ]
 
 [[package]]

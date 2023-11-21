@@ -39,7 +39,7 @@ impl Window {
 impl Drop for Window {
     fn drop(&mut self) {
         let _ = self.thread_exit_tx.take().unwrap().send(());
-        let _ = self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(100)).unwrap();
+        let _ = self.thread_handle.take().unwrap()/*.try_timed_join(Duration::from_millis(100)).unwrap()*/;
     }
 }
 

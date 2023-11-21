@@ -159,7 +159,7 @@ impl Drop for Writer {
         #[cfg(not(feature = "integration"))]
         if let Some(exit_tx) = self.exit_tx.take() {
             let _ = exit_tx.send(());
-            let _ = self.thread_handle.take().unwrap().try_timed_join(Duration::from_millis(5000));
+            let _ = self.thread_handle.take().unwrap()/*.try_timed_join(Duration::from_millis(5000))*/;
         }
     }
 }

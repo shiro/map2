@@ -21,7 +21,6 @@ use arc_swap::ArcSwapOption;
 use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent as EvdevInputEvent;
 use nom::lib::std::collections::HashMap;
-use thread_tryjoin::TryJoinHandle;
 use uuid::Uuid;
 
 use event_loop::EVENT_LOOP;
