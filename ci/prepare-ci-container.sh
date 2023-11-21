@@ -2,7 +2,6 @@
 
 set -e
 
-#rustup default nightly
 
 yum install -y libxkbcommon-devel
 

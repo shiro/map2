@@ -1,7 +1,7 @@
 import map2
 import time
 
-map2.default(layout = "rabbit")
+map2.default()
 
 writer = map2.Writer(capabilities = {"rel": True, "buttons": True})
 

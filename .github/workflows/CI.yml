@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         target: [x86_64, x86,
-#          aarch64, armv7, s390x, ppc64le
+        # aarch64, armv7, s390x, ppc64le
         ]
     steps:
       - uses: actions/checkout@v3
@@ -29,10 +29,18 @@ jobs:
       - name: Git submodule init
         run: git submodule sync --recursive && git submodule update --init --force; ls -la evdev-rs/evdev-sys/libevdev
 
+      # install python & rust
       - uses: actions/setup-python@v4
         with:
           python-version: 3.9
           architecture: x64
+      - uses: dtolnay/rust-toolchain@nightly
+
+      # run tests
+      - name: Setup test dependencies
+        run:  ./ci/prepare-ci-test.sh
+      - name: Test
+        run: source .env/bin/activate && ./test.sh
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -42,9 +50,7 @@ jobs:
           rust-toolchain: nightly
           sccache: 'true'
           manylinux: auto
-          before-script-linux: "./ci/prepare-ci.sh"
-      - name: foo
-        run: ls -la dist
+          before-script-linux: "./ci/prepare-ci-container.sh"
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
