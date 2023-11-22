@@ -52,6 +52,7 @@ fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
     for target in chain.into_iter() {
         if let Some(source) = prev {
             if let Ok(mut source) = source.extract::<PyRefMut<Reader>>(py) { source.link(target.as_ref(py))?; }
+            if let Ok(mut source) = source.extract::<PyRefMut<VirtualReader>>(py) { source.link(target.as_ref(py))?; }
             if let Ok(mut source) = source.extract::<PyRefMut<Mapper>>(py) { source.link(target.as_ref(py))?; }
         }
         prev = Some(target);
@@ -66,6 +67,7 @@ pub fn err_to_py(err: anyhow::Error) -> PyErr {
 
 #[pyfunction]
 fn wait(py: Python) {
+    #[cfg(not(feature = "integration"))]
     py.allow_threads(|| {
         let mut signals = Signals::new(&[SIGINT]).unwrap();
         for _ in signals.forever() {
