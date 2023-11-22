@@ -142,20 +142,21 @@ mod tests {
     fn key_special() {
         let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
-        assert_eq!(key_utf(Some(&t))("SHIFT"), nom_ok((*KEY_LEFTSHIFT, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("BACKSPACE"), nom_ok((*KEY_BACKSPACE, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("LEFT"), nom_ok((*KEY_LEFT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("RIGHT"), nom_ok((*KEY_RIGHT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("UP"), nom_ok((*KEY_UP, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("BTN_LEFT"), nom_ok((*BTN_LEFT, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("BTN_MIDDLE"), nom_ok((*BTN_MIDDLE, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("BTN_RIGHT"), nom_ok((*BTN_RIGHT, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("CAPSLOCK"), nom_ok((*KEY_CAPSLOCK, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("DOWN"), nom_ok((*KEY_DOWN, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("SPACE"), nom_ok((*KEY_SPACE, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("TAB"), nom_ok((*KEY_TAB, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("ESC"), nom_ok((*KEY_ESC, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("LEFT"), nom_ok((*KEY_LEFT, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("PAGE_DOWN"), nom_ok((*KEY_PAGEDOWN, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("PAGE_UP"), nom_ok((*KEY_PAGEUP, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("CAPSLOCK"), nom_ok((*KEY_CAPSLOCK, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("BTN_LEFT"), nom_ok((*BTN_LEFT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("BTN_RIGHT"), nom_ok((*BTN_RIGHT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("BTN_MIDDLE"), nom_ok((*BTN_MIDDLE, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("RIGHT"), nom_ok((*KEY_RIGHT, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("SHIFT"), nom_ok((*KEY_LEFTSHIFT, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("SPACE"), nom_ok((*KEY_SPACE, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("TAB"), nom_ok((*KEY_TAB, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("UP"), nom_ok((*KEY_UP, KeyModifierFlags::new())));
     }
 
     #[test]
