@@ -12,7 +12,7 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 use crate::EvdevInputEvent;
 
-fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
+fn find_fd_with_pattern(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     let mut list = vec![];
     for entry in WalkDir::new("/dev/input")
         .into_iter()
@@ -21,7 +21,8 @@ fn get_fd_list(patterns: &Vec<Regex>) -> Vec<PathBuf> {
     {
         let name: String = String::from(entry.path().to_string_lossy());
 
-        if !patterns.iter().any(|p| p.is_match(&name)) { continue; }
+        // pattens need to match the whole name
+        if !patterns.iter().any(|p| p.find(&name).map_or(false, |m| m.len() == name.len())) { continue; }
         list.push(PathBuf::from_str(&name).unwrap());
     }
     list
@@ -119,7 +120,7 @@ pub fn grab_udev_inputs
     exit_rx: oneshot::Receiver<()>,
 ) -> Result<thread::JoinHandle<Result<()>>> {
     let device_fd_path_pattens = fd_patterns.into_iter()
-        .map(|v| Regex::new(v.as_ref()))
+        .map(|x| Regex::new(x.as_ref()))
         .collect::<std::result::Result<_, _>>()
         .map_err(|err| anyhow!("failed to parse regex: {}", err))?;
 
@@ -133,7 +134,7 @@ pub fn grab_udev_inputs
         let mut device_map = HashMap::new();
 
         // grab all devices
-        for device_fd_path in get_fd_list(&device_fd_path_pattens) {
+        for device_fd_path in find_fd_with_pattern(&device_fd_path_pattens) {
             let res = grab_device(&device_fd_path, ev_handler.clone());
             let abort_tx = match res {
                 Ok(v) => v,
