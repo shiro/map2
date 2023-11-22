@@ -12,7 +12,7 @@ map2.default(layout = "us")
 # an easy to use interval utility that allows us to run a function on a timer
 class setInterval:
     def __init__(self, interval, action):
-        self.interval = interval
+        self.interval = interval / 1000
         self.action = action
         self.stopEvent = threading.Event()
         thread = threading.Thread(target = self.__setInterval)
@@ -67,7 +67,7 @@ def mouse_ctrl(key, state, axis, multiplier):
         # we call it once to move the mouse a bit immediately on key down
         send()
         # and register an interval that will continue to move it on a timer
-        intervals[key] = setInterval(0.02, send)
+        intervals[key] = setInterval(20, send)
     return inner_fn
 
 

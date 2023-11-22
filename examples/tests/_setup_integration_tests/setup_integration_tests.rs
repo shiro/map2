@@ -34,9 +34,17 @@ pub fn writer_read(py: Python, module: &PyModule, name: &str) -> Option<EvdevInp
         .and_then(|x| serde_json::from_str(&x).unwrap())
 }
 
+pub fn writer_read_all(py: Python, module: &PyModule, name: &str) -> Vec<EvdevInputEvent> {
+    let mut acc = vec![];
+    while let Some(ev) = writer_read(py, module, name){
+        acc.push(ev);
+    }
+    acc
+}
+
 pub fn reader_send(py: Python, module: &PyModule, name: &str, ev: &EvdevInputEvent) {
     let target = module.getattr(name).unwrap().to_object(py);
     let ev = serde_json::to_string(ev).unwrap();
 
-    target.call_method(py, "send", (ev,), None).unwrap();
+    target.call_method(py, "send", (ev, ), None).unwrap();
 }
