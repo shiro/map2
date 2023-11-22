@@ -2,18 +2,9 @@ use unicode_xid::UnicodeXID;
 
 use super::*;
 
-pub(super) fn ident(input: &str) -> ParseResult<&str, String> {
-    let (rest, id) = match word(input) {
-        Ok((rest, id)) => (rest, id),
-        Err(_) => return Err(make_generic_nom_err_options(input, vec!["identifier".to_string()])),
-    };
-
-    match id.as_ref() {
-        "break" | "continue" | "do" | "else" | "false" | "for" |
-        "if" | "in" | "let" | "loop" | "return" | "true" | "while"
-        => Err(make_generic_nom_err_new(input)),
-        _ => Ok((rest, id)),
-    }
+pub fn ident(input: &str) -> ParseResult<&str, String> {
+    word(input)
+        .map_err(|err| make_generic_nom_err_options(input, vec!["identifier".to_string()]))
 }
 
 pub(super) fn word(input: &str) -> ParseResult<&str, String> {
@@ -31,7 +22,7 @@ pub(super) fn word(input: &str) -> ParseResult<&str, String> {
         }
     }
 
-    Ok(("", input.into()))
+    Ok((&input[input.len()..], input.into()))
 }
 
 #[cfg(test)]

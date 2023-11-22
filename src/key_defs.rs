@@ -83,10 +83,10 @@ pub static ref BTN_MIDDLE: Key = Key::from_str(&EventType::EV_KEY, "BTN_MIDDLE")
 lazy_static! {
     pub(crate) static ref KEY_ALIAS_TABLE: HashMap<&'static str, (Key, KeyModifierFlags)> = {
         let mut m = HashMap::new();
-        m.insert(" ", (Key::from_str(&EventType::EV_KEY, "KEY_SPACE").unwrap(), KeyModifierFlags::new()));
         m.insert("BTN_LEFT", (*BTN_LEFT, KeyModifierFlags::new()));
         m.insert("BTN_RIGHT", (*BTN_RIGHT, KeyModifierFlags::new()));
         m.insert("BTN_MIDDLE", (*BTN_MIDDLE, KeyModifierFlags::new()));
+        m.insert("SPACE", (*KEY_SPACE, KeyModifierFlags::new()));
         m.insert("BACKSPACE", (*KEY_BACKSPACE, KeyModifierFlags::new()));
         m.insert("SHIFT", (*KEY_LEFTSHIFT, KeyModifierFlags::new()));
         m.insert("LEFT_SHIFT", (*KEY_LEFTSHIFT, KeyModifierFlags::new()));
@@ -97,6 +97,7 @@ lazy_static! {
         m.insert("DOWN", (*KEY_DOWN, KeyModifierFlags::new()));
         m.insert("PAGE_UP", (*KEY_PAGEUP, KeyModifierFlags::new()));
         m.insert("PAGE_DOWN", (*KEY_PAGEDOWN, KeyModifierFlags::new()));
+        m.insert("TAB", (*KEY_TAB, KeyModifierFlags::new()));
         m.insert("ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("LEFT_ALT", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTALT").unwrap(), KeyModifierFlags::new()));
         m.insert("RIGHT_ALT", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTALT").unwrap(), KeyModifierFlags::new()));

@@ -76,46 +76,6 @@ pub fn complex_key_action_utf<'a>(
     }
 }
 
-pub fn single_key_action_utf<'a>(
-    transformer: Option<&'a XKBTransformer>
-) -> impl Fn(&'a str) -> ParseResult<&str, ParsedKeyAction> {
-    move |input: &str| {
-        map_res(
-            alt((
-                // any complex action
-                complex_key_action_utf(transformer),
-
-                // escaped special char - \\{
-                map(tuple((tag_custom("\\"), key_utf(transformer))), |(_, (key, mods))| ((key, Some(mods)), None)),
-
-                // any 1 char except special ones
-                map_res(
-                    recognize(none_of("{}")),
-                    |input| {
-                        let (_, (key, mods)) = key_utf(transformer)(input)?;
-                        Ok::<_, nom::Err<CustomError<&str>>>(((key, Some(mods)), None))
-                    },
-                ),
-            )),
-            |((key, mods), value)| {
-                let action = match value {
-                    Some(value) => {
-                        match mods {
-                            Some(mods) => ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, value, mods)),
-                            None => { ParsedKeyAction::Action(KeyAction::new(key, value)) }
-                        }
-                    }
-                    None => {
-                        ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods.unwrap_or_default()))
-                    }
-                };
-
-                Ok::<ParsedKeyAction, CustomError<&str>>(action)
-            },
-        )(input)
-    }
-}
-
 pub fn single_key_action_with_flags(input: &str) -> ParseResult<&str, ParsedKeyAction> {
     single_key_action_utf_with_flags_utf(None)(input)
 }
@@ -146,6 +106,54 @@ pub fn single_key_action_utf_with_flags_utf<'a>(
     })
 }
 
+pub fn single_key_action_utf<'a>(
+    transformer: Option<&'a XKBTransformer>
+) -> impl Fn(&'a str) -> ParseResult<&str, ParsedKeyAction> {
+    move |input: &str| {
+        map_res(
+            alt((
+                // any complex action
+                complex_key_action_utf(transformer),
+
+                // escaped special char - \\{
+                map(tuple((tag_custom("\\"), key_utf(transformer))), |(_, (key, mods))| ((key, Some(mods)), None)),
+
+                // special key
+                map_res(
+                    recognize(ident),
+                    |input| {
+                        let (_, (key, mods)) = key_utf(transformer)(input)?;
+                        Ok::<_, nom::Err<CustomError<&str>>>(((key, Some(mods)), None))
+                    },
+                ),
+
+                // any 1 char except special ones
+                map_res(
+                    recognize(none_of("{}")),
+                    |input| {
+                        let (_, (key, mods)) = key_utf(transformer)(input)?;
+                        Ok::<_, nom::Err<CustomError<&str>>>(((key, Some(mods)), None))
+                    },
+                ),
+            )),
+            |((key, mods), value)| {
+                let action = match value {
+                    Some(value) => {
+                        match mods {
+                            Some(mods) => ParsedKeyAction::KeyAction(KeyActionWithMods::new(key, value, mods)),
+                            None => { ParsedKeyAction::Action(KeyAction::new(key, value)) }
+                        }
+                    }
+                    None => {
+                        ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(key, mods.unwrap_or_default()))
+                    }
+                };
+
+                Ok::<ParsedKeyAction, CustomError<&str>>(action)
+            },
+        )(input)
+    }
+}
 
 pub fn key_action(input: &str) -> ParseResult<&str, ParsedKeyAction> {
     key_action_utf(None)(input)
@@ -257,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn action_handle_special_chars() {
+    fn single_key_action_input() {
         let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         assert_nom_err(key_action_utf(Some(&t))("{"), "{");
@@ -270,6 +278,10 @@ mod tests {
         assert_eq!(single_key_action_utf_with_flags_utf(Some(&t))("\\{"), nom_ok(ParsedKeyAction::KeyClickAction(
             KeyClickActionWithMods::new_with_mods(*KEY_LEFTBRACE,
                 KeyModifierFlags::new().tap_mut(|v| v.shift()))
+        )));
+
+        assert_eq!(single_key_action_utf_with_flags_utf(Some(&t))("page_down"), nom_ok(ParsedKeyAction::KeyClickAction(
+            KeyClickActionWithMods::new_with_mods(*KEY_PAGEDOWN, KeyModifierFlags::new())
         )));
     }
 
