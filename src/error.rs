@@ -4,9 +4,11 @@ use crate::*;
 use crate::python::*;
 
 #[derive(Error, Debug)]
-pub enum InputError {
+pub enum ApplicationError {
     #[error("expected a callable object")]
-    NotCallable
+    NotCallable,
+    #[error("unsupported platform, supported platforms are: Hyprland")]
+    UnsupportedPlatform,
 }
 
-impl Into<PyErr> for InputError { fn into(self) -> PyErr { PyRuntimeError::new_err(self.to_string()) } }
+impl Into<PyErr> for ApplicationError { fn into(self) -> PyErr { PyRuntimeError::new_err(self.to_string()) } }

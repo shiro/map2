@@ -395,7 +395,7 @@ impl Mapper {
             *self.inner.fallback_handler.write().unwrap() = Some(fallback_handler);
             return Ok(());
         }
-        Err(InputError::NotCallable.into())
+        Err(ApplicationError::NotCallable.into())
     }
 
     pub fn map_relative(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
@@ -405,7 +405,7 @@ impl Mapper {
             *self.inner.relative_handler.write().unwrap() = Some(handler);
             return Ok(());
         }
-        Err(InputError::NotCallable.into())
+        Err(ApplicationError::NotCallable.into())
     }
 
     pub fn map_absolute(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
@@ -415,7 +415,7 @@ impl Mapper {
             *self.inner.absolute_handler.write().unwrap() = Some(handler);
             return Ok(());
         }
-        Err(InputError::NotCallable.into())
+        Err(ApplicationError::NotCallable.into())
     }
 
     pub fn nop(&mut self, from: String) -> PyResult<()> {

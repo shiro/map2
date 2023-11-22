@@ -1,14 +1,48 @@
+use crate::*;
+use crate::python::*;
+use crate::window::window_base::{ActiveWindowInfo, WindowControlMessage, WindowHandler};
+
 use anyhow::Result;
 use x11rb::connection::Connection;
 use x11rb::protocol::Event::PropertyNotify;
 use x11rb::protocol::xproto::{Atom, AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply, intern_atom, Screen, Window};
 use x11rb::x11_utils::TryParse;
 
-#[derive(Debug, Clone)]
-pub struct ActiveWindowInfo {
-    pub class: String,
-    pub instance: String,
-    pub name: String,
+
+pub fn x11_window_handler() -> WindowHandler {
+    Box::new(|exit_rx: oneshot::Receiver<()>,
+        subscription_rx: mpsc::Receiver<WindowControlMessage>| -> Result<()> {
+        let x11_state = Arc::new(x11_initialize().unwrap());
+        let mut subscriptions = Arc::new(Mutex::new(HashMap::new()));
+
+        loop {
+            if exit_rx.try_recv().is_ok() { break; }
+
+            while let Ok(msg) = subscription_rx.try_recv() {
+                match msg {
+                    WindowControlMessage::Subscribe(id, callback) => { subscriptions.lock().unwrap().insert(id, callback); }
+                    WindowControlMessage::Unsubscribe(id) => { subscriptions.lock().unwrap().remove(&id); }
+                }
+            }
+
+            let info = get_window_info_x11(&x11_state);
+
+            if let Ok(Some(val)) = info {
+                Python::with_gil(|py| {
+                    for callback in subscriptions.lock().unwrap().values() {
+                        let is_callable = callback.as_ref(py).is_callable();
+                        if !is_callable { continue; }
+
+                        let _ = callback.call(py, (val.class.clone(), ), None);
+                    }
+                });
+            }
+
+            thread::sleep(Duration::from_millis(100));
+        }
+
+        Ok(())
+    })
 }
 
 #[allow(non_snake_case)]

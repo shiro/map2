@@ -1,4 +1,6 @@
 #![feature(fn_traits)]
+#![feature(type_alias_impl_trait)]
+
 #![recursion_limit = "256"]
 
 #![allow(warnings)]
@@ -34,13 +36,11 @@ use crate::event::InputEvent;
 pub use crate::key_defs::*;
 use crate::key_primitives::*;
 use crate::state::*;
-use crate::x11::ActiveWindowInfo;
 use crate::error::*;
 
 // #[macro_use]
 // use subscriber::linkable;
 
-pub mod x11;
 pub mod key_defs;
 pub mod state;
 pub mod key_primitives;
@@ -56,6 +56,7 @@ pub mod xkb;
 pub mod xkb_transformer_registry;
 pub mod error;
 pub mod global;
+pub mod platform;
 
 #[cfg(feature = "integration")]
 pub mod testing;
