@@ -256,9 +256,16 @@ impl Subscribable for Inner {
                     let name = transformer.raw_to_utf(key, &*state.modifiers)
                         .unwrap_or_else(|| format!("{key:?}").to_string());
 
+                    let value = match *value {
+                        0 => "up",
+                        1 => "down",
+                        2 => "repeat",
+                        _ => unreachable!(),
+                    }.to_string();
+
                     let args = vec![
                         PythonArgument::String(name),
-                        PythonArgument::Number(*value),
+                        PythonArgument::String(value),
                     ];
 
                     run_python_handler(
