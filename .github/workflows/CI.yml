@@ -76,7 +76,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "This is my release text"
+          # body: "This is my release text"
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
