@@ -102,7 +102,7 @@ fn run_python_handler(
         } else {
             let args = args_to_py(py, args.unwrap_or(vec![]));
             let ret = handler.call(py, args, None)
-                .map_err(|err| anyhow!("{err}"))
+                .map_err(|err| anyhow!("{}", err))
                 .and_then(|ret| {
                     if ret.is_none(py) { return Ok(None); }
 
