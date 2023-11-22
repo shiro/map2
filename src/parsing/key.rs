@@ -152,6 +152,7 @@ mod tests {
         assert_eq!(key_utf(Some(&t))("TAB"), nom_ok((*KEY_TAB, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("PAGE_DOWN"), nom_ok((*KEY_PAGEDOWN, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("PAGE_UP"), nom_ok((*KEY_PAGEUP, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("CAPSLOCK"), nom_ok((*KEY_CAPSLOCK, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("BTN_LEFT"), nom_ok((*BTN_LEFT, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("BTN_RIGHT"), nom_ok((*BTN_RIGHT, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("BTN_MIDDLE"), nom_ok((*BTN_MIDDLE, KeyModifierFlags::new())));

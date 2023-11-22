@@ -107,7 +107,7 @@ lazy_static! {
         m.insert("CTRL", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTCTRL").unwrap(), KeyModifierFlags::new()));
         m.insert("LEFT_CTRL", (Key::from_str(&EventType::EV_KEY, "KEY_LEFTCTRL").unwrap(), KeyModifierFlags::new()));
         m.insert("RIGHT_CTRL", (Key::from_str(&EventType::EV_KEY, "KEY_RIGHTCTRL").unwrap(), KeyModifierFlags::new()));
-        m.insert("CAPS", (Key::from_str(&EventType::EV_KEY, "KEY_CAPSLOCK").unwrap(), KeyModifierFlags::new()));
+        m.insert("CAPSLOCK", (Key::from_str(&EventType::EV_KEY, "KEY_CAPSLOCK").unwrap(), KeyModifierFlags::new()));
         m
     };
 }
