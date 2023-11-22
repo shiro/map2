@@ -72,11 +72,21 @@ fn release_restore_modifiers(
     // TODO eat keys we just released, un-eat keys we just restored
 }
 
+#[derive(Debug, Clone)]
+enum PythonReturn {
+    String(String),
+    Bool(bool),
+}
+
 fn run_python_handler(
     handler: &PyObject,
     args: Option<Vec<PythonArgument>>,
-) -> Option<String> {
-    Python::with_gil(|py| -> Option<String> {
+    id: &str,
+    ev: &EvdevInputEvent,
+    transformer: &Arc<XKBTransformer>,
+    subscriber: &Option<Arc<Subscriber>>,
+) {
+    let ret = Python::with_gil(|py| -> Result<()> {
         let asyncio = py.import("asyncio")
             .expect("python runtime error: failed to import 'asyncio', is it installed?");
 
@@ -88,24 +98,49 @@ fn run_python_handler(
 
         if is_async_callback {
             EVENT_LOOP.lock().unwrap().execute(handler.clone(), args);
-            None
+            Ok(())
         } else {
             let args = args_to_py(py, args.unwrap_or(vec![]));
-            let res = handler.call(py, args, None)
+            let ret = handler.call(py, args, None)
+                .map_err(|err| anyhow!("{err}"))
                 .and_then(|ret| {
                     if ret.is_none(py) { return Ok(None); }
-                    Ok(Some(ret.extract::<String>(py)?.clone()))
-                });
 
-            match res {
-                Ok(ret) => ret,
-                Err(err) => {
-                    eprintln!("{err}");
-                    std::process::exit(1);
+                    if let Ok(ret) = ret.extract::<String>(py) {
+                        return Ok(Some(PythonReturn::String(ret)));
+                    }
+                    if let Ok(ret) = ret.extract::<bool>(py) {
+                        return Ok(Some(PythonReturn::Bool(ret)));
+                    }
+
+                    Err(anyhow!("unsupported python return value"))
+                })?;
+
+            match ret {
+                Some(PythonReturn::String(ret)) => {
+                    let seq = parse_key_sequence_py(&ret, Some(transformer))?;
+
+                    if let Some(subscriber) = subscriber {
+                        for action in seq.to_key_actions() {
+                            subscriber.handle(id, InputEvent::Raw(action.to_input_ev()));
+                        }
+                    }
                 }
-            }
+                Some(PythonReturn::Bool(ret)) if ret => {
+                    if let Some(subscriber) = subscriber {
+                        subscriber.handle(id, InputEvent::Raw(ev.clone()));
+                    }
+                }
+                _ => {}
+            };
+            Ok(())
         }
-    })
+    });
+
+    if let Err(err) = ret {
+        eprintln!("{err}");
+        std::process::exit(1);
+    }
 }
 
 
@@ -194,22 +229,14 @@ impl Subscribable for Inner {
                                 subscriber.handle("", InputEvent::Raw(ev));
                             }
 
-                            let ret = run_python_handler(&handler, None);
-                            if let Some(ret) = ret {
-                                let _transformer = self.transformer.read().unwrap();
-                                let transformer = _transformer.as_ref().unwrap();
-
-                                let seq = parse_key_sequence_py(&ret, Some(transformer)).unwrap_or_else(|err| {
-                                    eprintln!("{err}");
-                                    std::process::exit(1);
-                                });
-
-                                if let Some(subscriber) = self.subscriber.load().deref() {
-                                    for action in seq.to_key_actions() {
-                                        subscriber.handle("", InputEvent::Raw(action.to_input_ev()));
-                                    }
-                                }
-                            }
+                            run_python_handler(
+                                &handler,
+                                None,
+                                id,
+                                ev,
+                                self.transformer.read().unwrap().as_ref().unwrap(),
+                                self.subscriber.load().deref(),
+                            );
                         }
                         RuntimeAction::NOP => {}
                     }
@@ -234,19 +261,14 @@ impl Subscribable for Inner {
                         PythonArgument::Number(*value),
                     ];
 
-                    let ret = run_python_handler(&handler, Some(args));
-                    if let Some(ret) = ret {
-                        let seq = parse_key_sequence_py(&ret, Some(transformer)).unwrap_or_else(|err| {
-                            eprintln!("{err}");
-                            std::process::exit(1);
-                        });
-
-                        if let Some(subscriber) = self.subscriber.load().deref() {
-                            for action in seq.to_key_actions() {
-                                subscriber.handle(id, InputEvent::Raw(action.to_input_ev()));
-                            }
-                        }
-                    }
+                    run_python_handler(
+                        &handler,
+                        Some(args),
+                        id,
+                        ev,
+                        self.transformer.read().unwrap().as_ref().unwrap(),
+                        self.subscriber.load().deref(),
+                    );
 
                     return;
                 }
@@ -261,9 +283,6 @@ impl Subscribable for Inner {
                     _ => unreachable!()
                 };
                 if let Some(handler) = handler.as_ref() {
-                    let _transformer = self.transformer.read().unwrap();
-                    let transformer = _transformer.as_ref().unwrap();
-
                     let name = format!("{key:?}");
                     // remove prefix REL_ / ABS_
                     let name = name[4..name.len()].to_string();
@@ -271,19 +290,14 @@ impl Subscribable for Inner {
                         PythonArgument::String(name),
                         PythonArgument::Number(*value),
                     ];
-                    let ret = run_python_handler(&handler, Some(args));
-                    if let Some(ret) = ret {
-                        let seq = parse_key_sequence_py(&ret, Some(transformer)).unwrap_or_else(|err| {
-                            eprintln!("{err}");
-                            std::process::exit(1);
-                        });
-
-                        if let Some(subscriber) = self.subscriber.load().deref() {
-                            for action in seq.to_key_actions() {
-                                subscriber.handle(id, InputEvent::Raw(action.to_input_ev()));
-                            }
-                        }
-                    }
+                    run_python_handler(
+                        &handler,
+                        Some(args),
+                        id,
+                        ev,
+                        self.transformer.read().unwrap().as_ref().unwrap(),
+                        self.subscriber.load().deref(),
+                    );
                     return;
                 }
             }
