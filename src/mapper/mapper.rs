@@ -246,38 +246,38 @@ impl Subscribable for Inner {
 
                 let was_modifier = event_handlers::update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
 
-                if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
-                    // don't trigger the fallback handler with modifier keys
-                    if was_modifier { return; }
+                // don't trigger the fallback handler with modifier keys
+                if !was_modifier {
+                    if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
+                        let _transformer = self.transformer.read().unwrap();
+                        let transformer = _transformer.as_ref().unwrap();
 
-                    let _transformer = self.transformer.read().unwrap();
-                    let transformer = _transformer.as_ref().unwrap();
+                        let name = transformer.raw_to_utf(key, &*state.modifiers)
+                            .unwrap_or_else(|| format!("{key:?}").to_string());
 
-                    let name = transformer.raw_to_utf(key, &*state.modifiers)
-                        .unwrap_or_else(|| format!("{key:?}").to_string());
+                        let value = match *value {
+                            0 => "up",
+                            1 => "down",
+                            2 => "repeat",
+                            _ => unreachable!(),
+                        }.to_string();
 
-                    let value = match *value {
-                        0 => "up",
-                        1 => "down",
-                        2 => "repeat",
-                        _ => unreachable!(),
-                    }.to_string();
+                        let args = vec![
+                            PythonArgument::String(name),
+                            PythonArgument::String(value),
+                        ];
 
-                    let args = vec![
-                        PythonArgument::String(name),
-                        PythonArgument::String(value),
-                    ];
+                        run_python_handler(
+                            &handler,
+                            Some(args),
+                            id,
+                            ev,
+                            self.transformer.read().unwrap().as_ref().unwrap(),
+                            self.subscriber.load().deref(),
+                        );
 
-                    run_python_handler(
-                        &handler,
-                        Some(args),
-                        id,
-                        ev,
-                        self.transformer.read().unwrap().as_ref().unwrap(),
-                        self.subscriber.load().deref(),
-                    );
-
-                    return;
+                        return;
+                    }
                 }
             }
             // rel/abs event

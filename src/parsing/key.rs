@@ -157,6 +157,17 @@ mod tests {
         assert_eq!(key_utf(Some(&t))("SPACE"), nom_ok((*KEY_SPACE, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("TAB"), nom_ok((*KEY_TAB, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("UP"), nom_ok((*KEY_UP, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD1"), nom_ok((*KEY_KPD1, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD2"), nom_ok((*KEY_KPD2, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD3"), nom_ok((*KEY_KPD3, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD4"), nom_ok((*KEY_KPD4, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD5"), nom_ok((*KEY_KPD5, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD6"), nom_ok((*KEY_KPD6, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD7"), nom_ok((*KEY_KPD7, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD8"), nom_ok((*KEY_KPD8, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KPD9"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
+
+        assert_eq!(key_utf(Some(&t))("F11"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
     }
 
     #[test]
