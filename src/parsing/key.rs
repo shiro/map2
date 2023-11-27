@@ -65,7 +65,7 @@ pub fn key_utf<'a>(
                                     .tap_mut(|s| s.push_str(&key_name));
                             }
 
-                            let key = Key::from_str(&EventType::EV_KEY, key_name.as_str())
+                            let key = Key::from_str(key_name.as_str())
                                 .map_err(|_| make_generic_nom_err_new(input))?;
 
                             (key, KeyModifierFlags::new())
@@ -94,12 +94,12 @@ mod tests {
     #[test]
     fn test_key() {
         assert_eq!(key("d"), nom_ok((
-            Key::from_str(&EventType::EV_KEY, "KEY_D").unwrap(),
+            Key::from_str("KEY_D").unwrap(),
             KeyModifierFlags::new()
         )));
 
         assert_eq!(key("btn_forward"), nom_ok((
-            Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap(),
+            Key::from_str("BTN_FORWARD").unwrap(),
             KeyModifierFlags::new()))
         );
     }
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(key_utf(Some(&t))("KPD8"), nom_ok((*KEY_KPD8, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("KPD9"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
 
-        assert_eq!(key_utf(Some(&t))("F11"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("F11"), nom_ok((*KEY_F11, KeyModifierFlags::new())));
     }
 
     #[test]

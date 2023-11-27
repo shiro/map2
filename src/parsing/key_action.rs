@@ -214,15 +214,15 @@ mod tests {
     #[test]
     fn action_with_state() {
         assert_eq!(key_action("{a down}"), nom_ok(ParsedKeyAction::KeyAction(
-            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new())
+            KeyActionWithMods::new(Key::from_str("KEY_A").unwrap(), 1, KeyModifierFlags::new())
         )));
 
         assert_eq!(key_action("{btn_forward down}"), nom_ok(ParsedKeyAction::KeyAction(
-            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "BTN_FORWARD").unwrap(), 1, KeyModifierFlags::new())
+            KeyActionWithMods::new(Key::from_str("BTN_FORWARD").unwrap(), 1, KeyModifierFlags::new())
         )));
 
         assert_eq!(key_action("{shift down}"), nom_ok(ParsedKeyAction::KeyAction(
-            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_LEFTSHIFT").unwrap(), 1, KeyModifierFlags::new())
+            KeyActionWithMods::new(Key::from_str("KEY_LEFTSHIFT").unwrap(), 1, KeyModifierFlags::new())
         )));
 
         assert_eq!(key_action("{relative X 99}"), nom_ok(ParsedKeyAction::Action(
@@ -233,11 +233,11 @@ mod tests {
     #[test]
     fn action_with_mods() {
         assert_eq!(single_key_action_with_flags("+a down"), nom_ok(ParsedKeyAction::KeyAction(
-            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_A").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.shift()))
+            KeyActionWithMods::new(Key::from_str("KEY_A").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.shift()))
         )));
 
         assert_eq!(single_key_action_with_flags("!j down"), nom_ok(ParsedKeyAction::KeyAction(
-            KeyActionWithMods::new(Key::from_str(&EventType::EV_KEY, "KEY_J").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.alt()))
+            KeyActionWithMods::new(Key::from_str("KEY_J").unwrap(), 1, KeyModifierFlags::new().tap_mut(|v| v.alt()))
         )));
     }
 

@@ -8,8 +8,8 @@ pub struct Key {
 }
 
 impl Key {
-    pub fn from_str(ev_type: &EventType, s: &str) -> Result<Self> {
-        match EventCode::from_str(ev_type, s) {
+    pub fn from_str(s: &str) -> Result<Self> {
+        match EventCode::from_str(&EventType::EV_KEY, s) {
             Some(event_code) => { Ok(Key { event_code }) }
             None => { Err(anyhow!("key not found: '{}'", s)) }
         }
