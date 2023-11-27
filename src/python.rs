@@ -7,6 +7,7 @@ pub use pyo3::prelude::*;
 pub use pyo3::PyClass;
 pub use pyo3::types::PyDict;
 use signal_hook::{consts::SIGINT, iterator::Signals};
+use tokio::runtime::Runtime;
 use xkeysym::key::hebrew_ayin;
 
 use crate::*;
@@ -68,6 +69,8 @@ fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
 pub fn err_to_py(err: anyhow::Error) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
+
+pub fn get_runtime<'a>() -> &'a Runtime {pyo3_asyncio::tokio::get_runtime()}
 
 #[pyfunction]
 fn wait(py: Python) {

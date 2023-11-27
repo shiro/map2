@@ -8,7 +8,7 @@ use crate::mapper::mapping_functions::*;
 use crate::parsing::key_action::*;
 use crate::parsing::python::*;
 use crate::python::*;
-use crate::subscriber::{Subscribable, Subscriber};
+use crate::subscriber::{SubscribeEvent, Subscriber};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 
@@ -81,7 +81,7 @@ enum PythonReturn {
 fn run_python_handler(
     handler: &PyObject,
     args: Option<Vec<PythonArgument>>,
-    id: &str,
+    id: String,
     ev: &EvdevInputEvent,
     transformer: &Arc<XKBTransformer>,
     subscriber: &Option<Arc<Subscriber>>,
@@ -122,13 +122,13 @@ fn run_python_handler(
 
                     if let Some(subscriber) = subscriber {
                         for action in seq.to_key_actions() {
-                            subscriber.handle(id, InputEvent::Raw(action.to_input_ev()));
+                            let _ = subscriber.send((id.clone(), InputEvent::Raw(action.to_input_ev())));
                         }
                     }
                 }
                 Some(PythonReturn::Bool(ret)) if ret => {
                     if let Some(subscriber) = subscriber {
-                        subscriber.handle(id, InputEvent::Raw(ev.clone()));
+                        let _ = subscriber.send((id, InputEvent::Raw(ev.clone())));
                     }
                 }
                 _ => {}
@@ -147,7 +147,7 @@ fn run_python_handler(
 #[derive(Default)]
 struct Inner {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
-    state_map: RwLock<HashMap<String, RwLock<State>>>,
+    state: RwLock<State>,
     transformer: RwLock<Option<Arc<XKBTransformer>>>,
     mappings: RwLock<Mappings>,
 
@@ -156,21 +156,21 @@ struct Inner {
     absolute_handler: RwLock<Option<PyObject>>,
 }
 
-impl Subscribable for Inner {
-    fn handle(&self, id: &str, raw_ev: InputEvent) {
-        let mut state_map = self.state_map.read().unwrap();
-        let mut state_guard = state_map.get(id);
-        if state_guard.is_none() {
-            drop(state_map);
-            let mut writable_state_map = self.state_map.write().unwrap();
-            writable_state_map.insert(id.to_string(), RwLock::new(State::new()));
-            drop(writable_state_map);
-            state_map = self.state_map.read().unwrap();
-            state_guard = state_map.get(id);
-        }
-
+impl Inner {
+    fn handle(&self, id: String, raw_ev: InputEvent) {
+        // let mut state_map = self.state_map.read().unwrap();
+        // let mut state_guard = state_map.get(id);
+        // if state_guard.is_none() {
+        //     drop(state_map);
+        //     let mut writable_state_map = self.state_map.write().unwrap();
+        //     writable_state_map.insert(id.to_string(), RwLock::new(State::new()));
+        //     drop(writable_state_map);
+        //     state_map = self.state_map.read().unwrap();
+        //     state_guard = state_map.get(id);
+        // }
+        let mut state_guard = self.state.write().unwrap();
+        let mut state = state_guard.deref_mut();
         let mappings = self.mappings.read().unwrap();
-        let mut state = state_guard.unwrap().write().unwrap();
 
 
         let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
@@ -210,13 +210,13 @@ impl Subscribable for Inner {
                                     RuntimeKeyAction::KeyAction(key_action) => {
                                         let ev = key_action.to_input_ev();
 
-                                        subscriber.handle("", InputEvent::Raw(ev));
+                                        let _ = subscriber.send((id.clone(), InputEvent::Raw(ev)));
                                     }
                                     RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
                                         let mut new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);
                                         // events.append(&mut new_events);
                                         for ev in new_events {
-                                            subscriber.handle("", InputEvent::Raw(ev));
+                                            let _ = subscriber.send((id.clone(), InputEvent::Raw(ev)));
                                         }
                                     }
                                 }
@@ -226,7 +226,7 @@ impl Subscribable for Inner {
                             // always release all trigger mods before running the callback
                             let mut new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
                             for ev in new_events {
-                                subscriber.handle("", InputEvent::Raw(ev));
+                                let _ = subscriber.send((id.clone(), InputEvent::Raw(ev)));
                             }
 
                             run_python_handler(
@@ -312,7 +312,7 @@ impl Subscribable for Inner {
         }
 
         if let Some(subscriber) = self.subscriber.load().deref() {
-            subscriber.handle(id, raw_ev);
+            let _ = subscriber.send((id, raw_ev));
         }
     }
 }
@@ -321,6 +321,7 @@ impl Subscribable for Inner {
 #[pyclass]
 pub struct Mapper {
     subscriber: Arc<ArcSwapOption<Subscriber>>,
+    ev_tx: Subscriber,
     inner: Arc<Inner>,
     transformer: Option<Arc<XKBTransformer>>,
     transformer_params: TransformerParams,
@@ -351,18 +352,30 @@ impl Mapper {
 
         let inner = Arc::new(Inner {
             subscriber: subscriber.clone(),
-            state_map: RwLock::new(HashMap::new()),
+            state: RwLock::new(State::new()),
             mappings: RwLock::new(Mappings::new()),
             ..Default::default()
         });
 
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
+
+        let _inner = inner.clone();
+        get_runtime().spawn(async move {
+            loop {
+                let (id, ev) = ev_rx.recv().await.unwrap();
+                _inner.handle(id, ev);
+            }
+        });
+
         Ok(Self {
             subscriber,
+            ev_tx,
             inner,
             transformer: None,
             transformer_params,
         })
     }
+
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
@@ -487,7 +500,7 @@ impl Mapper {
     linkable!();
 
     pub fn subscribe(&self) -> Subscriber {
-        self.inner.clone()
+        self.ev_tx.clone()
     }
 
     fn _map_callback(&mut self, from: ParsedKeyAction, to: PyObject) -> PyResult<()> {

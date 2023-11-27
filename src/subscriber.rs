@@ -2,11 +2,12 @@ use pyo3::{PyAny, PyRefMut};
 
 use crate::*;
 
-pub trait Subscribable {
-    fn handle(&self, id: &str, ev: InputEvent);
-}
+// pub trait Subscribable {
+//     fn handle(&self, id: &str, ev: InputEvent);
+// }
 
-pub type Subscriber = Arc<dyn Subscribable + Send + Sync>;
+pub type SubscribeEvent = (String, InputEvent);
+pub type Subscriber = tokio::sync::mpsc::UnboundedSender<SubscribeEvent>;
 
 
 pub fn add_event_subscription(target: &PyAny) -> Option<Subscriber> {

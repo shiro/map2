@@ -1,5 +1,6 @@
 use std::{fs, io, thread, time};
 use std::collections::HashMap;
+use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, mpsc};
@@ -8,6 +9,7 @@ use anyhow::{anyhow, Result};
 use evdev_rs::*;
 use notify::{DebouncedEvent, Watcher};
 use regex::Regex;
+use tokio::io::unix::AsyncFd;
 use uuid::Uuid;
 use walkdir::WalkDir;
 use crate::EvdevInputEvent;
@@ -29,7 +31,7 @@ fn find_fd_with_pattern(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 }
 
 
-pub fn read_from_device_input_fd_thread_handler(
+pub async fn read_from_device_input_fd_thread_handler(
     device: Device,
     mut ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
     abort_rx: oneshot::Receiver<()>,
@@ -37,37 +39,46 @@ pub fn read_from_device_input_fd_thread_handler(
     let mut read_buf: io::Result<(ReadStatus, InputEvent)>;
     let id = Uuid::new_v4().to_string();
 
+    let file = device.file().as_ref().unwrap().as_raw_fd();
+    let async_fd = AsyncFd::new(file).unwrap();
+
     loop {
         if abort_rx.try_recv().is_ok() { return; }
 
-        read_buf = device.next_event(ReadFlag::NORMAL);
-        if read_buf.is_ok() {
-            let mut result = read_buf.ok().unwrap();
-            match result.0 {
-                ReadStatus::Sync => { // dropped, need to sync
-                    while result.0 == ReadStatus::Sync {
-                        read_buf = device.next_event(ReadFlag::SYNC);
-                        if read_buf.is_ok() {
-                            result = read_buf.ok().unwrap();
-                        } else { // something failed, abort sync and carry on
-                            break;
+        let mut guard = async_fd.readable().await.unwrap();
+        guard.clear_ready();
+
+        loop {
+            read_buf = device.next_event(ReadFlag::NORMAL);
+            if read_buf.is_ok() {
+                let mut result = read_buf.ok().unwrap();
+                match result.0 {
+                    ReadStatus::Sync => { // dropped, need to sync
+                        while result.0 == ReadStatus::Sync {
+                            read_buf = device.next_event(ReadFlag::SYNC);
+                            if read_buf.is_ok() {
+                                result = read_buf.ok().unwrap();
+                            } else { // something failed, abort sync and carry on
+                                break;
+                            }
                         }
                     }
+                    ReadStatus::Success => { ev_handler(&id, result.1); }
                 }
-                ReadStatus::Success => { ev_handler(&id, result.1); }
-            }
-        } else {
-            let err = read_buf.err().unwrap();
-            match err.raw_os_error() {
-                Some(libc::ENODEV) => { return; }
-                Some(libc::EWOULDBLOCK) => {
-                    thread::sleep(time::Duration::from_millis(10));
-                    thread::yield_now();
-                    continue;
-                }
-                _ => {
-                    println!("Reader event polling loop error: {}", err);
-                    std::process::exit(1);
+            } else {
+                let err = read_buf.err().unwrap();
+                match err.raw_os_error() {
+                    // Some(libc::ENODEV) => { return; }
+                    Some(libc::EWOULDBLOCK) => {
+                        // println!("would block!");
+                        // thread::sleep(time::Duration::from_millis(10));
+                        // thread::yield_now();
+                        break;
+                    }
+                    _ => {
+                        println!("Reader event polling loop error: {}", err);
+                        std::process::exit(1);
+                    }
                 }
             }
         }
@@ -92,6 +103,10 @@ fn grab_device
         .open(&fd_path)
         .map_err(|err| anyhow!("failed to open fd '{}': {err}", fd_path.to_str().unwrap_or("...")))?;
 
+    // let fd_file = pyo3_asyncio::tokio::get_runtime().block_on(async {
+    //         AsyncFd::new(fd_file).unwrap()
+    //     });
+
     nix::fcntl::fcntl(fd_file.as_raw_fd(), FcntlArg::F_SETFL(OFlag::O_NONBLOCK))?;
 
     let mut device = Device::new_from_file(fd_file)
@@ -101,13 +116,12 @@ fn grab_device
 
     // spawn tasks for reading devices
     let (abort_tx, abort_rx) = oneshot::channel();
-    thread::spawn(move || {
+    pyo3_asyncio::tokio::get_runtime().spawn(async move {
         read_from_device_input_fd_thread_handler(
             device,
-            // |ev| { let _ = ev_tx.send(ev); },
             ev_handler,
             abort_rx,
-        );
+        ).await;
     });
 
     Ok(abort_tx)

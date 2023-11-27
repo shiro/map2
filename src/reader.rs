@@ -36,19 +36,28 @@ impl Reader {
         }
 
         #[cfg(not(feature = "integration"))]
-        let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
+            let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
         let _subscriber = subscriber.clone();
 
         let handler = Arc::new(move |id: &str, ev: EvdevInputEvent| {
             if let Some(subscriber) = _subscriber.load().deref() {
-                subscriber.handle(id, InputEvent::Raw(ev));
+                // subscriber.handle(id, InputEvent::Raw(ev));
+                let _ = subscriber.send((id.to_string(), InputEvent::Raw(ev)));
             }
         });
 
         #[cfg(not(feature = "integration"))]
-        let reader_thread_handle = grab_udev_inputs(&patterns, handler, reader_exit_rx).map_err(err_to_py)?;
+            let reader_thread_handle = grab_udev_inputs(&patterns, handler, reader_exit_rx).map_err(err_to_py)?;
+
+        // #[cfg(not(feature = "integration"))]
+        //     let reader_thread_handle = pyo3_asyncio::tokio::get_runtime().block_on(async move {
+        //     // tokio::time::sleep(Duration::from_millis(1000)).await;
+        //     // println!("hi future");
+        //     grab_udev_inputs(&patterns, handler, reader_exit_rx).map_err(err_to_py)
+        // })?;
+
 
         Ok(Self {
             subscriber,

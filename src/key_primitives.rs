@@ -59,7 +59,7 @@ impl KeyModifierFlags {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct KeyModifierState {
     pub left_ctrl: bool,
     pub right_ctrl: bool,
@@ -105,7 +105,7 @@ impl KeyAction {
         EvdevInputEvent { event_code: self.key.event_code, value: self.value, time: INPUT_EV_DUMMY_TIME }
     }
     pub fn to_key_action_with_mods(self, modifiers: KeyModifierFlags) -> KeyActionWithMods {
-        KeyActionWithMods{key: self.key, value: self.value, modifiers}
+        KeyActionWithMods { key: self.key, value: self.value, modifiers }
     }
 }
 

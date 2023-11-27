@@ -6,32 +6,33 @@ use python::*;
 use crate::*;
 use crate::device::*;
 use crate::device::virt_device::DeviceCapabilities;
-use crate::subscriber::{Subscribable, Subscriber};
+use crate::subscriber::{SubscribeEvent, Subscriber};
 
-struct Inner {
-    out_ev_tx: mpsc::Sender<EvdevInputEvent>,
-}
+// struct Inner {
+//     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
+// }
 
-impl Subscribable for Inner {
-    fn handle(&self, id: &str, ev: InputEvent) {
-        match ev {
-            InputEvent::Raw(ev) => {
-                let _ = self.out_ev_tx.send(ev);
-            }
-        }
-    }
-}
+// impl Inner {
+//     fn handle(&self, id: &str, ev: InputEvent) {
+//         match ev {
+//             InputEvent::Raw(ev) => {
+//                 let _ = self.out_ev_tx.send(ev);
+//             }
+//         }
+//     }
+// }
 
 
 #[pyclass]
 pub struct Writer {
-    out_ev_tx: mpsc::Sender<EvdevInputEvent>,
-    inner: Arc<Inner>,
+    // out_ev_tx: mpsc::Sender<EvdevInputEvent>,
+    // inner: Arc<Inner>,
+    ev_tx: Subscriber,
 
-    #[cfg(not(feature = "integration"))]
-    exit_tx: Option<oneshot::Sender<()>>,
-    #[cfg(not(feature = "integration"))]
-    thread_handle: Option<thread::JoinHandle<Result<()>>>,
+    // #[cfg(not(feature = "integration"))]
+    // exit_tx: Option<oneshot::Sender<()>>,
+    // #[cfg(not(feature = "integration"))]
+    // thread_handle: Option<thread::JoinHandle<Result<()>>>,
 
     #[cfg(feature = "integration")]
     out_ev_rx: mpsc::Receiver<EvdevInputEvent>,
@@ -86,52 +87,54 @@ impl Writer {
         };
 
         #[cfg(not(feature = "integration"))]
-        let (exit_tx, exit_rx) = oneshot::channel();
-        let (out_ev_tx, out_ev_rx) = mpsc::channel::<EvdevInputEvent>();
+            // let (exit_tx, exit_rx) = oneshot::channel();
+            let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
 
         #[cfg(not(feature = "integration"))]
-            let thread_handle = thread::spawn(move || {
+        {
             // grab udev device
             let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
                 .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+            get_runtime().spawn(async move {
+                loop {
+                    // if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
 
-            loop {
-                if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
+                    loop {
+                        let (id, ev) = ev_rx.recv().await.unwrap();
+                        let ev = match &ev { InputEvent::Raw(ev) => ev };
+                        let mut syn = SYN_REPORT.clone();
+                        syn.time.tv_sec = ev.time.tv_sec;
+                        syn.time.tv_usec = ev.time.tv_usec;
 
-                while let Ok(ev) = out_ev_rx.try_recv() {
-                    let mut syn = SYN_REPORT.clone();
-                    syn.time.tv_sec = ev.time.tv_sec;
-                    syn.time.tv_usec = ev.time.tv_usec;
 
+                        #[cfg(not(feature = "integration"))]
+                        {
+                            let _ = output_device.send(&ev);
+                            let _ = output_device.send(&syn);
+                        }
 
-                    #[cfg(not(feature = "integration"))]
-                    {
-                        let _ = output_device.send(&ev);
-                        let _ = output_device.send(&syn);
-                    }
-
-                    // this is a hack that stops successive events to not get registered
-                    if let EventCode::EV_KEY(_) = ev.event_code {
-                        thread::sleep(Duration::from_millis(1));
+                        // this is a hack that stops successive events to not get registered
+                        if let EventCode::EV_KEY(_) = ev.event_code {
+                            // thread::sleep(Duration::from_millis(1));
+                            tokio::time::sleep(Duration::from_millis(1)).await;
+                        }
                     }
                 }
+            });
+        }
 
-                thread::sleep(Duration::from_millis(10));
-                thread::yield_now();
-            }
-        });
-
-        let inner = Arc::new(Inner {
-            out_ev_tx: out_ev_tx.clone(),
-        });
+        // let inner = Arc::new(Inner {
+        //     out_ev_tx: out_ev_tx.clone(),
+        // });
 
         let handle = Self {
-            out_ev_tx,
-            inner,
-            #[cfg(not(feature = "integration"))]
-            exit_tx: Some(exit_tx),
-            #[cfg(not(feature = "integration"))]
-            thread_handle: Some(thread_handle),
+            // out_ev_tx,
+            // inner,
+            ev_tx,
+            // #[cfg(not(feature = "integration"))]
+            // exit_tx: Some(exit_tx),
+            // #[cfg(not(feature = "integration"))]
+            // thread_handle: Some(thread_handle),
             #[cfg(feature = "integration")]
             out_ev_rx,
         };
@@ -141,25 +144,25 @@ impl Writer {
 
     #[cfg(feature = "integration")]
     pub fn try_recv(&mut self) -> PyResult<Option<String>> {
-        match self.out_ev_rx.try_recv().ok(){
-            Some(ev) => {Ok(Some(serde_json::to_string(&ev).unwrap()))}
-            None => {Ok(None)}
+        match self.out_ev_rx.try_recv().ok() {
+            Some(ev) => { Ok(Some(serde_json::to_string(&ev).unwrap())) }
+            None => { Ok(None) }
         }
     }
 }
 
 impl Writer {
     pub fn subscribe(&self) -> Subscriber {
-        self.inner.clone()
+        self.ev_tx.clone()
     }
 }
 
 impl Drop for Writer {
     fn drop(&mut self) {
-        #[cfg(not(feature = "integration"))]
-        if let Some(exit_tx) = self.exit_tx.take() {
-            let _ = exit_tx.send(());
-            let _ = self.thread_handle.take().unwrap()/*.try_timed_join(Duration::from_millis(5000))*/;
-        }
+        // #[cfg(not(feature = "integration"))]
+        // if let Some(exit_tx) = self.exit_tx.take() {
+        //     let _ = exit_tx.send(());
+        // let _ = self.thread_handle.take().unwrap()/*.try_timed_join(Duration::from_millis(5000))*/;
+        // }
     }
 }

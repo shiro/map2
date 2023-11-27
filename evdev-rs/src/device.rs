@@ -5,13 +5,14 @@ use std::ffi::CString;
 use std::mem::ManuallyDrop;
 use std::os::unix::io::{AsRawFd};
 use std::{io, ptr};
+use std::fs::File;
 
 use crate::enums::*;
 use crate::util::*;
 
 use evdev_sys as raw;
 
-pub type File = Box<dyn AsRawFd>;
+// pub type File = Box<dyn AsRawFd>;
 
 /// Abstraction over structs which contain an inner `*mut libevdev`
 pub trait DeviceWrapper {
@@ -497,13 +498,13 @@ impl UninitDevice {
     /// If the device changed and you need to re-read a device, use `Device::new_from_file` method.
     /// If you need to change the file after
     /// closing and re-opening the same device, use `change_file`.
-    pub fn set_file<F: AsRawFd + 'static>(self, file: F) -> io::Result<Device> {
+    pub fn set_file(self, file: File) -> io::Result<Device> {
         // Don't call UninitDevice's destructor so we can reuse the inner libevdev
         let leak = ManuallyDrop::new(self);
         let result = unsafe { raw::libevdev_set_fd(leak.raw, file.as_raw_fd()) };
         match result {
             0 => Ok(Device {
-                file: Some(Box::new(file)),
+                file: Some(file),
                 raw: leak.raw,
             }),
             error => Err(io::Error::from_raw_os_error(-error)),
@@ -516,7 +517,7 @@ impl UninitDevice {
         more closely match their type signature. See issue 42 for discussion
         https://github.com/ndesh26/evdev-rs/issues/42"
     )]
-    pub fn set_fd<F: AsRawFd + 'static>(self, file: F) -> io::Result<Device> {
+    pub fn set_fd(self, file: File) -> io::Result<Device> {
         self.set_file(file)
     }
 }
@@ -558,14 +559,14 @@ impl Device {
     /// # let file = File::open("/dev/input/event0").unwrap();
     /// let device = uninit_device.set_file(file);
     /// ```
-    pub fn new_from_file<F: AsRawFd + 'static>(file: F) -> io::Result<Device> {
+    pub fn new_from_file(file: File) -> io::Result<Device> {
         let mut libevdev = std::ptr::null_mut();
         let result =
             unsafe { raw::libevdev_new_from_fd(file.as_raw_fd(), &mut libevdev) };
 
         match result {
             0 => Ok(Device {
-                file: Some(Box::new(file)),
+                file: Some(file),
                 raw: libevdev,
             }),
             error => Err(io::Error::from_raw_os_error(-error)),
@@ -578,7 +579,7 @@ impl Device {
         more closely match their type signature. See issue 42 for discussion
         https://github.com/ndesh26/evdev-rs/issues/42"
     )]
-    pub fn new_from_fd<F: AsRawFd + 'static>(file: F) -> io::Result<Device> {
+    pub fn new_from_fd(file: File) -> io::Result<Device> {
         Self::new_from_file(file)
     }
 

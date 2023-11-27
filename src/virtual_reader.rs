@@ -65,7 +65,7 @@ impl VirtualReader {
                 .to_key_actions();
 
             for action in actions {
-                subscriber.handle(&self.id, InputEvent::Raw(action.to_input_ev()));
+                let _ = subscriber.send((self.id.clone(), InputEvent::Raw(action.to_input_ev())));
             }
         }
         Ok(())
