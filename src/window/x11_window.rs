@@ -33,7 +33,12 @@ pub fn x11_window_handler() -> WindowHandler {
                         let is_callable = callback.as_ref(py).is_callable();
                         if !is_callable { continue; }
 
-                        let _ = callback.call(py, (val.class.clone(), ), None);
+                        let ret = callback.call(py, (val.class.clone(), ), None);
+
+                        if let Err(err) = ret {
+                            eprintln!("{err}");
+                            std::process::exit(1);
+                        }
                     }
                 });
             }
