@@ -53,12 +53,22 @@ fn default(options: Option<&PyDict>) -> PyResult<()> {
 #[pyfunction]
 fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
     let mut prev: Option<PyObject> = None;
+    let mut path = vec![];
 
     for target in chain.into_iter() {
         if let Some(source) = prev {
-            if let Ok(mut source) = source.extract::<PyRefMut<Reader>>(py) { source.link(target.as_ref(py))?; }
-            if let Ok(mut source) = source.extract::<PyRefMut<VirtualReader>>(py) { source.link(target.as_ref(py))?; }
-            if let Ok(mut source) = source.extract::<PyRefMut<Mapper>>(py) { source.link(target.as_ref(py))?; }
+            if let Ok(mut source) = source.extract::<PyRefMut<Reader>>(py) {
+                source._link(target.as_ref(py))?;
+                path.push(source.id.clone());
+            }
+            if let Ok(mut source) = source.extract::<PyRefMut<VirtualReader>>(py) {
+                source._link(target.as_ref(py))?;
+                path.push(source.id.clone());
+            }
+            if let Ok(mut source) = source.extract::<PyRefMut<Mapper>>(py) {
+                source._link(path.clone(), target.as_ref(py))?;
+                path.push(source.id.clone());
+            }
         }
         prev = Some(target);
     }
@@ -70,7 +80,7 @@ pub fn err_to_py(err: anyhow::Error) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
 
-pub fn get_runtime<'a>() -> &'a Runtime {pyo3_asyncio::tokio::get_runtime()}
+pub fn get_runtime<'a>() -> &'a Runtime { pyo3_asyncio::tokio::get_runtime() }
 
 #[pyfunction]
 fn wait(py: Python) {

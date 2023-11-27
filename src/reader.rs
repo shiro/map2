@@ -8,6 +8,7 @@ use crate::subscriber::{Subscriber, add_event_subscription};
 
 #[pyclass]
 pub struct Reader {
+    pub id: Arc<Uuid>,
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     #[cfg(not(feature = "integration"))]
     reader_exit_tx: Option<oneshot::Sender<()>>,
@@ -41,10 +42,12 @@ impl Reader {
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
         let _subscriber = subscriber.clone();
 
-        let handler = Arc::new(move |id: &str, ev: EvdevInputEvent| {
+        let id = Arc::new(Uuid::new_v4());
+
+        let _id = id.clone();
+        let handler = Arc::new(move |_: &str, ev: EvdevInputEvent| {
             if let Some(subscriber) = _subscriber.load().deref() {
-                // subscriber.handle(id, InputEvent::Raw(ev));
-                let _ = subscriber.send((id.to_string(), InputEvent::Raw(ev)));
+                let _ = subscriber.send((vec![_id.clone()], InputEvent::Raw(ev)));
             }
         });
 
@@ -60,6 +63,7 @@ impl Reader {
 
 
         Ok(Self {
+            id,
             subscriber,
             #[cfg(not(feature = "integration"))]
             reader_exit_tx: Some(reader_exit_tx),
@@ -67,8 +71,6 @@ impl Reader {
             reader_thread_handle: Some(reader_thread_handle),
         })
     }
-
-    pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
 
     #[cfg(feature = "integration")]
     pub fn send(&mut self, ev: String) -> PyResult<()> {
@@ -82,5 +84,19 @@ impl Reader {
 }
 
 impl Reader {
-    linkable!();
+    pub fn _link(&mut self, target: &PyAny) -> PyResult<()> {
+        use crate::subscriber::*;
+
+        if target.is_none() {
+            self.subscriber.store(None);
+            return Ok(());
+        }
+
+        let target = match add_event_subscription(target) {
+            Some(target) => target,
+            None => { return Err(PyRuntimeError::new_err("unsupported link target")); }
+        };
+        self.subscriber.store(Some(Arc::new(target)));
+        Ok(())
+    }
 }

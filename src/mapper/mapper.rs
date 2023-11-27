@@ -1,4 +1,5 @@
 use std::sync::RwLock;
+use pyo3::impl_::wrap::SomeWrap;
 
 use crate::*;
 use crate::event::InputEvent;
@@ -81,10 +82,10 @@ enum PythonReturn {
 fn run_python_handler(
     handler: &PyObject,
     args: Option<Vec<PythonArgument>>,
-    id: String,
+    path: Vec<Arc<Uuid>>,
     ev: &EvdevInputEvent,
     transformer: &Arc<XKBTransformer>,
-    subscriber: &Option<Arc<Subscriber>>,
+    subscriber: Option<&Subscriber>,
 ) {
     let ret = Python::with_gil(|py| -> Result<()> {
         let asyncio = py.import("asyncio")
@@ -122,13 +123,13 @@ fn run_python_handler(
 
                     if let Some(subscriber) = subscriber {
                         for action in seq.to_key_actions() {
-                            let _ = subscriber.send((id.clone(), InputEvent::Raw(action.to_input_ev())));
+                            let _ = subscriber.send((path.clone(), InputEvent::Raw(action.to_input_ev())));
                         }
                     }
                 }
                 Some(PythonReturn::Bool(ret)) if ret => {
                     if let Some(subscriber) = subscriber {
-                        let _ = subscriber.send((id, InputEvent::Raw(ev.clone())));
+                        let _ = subscriber.send((path, InputEvent::Raw(ev.clone())));
                     }
                 }
                 _ => {}
@@ -146,7 +147,8 @@ fn run_python_handler(
 
 #[derive(Default)]
 struct Inner {
-    subscriber: Arc<ArcSwapOption<Subscriber>>,
+    id: Arc<Uuid>,
+    subscriber_map: Arc<RwLock<SubscriberMap>>,
     state: RwLock<State>,
     transformer: RwLock<Option<Arc<XKBTransformer>>>,
     mappings: RwLock<Mappings>,
@@ -157,21 +159,14 @@ struct Inner {
 }
 
 impl Inner {
-    fn handle(&self, id: String, raw_ev: InputEvent) {
-        // let mut state_map = self.state_map.read().unwrap();
-        // let mut state_guard = state_map.get(id);
-        // if state_guard.is_none() {
-        //     drop(state_map);
-        //     let mut writable_state_map = self.state_map.write().unwrap();
-        //     writable_state_map.insert(id.to_string(), RwLock::new(State::new()));
-        //     drop(writable_state_map);
-        //     state_map = self.state_map.read().unwrap();
-        //     state_guard = state_map.get(id);
-        // }
+    fn handle(&self, mut path: Vec<Arc<Uuid>>, raw_ev: InputEvent) {
         let mut state_guard = self.state.write().unwrap();
         let mut state = state_guard.deref_mut();
         let mappings = self.mappings.read().unwrap();
 
+        let subscriber_map = self.subscriber_map.read().unwrap();
+        let subscriber = subscriber_map.get(&path);
+        path.push(self.id.clone());
 
         let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
 
@@ -197,8 +192,7 @@ impl Inner {
                 // let mut usec = since_the_epoch.subsec_micros() as i64;
 
                 if let Some(runtime_action) = mappings.get(&from_key_action) {
-                    let _subscriber = self.subscriber.load();
-                    let subscriber = match _subscriber.deref() {
+                    let subscriber = match subscriber {
                         Some(x) => x,
                         None => { return; }
                     };
@@ -210,13 +204,13 @@ impl Inner {
                                     RuntimeKeyAction::KeyAction(key_action) => {
                                         let ev = key_action.to_input_ev();
 
-                                        let _ = subscriber.send((id.clone(), InputEvent::Raw(ev)));
+                                        let _ = subscriber.send((path.clone(), InputEvent::Raw(ev)));
                                     }
                                     RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
                                         let mut new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);
                                         // events.append(&mut new_events);
                                         for ev in new_events {
-                                            let _ = subscriber.send((id.clone(), InputEvent::Raw(ev)));
+                                            let _ = subscriber.send((path.clone(), InputEvent::Raw(ev)));
                                         }
                                     }
                                 }
@@ -226,16 +220,16 @@ impl Inner {
                             // always release all trigger mods before running the callback
                             let mut new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
                             for ev in new_events {
-                                let _ = subscriber.send((id.clone(), InputEvent::Raw(ev)));
+                                let _ = subscriber.send((path.clone(), InputEvent::Raw(ev)));
                             }
 
                             run_python_handler(
                                 &handler,
                                 None,
-                                id,
+                                path,
                                 ev,
                                 self.transformer.read().unwrap().as_ref().unwrap(),
-                                self.subscriber.load().deref(),
+                                Some(subscriber),
                             );
                         }
                         RuntimeAction::NOP => {}
@@ -270,10 +264,10 @@ impl Inner {
                         run_python_handler(
                             &handler,
                             Some(args),
-                            id,
+                            path,
                             ev,
                             self.transformer.read().unwrap().as_ref().unwrap(),
-                            self.subscriber.load().deref(),
+                            subscriber,
                         );
 
                         return;
@@ -300,10 +294,10 @@ impl Inner {
                     run_python_handler(
                         &handler,
                         Some(args),
-                        id,
+                        path,
                         ev,
                         self.transformer.read().unwrap().as_ref().unwrap(),
-                        self.subscriber.load().deref(),
+                        subscriber,
                     );
                     return;
                 }
@@ -311,8 +305,8 @@ impl Inner {
             _ => {}
         }
 
-        if let Some(subscriber) = self.subscriber.load().deref() {
-            let _ = subscriber.send((id, raw_ev));
+        if let Some(subscriber) = subscriber {
+            let _ = subscriber.send((path, raw_ev));
         }
     }
 }
@@ -320,7 +314,8 @@ impl Inner {
 
 #[pyclass]
 pub struct Mapper {
-    subscriber: Arc<ArcSwapOption<Subscriber>>,
+    pub id: Arc<Uuid>,
+    subscriber_map: Arc<RwLock<SubscriberMap>>,
     ev_tx: Subscriber,
     inner: Arc<Inner>,
     transformer: Option<Arc<XKBTransformer>>,
@@ -348,10 +343,12 @@ impl Mapper {
                 global::DEFAULT_TRANSFORMER_PARAMS.read().unwrap().clone()
             };
 
-        let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
+        let subscriber_map: Arc<RwLock<SubscriberMap>> = Arc::new(RwLock::new(HashMap::new()));
+        let id = Arc::new(Uuid::new_v4());
 
         let inner = Arc::new(Inner {
-            subscriber: subscriber.clone(),
+            id: id.clone(),
+            subscriber_map: subscriber_map.clone(),
             state: RwLock::new(State::new()),
             mappings: RwLock::new(Mappings::new()),
             ..Default::default()
@@ -362,13 +359,14 @@ impl Mapper {
         let _inner = inner.clone();
         get_runtime().spawn(async move {
             loop {
-                let (id, ev) = ev_rx.recv().await.unwrap();
-                _inner.handle(id, ev);
+                let (path, ev) = ev_rx.recv().await.unwrap();
+                _inner.handle(path, ev);
             }
         });
 
         Ok(Self {
-            subscriber,
+            id,
+            subscriber_map,
             ev_tx,
             inner,
             transformer: None,
@@ -476,8 +474,6 @@ impl Mapper {
         Ok(())
     }
 
-    pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
-
     pub fn snapshot(&self, existing: Option<&KeyMapperSnapshot>) -> PyResult<Option<KeyMapperSnapshot>> {
         if let Some(existing) = existing {
             *self.inner.mappings.write().unwrap() = existing.mappings.clone();
@@ -497,7 +493,23 @@ impl Mapper {
 }
 
 impl Mapper {
-    linkable!();
+    // linkable!();
+
+    pub fn _link(&mut self, path: Vec<Arc<Uuid>>, target: &PyAny) -> PyResult<()> {
+        use crate::subscriber::*;
+
+        if target.is_none() {
+            self.subscriber_map.write().unwrap().remove(&path);
+            return Ok(());
+        }
+
+        let target = match add_event_subscription(target) {
+            Some(target) => target,
+            None => { return Err(PyRuntimeError::new_err("unsupported link target")); }
+        };
+        self.subscriber_map.write().unwrap().insert(path, target);
+        Ok(())
+    }
 
     pub fn subscribe(&self) -> Subscriber {
         self.ev_tx.clone()

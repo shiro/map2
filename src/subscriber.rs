@@ -6,7 +6,7 @@ use crate::*;
 //     fn handle(&self, id: &str, ev: InputEvent);
 // }
 
-pub type SubscribeEvent = (String, InputEvent);
+pub type SubscribeEvent = (Vec<Arc<Uuid>>, InputEvent);
 pub type Subscriber = tokio::sync::mpsc::UnboundedSender<SubscribeEvent>;
 
 
@@ -23,7 +23,7 @@ pub fn add_event_subscription(target: &PyAny) -> Option<Subscriber> {
 #[macro_export]
 macro_rules! linkable {
     () => {
-        pub fn _link(&mut self, target: &PyAny) -> PyResult<()> {
+        pub fn _link(&mut self, path: Vec<Uuid>, target: &PyAny) -> PyResult<()> {
             use crate::subscriber::*;
 
             if target.is_none() {

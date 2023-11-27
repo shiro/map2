@@ -17,7 +17,7 @@ pub enum ReaderMessage {
 
 #[pyclass]
 pub struct VirtualReader {
-    id: String,
+    pub id: Arc<Uuid>,
     subscriber: Arc<ArcSwapOption<Subscriber>>,
     transformer: Option<Arc<XKBTransformer>>,
     transformer_params: TransformerParams,
@@ -46,8 +46,10 @@ impl VirtualReader {
                 global::DEFAULT_TRANSFORMER_PARAMS.read().unwrap().clone()
             };
 
+        let id = Arc::new(Uuid::new_v4());
+
         Ok(Self {
-            id: Uuid::new_v4().to_string(),
+            id,
             subscriber,
             transformer: None,
             transformer_params,
@@ -65,7 +67,7 @@ impl VirtualReader {
                 .to_key_actions();
 
             for action in actions {
-                let _ = subscriber.send((self.id.clone(), InputEvent::Raw(action.to_input_ev())));
+                let _ = subscriber.send((vec![self.id.clone()], InputEvent::Raw(action.to_input_ev())));
             }
         }
         Ok(())
@@ -87,11 +89,26 @@ impl VirtualReader {
     //     Ok(())
     // }
 
-    pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
+    // pub fn link(&mut self, target: &PyAny) -> PyResult<()> { self._link(target) }
 }
 
 impl VirtualReader {
-    linkable!();
+    // linkable!();
+    pub fn _link(&mut self, target: &PyAny) -> PyResult<()> {
+        use crate::subscriber::*;
+
+        if target.is_none() {
+            self.subscriber.store(None);
+            return Ok(());
+        }
+
+        let target = match add_event_subscription(target) {
+            Some(target) => target,
+            None => { return Err(PyRuntimeError::new_err("unsupported link target")); }
+        };
+        self.subscriber.store(Some(Arc::new(target)));
+        Ok(())
+    }
 
     fn init_transformer(&mut self) -> Result<()> {
         if self.transformer.is_none() {

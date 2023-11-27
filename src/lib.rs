@@ -19,7 +19,7 @@ use std::thread;
 use std::time::Duration;
 
 pub use anyhow::{anyhow, Result};
-use arc_swap::ArcSwapOption;
+use arc_swap::{ArcSwap, ArcSwapOption};
 use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent as EvdevInputEvent;
 use nom::lib::std::collections::HashMap;
@@ -29,14 +29,15 @@ use event_loop::EVENT_LOOP;
 pub use mapper::mapper::Mapper;
 pub use python::err_to_py;
 use reader::Reader;
+use subscriber_map::SubscriberMap;
 use writer::Writer;
 
 use crate::device::virtual_input_device::grab_udev_inputs;
+use crate::error::*;
 use crate::event::InputEvent;
 pub use crate::key_defs::*;
 use crate::key_primitives::*;
 use crate::state::*;
-use crate::error::*;
 
 // #[macro_use]
 // use subscriber::linkable;
@@ -57,6 +58,7 @@ pub mod xkb_transformer_registry;
 pub mod error;
 pub mod global;
 pub mod platform;
+pub mod subscriber_map;
 
 #[cfg(feature = "integration")]
 pub mod testing;
