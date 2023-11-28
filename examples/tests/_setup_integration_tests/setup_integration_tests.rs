@@ -36,7 +36,7 @@ pub fn writer_read(py: Python, module: &PyModule, name: &str) -> Option<EvdevInp
 
 pub fn writer_read_all(py: Python, module: &PyModule, name: &str) -> Vec<EvdevInputEvent> {
     let mut acc = vec![];
-    while let Some(ev) = writer_read(py, module, name){
+    while let Some(ev) = writer_read(py, module, name) {
         acc.push(ev);
     }
     acc
@@ -47,4 +47,13 @@ pub fn reader_send(py: Python, module: &PyModule, name: &str, ev: &EvdevInputEve
     let ev = serde_json::to_string(ev).unwrap();
 
     target.call_method(py, "send", (ev, ), None).unwrap();
+}
+
+pub fn reader_send_all(py: Python, module: &PyModule, name: &str, ev_list: &Vec<EvdevInputEvent>) {
+    let target = module.getattr(name).unwrap().to_object(py);
+
+    for ev in ev_list.iter() {
+        let ev = serde_json::to_string(ev).unwrap();
+        target.call_method(py, "send", (ev, ), None).unwrap();
+    }
 }

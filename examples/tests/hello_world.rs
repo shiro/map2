@@ -1,3 +1,4 @@
+use map2::key_primitives::Key;
 use crate::*;
 
 #[pyo3_asyncio::tokio::test]
@@ -6,14 +7,11 @@ async fn hello_world() -> PyResult<()> {
         let m = pytests::include_python!();
 
         assert_eq!(
-            (
-                writer_read(py, m, "writer"),
-                writer_read(py, m, "writer"),
-            ),
-            (
-                Some(EvdevInputEvent::new(&Default::default(), &KEY_H.event_code, 1)),
-                Some(EvdevInputEvent::new(&Default::default(), &KEY_H.event_code, 0)),
-            )
+            writer_read_all(py, m, "writer"),
+            vec![
+                Key::from_str("h").unwrap().to_input_ev(1),
+                Key::from_str("h").unwrap().to_input_ev(0),
+            ]
         );
 
         Ok(())
