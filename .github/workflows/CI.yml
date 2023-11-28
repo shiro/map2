@@ -12,6 +12,9 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
 
 jobs:
   linux:
@@ -83,3 +86,26 @@ jobs:
         with:
           command: upload
           args: --non-interactive --skip-existing *
+
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - name: install, build and upload
+        uses: withastro/action@v1
+        with:
+          # root path
+          path: docs
+          # node-version: 18 # The specific version of Node that should be used to build your site. Defaults to 18. (optional)
+
+  deploy-docs:
+    needs: [linux, build-docs]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
