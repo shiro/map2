@@ -1,5 +1,6 @@
 use std::sync::mpsc;
 use std::sync::mpsc::TryRecvError;
+use evdev_rs::enums::EventType::EV_SYN;
 
 use python::*;
 
@@ -26,6 +27,7 @@ use crate::subscriber::{SubscribeEvent, Subscriber};
 #[pyclass]
 pub struct Writer {
     ev_tx: Subscriber,
+    exit_tx: tokio::sync::mpsc::UnboundedSender<()>,
 
     #[cfg(feature = "integration")]
     ev_rx: tokio::sync::mpsc::UnboundedReceiver<SubscribeEvent>,
@@ -80,6 +82,7 @@ impl Writer {
         };
 
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
+        let (exit_tx, mut exit_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
 
         #[cfg(not(feature = "integration"))]
         {
@@ -88,10 +91,11 @@ impl Writer {
                 .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
             get_runtime().spawn(async move {
                 loop {
-                    // if let Ok(()) = exit_rx.try_recv() { return Ok(()); }
-
                     loop {
-                        let (id, ev) = ev_rx.recv().await.unwrap();
+                        let (_, ev) = ev_rx.recv().await.unwrap();
+
+                        if let Ok(()) = exit_rx.try_recv() { return; }
+
                         let ev = match &ev { InputEvent::Raw(ev) => ev };
                         let mut syn = SYN_REPORT.clone();
                         syn.time.tv_sec = ev.time.tv_sec;
@@ -116,7 +120,9 @@ impl Writer {
 
         let handle = Self {
             ev_tx,
+            #[cfg(feature = "integration")]
             ev_rx,
+            exit_tx,
         };
 
         Ok(handle)
@@ -142,10 +148,7 @@ impl Writer {
 
 impl Drop for Writer {
     fn drop(&mut self) {
-        // #[cfg(not(feature = "integration"))]
-        // if let Some(exit_tx) = self.exit_tx.take() {
-        //     let _ = exit_tx.send(());
-        // let _ = self.thread_handle.take().unwrap()/*.try_timed_join(Duration::from_millis(5000))*/;
-        // }
+        let _ = self.exit_tx.send(());
+        let _ = self.ev_tx.send((vec![], InputEvent::Raw(SYN_REPORT.clone())));
     }
 }
