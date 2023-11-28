@@ -77,7 +77,7 @@ impl Reader {
         let ev: EvdevInputEvent = serde_json::from_str(&ev).unwrap();
 
         if let Some(subscriber) = self.subscriber.load().deref() {
-            subscriber.handle("", InputEvent::Raw(ev));
+            let _ = subscriber.send((vec![self.id.clone()], InputEvent::Raw(ev)));
         };
         Ok(())
     }

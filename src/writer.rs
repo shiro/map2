@@ -25,17 +25,10 @@ use crate::subscriber::{SubscribeEvent, Subscriber};
 
 #[pyclass]
 pub struct Writer {
-    // out_ev_tx: mpsc::Sender<EvdevInputEvent>,
-    // inner: Arc<Inner>,
     ev_tx: Subscriber,
 
-    // #[cfg(not(feature = "integration"))]
-    // exit_tx: Option<oneshot::Sender<()>>,
-    // #[cfg(not(feature = "integration"))]
-    // thread_handle: Option<thread::JoinHandle<Result<()>>>,
-
     #[cfg(feature = "integration")]
-    out_ev_rx: mpsc::Receiver<EvdevInputEvent>,
+    ev_rx: tokio::sync::mpsc::UnboundedReceiver<SubscribeEvent>,
 }
 
 #[pymethods]
@@ -86,9 +79,7 @@ impl Writer {
             }
         };
 
-        #[cfg(not(feature = "integration"))]
-            // let (exit_tx, exit_rx) = oneshot::channel();
-            let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
 
         #[cfg(not(feature = "integration"))]
         {
@@ -123,20 +114,9 @@ impl Writer {
             });
         }
 
-        // let inner = Arc::new(Inner {
-        //     out_ev_tx: out_ev_tx.clone(),
-        // });
-
         let handle = Self {
-            // out_ev_tx,
-            // inner,
             ev_tx,
-            // #[cfg(not(feature = "integration"))]
-            // exit_tx: Some(exit_tx),
-            // #[cfg(not(feature = "integration"))]
-            // thread_handle: Some(thread_handle),
-            #[cfg(feature = "integration")]
-            out_ev_rx,
+            ev_rx,
         };
 
         Ok(handle)
@@ -144,8 +124,11 @@ impl Writer {
 
     #[cfg(feature = "integration")]
     pub fn try_recv(&mut self) -> PyResult<Option<String>> {
-        match self.out_ev_rx.try_recv().ok() {
-            Some(ev) => { Ok(Some(serde_json::to_string(&ev).unwrap())) }
+        match self.ev_rx.try_recv().ok() {
+            Some((_, ev)) => {
+                let ev = match ev { InputEvent::Raw(ev) => { ev } };
+                Ok(Some(serde_json::to_string(&ev).unwrap()))
+            }
             None => { Ok(None) }
         }
     }
