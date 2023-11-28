@@ -30,4 +30,19 @@ map2.link([reader, mapper, writer])
 
 # map the "a" key to "b"
 mapper.map("a", "b")
+
+# key sequences are also supported
+mapper.map("s", "hello world!")
+
+
+# use the full power of Python using functions
+def custom_function(key, state):
+  print("called custom function")
+
+  # custom conditions and complex sequences
+  if key == "d":
+    return "{ctrl down}a{ctrl up}"
+  return True
+
+mapper.map("d", custom_function)
 ```
