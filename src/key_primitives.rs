@@ -8,11 +8,22 @@ pub struct Key {
 }
 
 impl Key {
-    pub fn from_str(s: &str) -> Result<Self> {
-        match EventCode::from_str(&EventType::EV_KEY, s) {
-            Some(event_code) => { Ok(Key { event_code }) }
-            None => { Err(anyhow!("key not found: '{}'", s)) }
+    pub fn from_str(key_name: &str) -> Result<Self> {
+        let mut key_name = key_name.to_uppercase();
+
+        // prefix if not already
+        if !key_name.starts_with("KEY_") && !key_name.starts_with("BTN_") {
+            key_name = "KEY_".to_string().tap_mut(|s| s.push_str(&key_name));
         }
+
+        match EventCode::from_str(&EventType::EV_KEY, &key_name) {
+            Some(event_code) => { Ok(Key { event_code }) }
+            None => { Err(anyhow!("key not found: '{}'", key_name)) }
+        }
+    }
+
+    pub fn to_input_ev(&self, state: i32) -> EvdevInputEvent {
+        EvdevInputEvent::new(&Default::default(), &self.event_code, state)
     }
 }
 

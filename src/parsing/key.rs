@@ -28,62 +28,59 @@ pub fn key_utf<'a>(
     transformer: Option<&'a XKBTransformer>
 ) -> impl Fn(&'a str) -> ParseResult<&str, (Key, KeyModifierFlags)> {
     move |input: &str| {
-        alt((
-            // multiple ASCII chars
-            ident,
+        map_res(
+            alt((
+                // multiple ASCII chars
+                ident,
 
-            // one arbitrary char
-            map(take(1usize), |v: &str| v.to_string())
-        ))(input)
-            .and_then(|(next, key_name)| {
+                // one arbitrary char
+                map(take(1usize), |v: &str| v.to_string())
+            )),
+            |key_name| {
                 let (key, mut flags) = match KEY_ALIAS_TABLE.get(&*key_name.to_uppercase()) {
                     Some(v) => *v,
                     None => {
+                        // try XKB conversion
                         if let Some(transformer) = transformer {
-                            let mut seq = transformer.utf_to_raw(key_name.to_string())
-                                .map_err(|_| make_generic_nom_err_new(input))?;
-
-                            let key = seq.remove(seq.len() - 1);
-
-                            let mut flags = KeyModifierFlags::new();
-
-                            for ev in seq.iter() {
-                                match ev {
-                                    Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_LEFTALT) } => { flags.alt(); }
-                                    Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_RIGHTALT) } => { flags.right_alt(); }
-                                    Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_LEFTSHIFT) } => { flags.shift(); }
-                                    Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_RIGHTSHIFT) } => { flags.shift(); }
-                                    _ => { unreachable!("unhandled modifier") }
-                                }
+                            if let Ok(res) = resolve_key_utf8(&key_name, transformer) {
+                                return Ok::<_, nom::Err<CustomError<&str>>>(res);
                             }
-
-                            (key, flags)
-                        } else {
-                            let mut key_name = key_name.to_uppercase();
-                            if !key_name.starts_with("KEY_") && !key_name.starts_with("BTN_") {
-                                key_name = "KEY_".to_string()
-                                    .tap_mut(|s| s.push_str(&key_name));
-                            }
-
-                            let key = Key::from_str(key_name.as_str())
-                                .map_err(|_| make_generic_nom_err_new(input))?;
-
-                            (key, KeyModifierFlags::new())
                         }
+
+                        // fall back to libevdev resolution
+                        let key = Key::from_str(&key_name)
+                            .map_err(|_| make_generic_nom_err_new(input))?;
+
+                        return Ok((key, KeyModifierFlags::new()))
                     }
                 };
 
-                if transformer.is_none() {
-                    // only 1 char and it's uppercase
-                    let mut it = key_name.chars();
-                    if it.next().unwrap().is_uppercase() && it.next().is_none() {
-                        flags.shift();
-                    }
-                }
-
-                Ok((next, (key, flags)))
-            })
+                Ok((key, flags))
+            },
+        )(input)
     }
+}
+
+fn resolve_key_utf8(key: &str, transformer: &XKBTransformer) -> Result<(Key, KeyModifierFlags)> {
+    let mut seq = transformer.utf_to_raw(key.to_string())?;
+
+    // the first entry is the key
+    let key = seq.remove(seq.len() - 1);
+
+    let mut flags = KeyModifierFlags::new();
+
+    // the rest are modifiers we have to collect
+    for ev in seq.iter() {
+        match ev {
+            Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_LEFTALT) } => { flags.alt(); }
+            Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_RIGHTALT) } => { flags.right_alt(); }
+            Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_LEFTSHIFT) } => { flags.shift(); }
+            Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_RIGHTSHIFT) } => { flags.shift(); }
+            _ => { unreachable!("unhandled modifier") }
+        }
+    }
+
+    Ok((key, flags))
 }
 
 
@@ -128,12 +125,12 @@ mod tests {
         let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         assert_eq!(key_utf(Some(&t))(":"), nom_ok((
-            *KEY_SEMICOLON,
+            Key::from_str("semicolon").unwrap(),
             KeyModifierFlags::new().tap_mut(|x| x.shift())
         )));
 
         assert_eq!(key_utf(Some(&t))("^"), nom_ok((
-            *KEY_6,
+            Key::from_str("6").unwrap(),
             KeyModifierFlags::new().tap_mut(|x| x.shift())
         )));
     }
@@ -146,7 +143,7 @@ mod tests {
         assert_eq!(key_utf(Some(&t))("BTN_LEFT"), nom_ok((*BTN_LEFT, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("BTN_MIDDLE"), nom_ok((*BTN_MIDDLE, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("BTN_RIGHT"), nom_ok((*BTN_RIGHT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("CAPSLOCK"), nom_ok((*KEY_CAPSLOCK, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("CAPSLOCK"), nom_ok((Key::from_str("capslock").unwrap(), KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("DOWN"), nom_ok((*KEY_DOWN, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("ESC"), nom_ok((*KEY_ESC, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("LEFT"), nom_ok((*KEY_LEFT, KeyModifierFlags::new())));
@@ -154,20 +151,15 @@ mod tests {
         assert_eq!(key_utf(Some(&t))("PAGE_UP"), nom_ok((*KEY_PAGEUP, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("RIGHT"), nom_ok((*KEY_RIGHT, KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("SHIFT"), nom_ok((*KEY_LEFTSHIFT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("SPACE"), nom_ok((*KEY_SPACE, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("TAB"), nom_ok((*KEY_TAB, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("SPACE"), nom_ok((Key::from_str("space").unwrap(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("TAB"), nom_ok((Key::from_str("tab").unwrap(), KeyModifierFlags::new())));
         assert_eq!(key_utf(Some(&t))("UP"), nom_ok((*KEY_UP, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD1"), nom_ok((*KEY_KPD1, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD2"), nom_ok((*KEY_KPD2, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD3"), nom_ok((*KEY_KPD3, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD4"), nom_ok((*KEY_KPD4, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD5"), nom_ok((*KEY_KPD5, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD6"), nom_ok((*KEY_KPD6, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD7"), nom_ok((*KEY_KPD7, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD8"), nom_ok((*KEY_KPD8, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KPD9"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("keypad_1"), nom_ok((*KEY_KPD1, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("kp1"), nom_ok((*KEY_KPD1, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KEYPAD_9"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KP9"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
 
-        assert_eq!(key_utf(Some(&t))("F11"), nom_ok((*KEY_F11, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("F11"), nom_ok((Key::from_str("f11").unwrap(), KeyModifierFlags::new())));
     }
 
     #[test]
@@ -175,6 +167,6 @@ mod tests {
         let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
 
         // assert_eq!(key_utf(Some(&t))("ab"), nom_err("ab"));
-        assert_nom_err(key_utf(Some(&t))("ab"), "ab");
+        assert_nom_err(key_utf(Some(&t))("abc"), "abc");
     }
 }

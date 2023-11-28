@@ -5,14 +5,14 @@ use crate::mapper::*;
 pub(crate) fn update_modifiers(state: &mut State, action: &KeyAction) -> bool {
     // TODO find a way to do this with a single accessor function
     let pairs: [(Key, fn(&KeyModifierState) -> bool, fn(&mut KeyModifierState) -> &mut bool); 8] = [
-        (*KEY_LEFT_CTRL, |s| s.left_ctrl, |s: &mut KeyModifierState| &mut s.left_ctrl),
-        (*KEY_RIGHT_CTRL, |s| s.right_ctrl, |s: &mut KeyModifierState| &mut s.right_ctrl),
-        (*KEY_LEFT_ALT, |s| s.left_alt, |s: &mut KeyModifierState| &mut s.left_alt),
-        (*KEY_RIGHT_ALT, |s| s.right_alt, |s: &mut KeyModifierState| &mut s.right_alt),
-        (*KEY_LEFT_SHIFT, |s| s.left_shift, |s: &mut KeyModifierState| &mut s.left_shift),
-        (*KEY_RIGHT_SHIFT, |s| s.right_shift, |s: &mut KeyModifierState| &mut s.right_shift),
-        (*KEY_LEFT_META, |s| s.left_meta, |s: &mut KeyModifierState| &mut s.left_meta),
-        (*KEY_RIGHT_META, |s| s.right_meta, |s: &mut KeyModifierState| &mut s.right_meta),
+        (*KEY_LEFTCTRL, |s| s.left_ctrl, |s: &mut KeyModifierState| &mut s.left_ctrl),
+        (*KEY_RIGHTCTRL, |s| s.right_ctrl, |s: &mut KeyModifierState| &mut s.right_ctrl),
+        (*KEY_LEFTALT, |s| s.left_alt, |s: &mut KeyModifierState| &mut s.left_alt),
+        (*KEY_RIGHTALT, |s| s.right_alt, |s: &mut KeyModifierState| &mut s.right_alt),
+        (*KEY_LEFTSHIFT, |s| s.left_shift, |s: &mut KeyModifierState| &mut s.left_shift),
+        (*KEY_RIGHTSHIFT, |s| s.right_shift, |s: &mut KeyModifierState| &mut s.right_shift),
+        (*KEY_LEFTMETA, |s| s.left_meta, |s: &mut KeyModifierState| &mut s.left_meta),
+        (*KEY_RIGHTMETA, |s| s.right_meta, |s: &mut KeyModifierState| &mut s.right_meta),
     ];
 
     for (key, is_modifier_down, modifier_mut) in pairs.iter() {
@@ -59,20 +59,20 @@ fn release_restore_modifiers(state: &mut State, output_device: &mut VirtualOutpu
     };
 
     if from_flags.ctrl && !to_flags.ctrl {
-        release_or_restore_modifier(&actual_state.left_ctrl, &*KEY_LEFT_CTRL);
-        release_or_restore_modifier(&actual_state.right_ctrl, &*KEY_RIGHT_CTRL);
+        release_or_restore_modifier(&actual_state.left_ctrl, &*KEY_LEFTCTRL);
+        release_or_restore_modifier(&actual_state.right_ctrl, &*KEY_RIGHTCTRL);
     }
     if from_flags.shift && !to_flags.shift {
-        release_or_restore_modifier(&actual_state.left_shift, &*KEY_LEFT_SHIFT);
-        release_or_restore_modifier(&actual_state.right_shift, &*KEY_RIGHT_SHIFT);
+        release_or_restore_modifier(&actual_state.left_shift, &*KEY_LEFTSHIFT);
+        release_or_restore_modifier(&actual_state.right_shift, &*KEY_RIGHTSHIFT);
     }
     if from_flags.alt && !to_flags.alt {
-        release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFT_ALT);
-        release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHT_ALT);
+        release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFTALT);
+        release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHTALT);
     }
     if from_flags.meta && !to_flags.meta {
-        release_or_restore_modifier(&actual_state.left_meta, &*KEY_LEFT_META);
-        release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHT_META);
+        release_or_restore_modifier(&actual_state.left_meta, &*KEY_LEFTMETA);
+        release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHTMETA);
     }
 
     // TODO eat keys we just released, un-eat keys we just restored

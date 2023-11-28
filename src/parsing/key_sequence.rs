@@ -24,36 +24,36 @@ mod tests {
     #[test]
     fn sequence_input() {
         assert_eq!(key_sequence("abc"), nom_ok(vec![
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_A, modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_B, modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_C, modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("a").unwrap(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("b").unwrap(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("c").unwrap(), modifiers: KeyModifierFlags::new() }),
         ]));
 
         assert_eq!(key_sequence("a{b down}"), nom_ok(vec![
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_A, modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyAction(KeyActionWithMods { key: *KEY_B, value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("a").unwrap(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyAction(KeyActionWithMods { key: Key::from_str("b").unwrap(), value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }),
         ]));
     }
 
     #[test]
     fn sequence_mixed() {
         assert_eq!(key_sequence("a{b down}c"), nom_ok(vec![
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_A, modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_B, TYPE_DOWN, KeyModifierFlags::new())),
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_C, modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("a").unwrap(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyAction(KeyActionWithMods::new(Key::from_str("b").unwrap(), TYPE_DOWN, KeyModifierFlags::new())),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("c").unwrap(), modifiers: KeyModifierFlags::new() }),
         ]));
 
         assert_eq!(key_sequence("{shift down}a{shift up}"), nom_ok(vec![
-            ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_LEFT_SHIFT, TYPE_DOWN, KeyModifierFlags::new())),
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: *KEY_A, modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_LEFT_SHIFT, TYPE_UP, KeyModifierFlags::new())),
+            ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_LEFTSHIFT, TYPE_DOWN, KeyModifierFlags::new())),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("a").unwrap(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_LEFTSHIFT, TYPE_UP, KeyModifierFlags::new())),
         ]));
     }
 
     #[test]
     fn sequence_special_chars() {
         assert_eq!(key_sequence("{relative X 55}"), nom_ok(vec![
-            ParsedKeyAction::Action(KeyAction::new(Key{event_code: EventCode::EV_REL(EV_REL::REL_X)}, 55)),
+            ParsedKeyAction::Action(KeyAction::new(Key { event_code: EventCode::EV_REL(EV_REL::REL_X) }, 55)),
         ]));
     }
 

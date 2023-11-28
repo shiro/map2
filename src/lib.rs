@@ -12,6 +12,9 @@ extern crate regex;
 
 use std::{fs, io};
 use std::borrow::BorrowMut;
+// #[macro_use]
+// use subscriber::linkable;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, mpsc, Mutex, RwLock, Weak};
@@ -19,10 +22,11 @@ use std::thread;
 use std::time::Duration;
 
 pub use anyhow::{anyhow, Result};
-use arc_swap::{ArcSwap, ArcSwapOption};
+use arc_swap::ArcSwapOption;
 use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent as EvdevInputEvent;
 use nom::lib::std::collections::HashMap;
+use tap::Tap;
 use uuid::Uuid;
 
 use event_loop::EVENT_LOOP;
@@ -38,10 +42,6 @@ use crate::event::InputEvent;
 pub use crate::key_defs::*;
 use crate::key_primitives::*;
 use crate::state::*;
-
-// #[macro_use]
-// use subscriber::linkable;
-use std::hash::{Hash, Hasher, DefaultHasher};
 
 pub mod key_defs;
 pub mod state;

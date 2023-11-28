@@ -82,8 +82,12 @@ impl Reader {
     pub fn send(&mut self, ev: String) -> PyResult<()> {
         let ev: EvdevInputEvent = serde_json::from_str(&ev).unwrap();
 
+        let mut h = DefaultHasher::new();
+        vec![self.id.clone()].hash(&mut h);
+        let path_hash = h.finish();
+
         if let Some(subscriber) = self.subscriber.load().deref() {
-            let _ = subscriber.send((vec![self.id.clone()], InputEvent::Raw(ev)));
+            let _ = subscriber.send((path_hash, InputEvent::Raw(ev)));
         };
         Ok(())
     }
