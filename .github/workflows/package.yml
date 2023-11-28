@@ -1,13 +1,12 @@
-name: CI
-
+# inspired by:
 # https://github.com/messense/rjmespath-py/blob/main/.github/workflows/CI.yml
+
+name: Build package
 
 on:
   push:
-    branches:
-      - proto/rewrite
-    tags:
-      - '*'
+    branches: [ master ]
+    tags: [ '*' ]
   pull_request:
   workflow_dispatch:
 

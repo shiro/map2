@@ -1,8 +1,9 @@
-name: Deploy to GitHub Pages
+name: Build Documentation
 
 on:
   push:
-    branches: [ feature/docs ]
+    branches: [ master ]
+    tags: [ '*' ]
   # allows manual fruns from the web UI
   workflow_dispatch:
 
@@ -12,7 +13,7 @@ permissions:
   id-token: write
 
 jobs:
-  build:
+  build-docs:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
@@ -24,8 +25,8 @@ jobs:
           path: docs
           # node-version: 18 # The specific version of Node that should be used to build your site. Defaults to 18. (optional)
 
-  deploy:
-    needs: build
+  deploy-docs:
+    needs: [linux, build-docs]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
