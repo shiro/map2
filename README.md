@@ -1,25 +1,19 @@
 <div align="center">
   <h1>map2</h1>
   <h3>Linux input remapping<br />Remap your keyboard, mouse, controller and more!</h3>
-  <a href="https://github.com/shiro/map2/blob/main/LICENSE">
-    <img alt="MIT License" src="https://img.shields.io/github/license/trpc/trpc" />
-  </a>
-  <a href="https://discord.gg/brKgH43XQN">
-    <img alt="Discord" src="https://img.shields.io/discord/1178929723208896543?color=7389D8&label&logo=discord&logoColor=ffffff" />
-  </a>
-  <a href="https://github.com/shiro/map2/actions/workflows/CI.yml" style="text-decoration: none;">
-    <img alt="Buile status" src="https://github.com/shiro/map2/actions/workflows/CI.yml/badge.svg" />
-  </a>
+
+  [![MIT License](https://img.shields.io/github/license/shiro/map2)](https://github.com/shiro/map2/blob/main/LICENSE)
+  [![Discord](https://img.shields.io/discord/1178929723208896543?color=7389D8&label&logo=discord&logoColor=ffffff)](https://discord.gg/brKgH43XQN)
+  [![Build](https://github.com/shiro/map2/actions/workflows/CI.yml/badge.svg)](https://github.com/shiro/map2/actions/workflows/CI.yml)
 </div>
 
 # Documentation
 
 Visit our [official documentation](https://shiro.github.io/map2/en/examples/hello-world/).
 
-## Install
+# Install
 
 Check out the [Install docs](https://shiro.github.io/map2/en/install/).
-
 
 # Contributing
 
