@@ -1,18 +1,18 @@
-# Astro Starter Kit: Docs Site
+# map2 documentation
 
-[![Build Astro site](https://github.com/advanced-astro/astro-docs-template/actions/workflows/test.yml/badge.svg)](https://github.com/advanced-astro/astro-docs-template/actions/workflows/test.yml)
+[![Build](https://github.com/shiro/map2/actions/workflows/CI.yml/badge.svg)](https://github.com/shiro/map2/actions/workflows/CI.yml)
 
 ## Setup
 
 To install dependencies, run:
 
-```
+```bash
 yarn
 ```
 
 ## Development
 
-```
+```bash
 yarn dev
 ```
 
