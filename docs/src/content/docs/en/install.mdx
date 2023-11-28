@@ -19,3 +19,17 @@ pip install map2
 ```
 
 It's safe to install globally, alternatively it also works in virtual envs.
+
+
+
+- add `etc/udev/rules.d/10-my-udev.rules`
+
+```
+groupadd map2
+
+# create "map2" group
+KERNEL=="event*", SUBSYSTEM=="input", ATTRS{hid}=="MYDEV000", MODE="0644", GROUP="map2", SYMLINK+="input/mydevice"
+
+# add yourself to the "map2" group
+$ usermod -aG `whoami` map2
+```

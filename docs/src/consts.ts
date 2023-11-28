@@ -16,9 +16,9 @@ export const KNOWN_LANGUAGES = {
 } as const
 export const KNOWN_LANGUAGE_CODES = Object.values(KNOWN_LANGUAGES)
 
-export const EDIT_URL = `https://github.com/shiro/map2/docs`
+export const EDIT_URL = `https://github.com/shiro/map2/docs`;
 
-export const COMMUNITY_INVITE_URL = `https://discord.gg/brKgH43XQN`
+export const COMMUNITY_INVITE_URL = `https://discord.gg/brKgH43XQN`;
 
 // See "Algolia" section of the README for more information.
 export const ALGOLIA = {
@@ -33,13 +33,20 @@ export type Sidebar = Record<
 >
 export const SIDEBAR: Sidebar = {
   en: {
-    'Basics': [
-      { text: 'Introduction', link: 'en/introduction' },
-      { text: 'Install', link: 'en/install' },
-      { text: 'Getting started', link: 'en/getting-started' },
+    "Basics": [
+      { text: "Introduction", link: "en/introduction" },
+      { text: "Install", link: "en/install" },
+      { text: "Getting started", link: "en/getting-started" },
     ],
-    'Examples': [
-      { text: 'Hello world', link: 'en/examples/hello-world' }
+    "API": [
+      { text: "Reader", link: "en/api/reader" },
+      { text: "Mapper", link: "en/api/mapper" },
+      { text: "Writer", link: "en/api/writer" },
+      { text: "VirtualReader", link: "en/api/virtual-reader" },
+      { text: "VirtualWriter", link: "en/api/virtual-writer" },
+    ],
+    "Examples": [
+      { text: "Hello world", link: "en/examples/hello-world" }
     ]
   }
 }
