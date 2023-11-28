@@ -1,0 +1,13 @@
+---
+title: 'Hello world'
+description: 'Creating new virtual input events'
+---
+
+import { Code } from 'astro:components';
+import code from "@root/../../examples/hello_world.py?raw";
+
+
+<Code code={code} lang="python" />
+
+Creates a `Writer` and a `virtualReader` and links them.
+

@@ -3,6 +3,11 @@
   "compilerOptions": {
     "jsx": "preserve",
     "skipLibCheck": true,
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "baseUrl": ".",
+    "paths": {
+      "@root/*": ["src/*"],
+      "@components/*": ["src/components/*"]
+    }
   }
 }

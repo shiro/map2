@@ -1,28 +1,24 @@
 export const SITE = {
-  title: 'Documentation',
-  description: 'Your website description.',
+  title: 'map2 docs',
+  description: 'Linux key remapping tool map2 - official documentation',
   defaultLanguage: 'en-us'
 } as const
 
 export const OPEN_GRAPH = {
   image: {
-    src: 'default-og-image.png',
-    alt:
-      'astro logo on a starry expanse of space,' +
-      ' with a purple saturn-like planet floating in the right foreground'
+    src: 'logo.png',
+    alt: 'map2 logo - stylized letters "M" and "2"'
   },
-  twitter: 'astrodotbuild'
 }
 
 export const KNOWN_LANGUAGES = {
-  Deutsch: 'de',
   English: 'en'
 } as const
 export const KNOWN_LANGUAGE_CODES = Object.values(KNOWN_LANGUAGES)
 
-export const EDIT_URL = `https://github.com/advanced-astro/astro-docs-template/tree/main`
+export const EDIT_URL = `https://github.com/shiro/map2/docs`
 
-export const COMMUNITY_INVITE_URL = `https://astro.build/chat`
+export const COMMUNITY_INVITE_URL = `https://discord.gg/brKgH43XQN`
 
 // See "Algolia" section of the README for more information.
 export const ALGOLIA = {
@@ -36,20 +32,14 @@ export type Sidebar = Record<
   Record<string, { text: string; link: string }[]>
 >
 export const SIDEBAR: Sidebar = {
-  de: {
-    Überschrift: [
-      { text: 'Einführung', link: 'de/introduction' },
-      { text: 'Seite 2', link: 'de/page-2' },
-      { text: 'Seite 3', link: 'de/page-3' }
-    ],
-    'Ein weiterer Abschnitt': [{ text: 'Seite 4', link: 'de/page-4' }]
-  },
   en: {
-    'Section Header': [
+    'Basics': [
       { text: 'Introduction', link: 'en/introduction' },
-      { text: 'Page 2', link: 'en/page-2' },
-      { text: 'Page 3', link: 'en/page-3' }
+      { text: 'Install', link: 'en/install' },
+      { text: 'Getting started', link: 'en/getting-started' },
     ],
-    'Another Section': [{ text: 'Page 4', link: 'en/page-4' }]
+    'Examples': [
+      { text: 'Hello world', link: 'en/examples/hello-world' }
+    ]
   }
 }

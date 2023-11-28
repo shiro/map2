@@ -7,7 +7,7 @@ import Header from '../components/Header/Header.astro'
 import PageContent from '../components/PageContent/PageContent.astro'
 import LeftSidebar from '../components/LeftSidebar/LeftSidebar.astro'
 import RightSidebar from '../components/RightSidebar/RightSidebar.astro'
-import Footer from '../components/Footer/Footer.astro'
+//import Footer from '../components/Footer/Footer.astro'
 import { EDIT_URL, SITE } from '../consts'
 
 type Props = CollectionEntry<'docs'>['data'] & {
@@ -17,7 +17,9 @@ type Props = CollectionEntry<'docs'>['data'] & {
 const { headings, ...data } = Astro.props
 const canonicalURL = new URL(Astro.url.pathname, Astro.site)
 const currentPage = Astro.url.pathname
-const currentFile = `src/content/docs${currentPage.replace(/\/$/, '')}.mdx`
+  .replace(/\/$/, '')
+  .replace(/\/map2\//, '\/');
+const currentFile = `src/content/docs${currentPage}.mdx`
 const editUrl = `${EDIT_URL}/${currentFile}`
 ---
 
@@ -133,6 +135,6 @@ const editUrl = `${EDIT_URL}/${currentFile}`
         <RightSidebar headings={headings} editUrl={editUrl} />
       </aside>
     </main>
-    <Footer path={currentFile} />
+    <!--<Footer path={currentFile} />-->
   </body>
 </html>
