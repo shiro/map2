@@ -1,4 +1,5 @@
 use crate::*;
 use crate::subscriber::Subscriber;
 
-pub type SubscriberMap = HashMap<Vec<Arc<Uuid>>, Subscriber>;
+// [path_hash] -> (next_path_hash, Subscriber)
+pub type SubscriberMap = HashMap<u64, (u64, Subscriber)>;

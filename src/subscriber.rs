@@ -2,11 +2,8 @@ use pyo3::{PyAny, PyRefMut};
 
 use crate::*;
 
-// pub trait Subscribable {
-//     fn handle(&self, id: &str, ev: InputEvent);
-// }
-
-pub type SubscribeEvent = (Vec<Arc<Uuid>>, InputEvent);
+// path hash, InputEvent
+pub type SubscribeEvent = (u64, InputEvent);
 pub type Subscriber = tokio::sync::mpsc::UnboundedSender<SubscribeEvent>;
 
 

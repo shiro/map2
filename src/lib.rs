@@ -41,6 +41,7 @@ use crate::state::*;
 
 // #[macro_use]
 // use subscriber::linkable;
+use std::hash::{Hash, Hasher, DefaultHasher};
 
 pub mod key_defs;
 pub mod state;

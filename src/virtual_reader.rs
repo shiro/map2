@@ -60,6 +60,10 @@ impl VirtualReader {
         self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
         if let Some(subscriber) = self.subscriber.load().deref() {
+            let mut h = DefaultHasher::new();
+            vec![self.id.clone()].hash(&mut h);
+            let path_hash = h.finish();
+
             let actions = parse_key_sequence_py(val.as_str(), Some(&self.transformer.as_ref().unwrap()))
                 .map_err(|err| PyRuntimeError::new_err(
                     format!("key sequence parse error: {}", err.to_string())
@@ -67,7 +71,7 @@ impl VirtualReader {
                 .to_key_actions();
 
             for action in actions {
-                let _ = subscriber.send((vec![self.id.clone()], InputEvent::Raw(action.to_input_ev())));
+                let _ = subscriber.send((path_hash, InputEvent::Raw(action.to_input_ev())));
             }
         }
         Ok(())

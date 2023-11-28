@@ -149,6 +149,6 @@ impl Writer {
 impl Drop for Writer {
     fn drop(&mut self) {
         let _ = self.exit_tx.send(());
-        let _ = self.ev_tx.send((vec![], InputEvent::Raw(SYN_REPORT.clone())));
+        let _ = self.ev_tx.send((0, InputEvent::Raw(SYN_REPORT.clone())));
     }
 }

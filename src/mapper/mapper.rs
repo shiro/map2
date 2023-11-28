@@ -82,10 +82,9 @@ enum PythonReturn {
 fn run_python_handler(
     handler: &PyObject,
     args: Option<Vec<PythonArgument>>,
-    path: Vec<Arc<Uuid>>,
     ev: &EvdevInputEvent,
     transformer: &Arc<XKBTransformer>,
-    subscriber: Option<&Subscriber>,
+    subscriber: Option<&(u64, Subscriber)>,
 ) {
     let ret = Python::with_gil(|py| -> Result<()> {
         let asyncio = py.import("asyncio")
@@ -121,15 +120,15 @@ fn run_python_handler(
                 Some(PythonReturn::String(ret)) => {
                     let seq = parse_key_sequence_py(&ret, Some(transformer))?;
 
-                    if let Some(subscriber) = subscriber {
+                    if let Some((path_hash, subscriber)) = subscriber {
                         for action in seq.to_key_actions() {
-                            let _ = subscriber.send((path.clone(), InputEvent::Raw(action.to_input_ev())));
+                            let _ = subscriber.send((*path_hash, InputEvent::Raw(action.to_input_ev())));
                         }
                     }
                 }
                 Some(PythonReturn::Bool(ret)) if ret => {
-                    if let Some(subscriber) = subscriber {
-                        let _ = subscriber.send((path, InputEvent::Raw(ev.clone())));
+                    if let Some((path_hash, subscriber)) = subscriber {
+                        let _ = subscriber.send((*path_hash, InputEvent::Raw(ev.clone())));
                     }
                 }
                 _ => {}
@@ -159,14 +158,13 @@ struct Inner {
 }
 
 impl Inner {
-    fn handle(&self, mut path: Vec<Arc<Uuid>>, raw_ev: InputEvent) {
+    fn handle(&self, path_hash: u64, raw_ev: InputEvent) {
         let mut state_guard = self.state.write().unwrap();
         let mut state = state_guard.deref_mut();
         let mappings = self.mappings.read().unwrap();
 
         let subscriber_map = self.subscriber_map.read().unwrap();
-        let subscriber = subscriber_map.get(&path);
-        path.push(self.id.clone());
+        let subscriber = subscriber_map.get(&path_hash);
 
         let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
 
@@ -192,44 +190,45 @@ impl Inner {
                 // let mut usec = since_the_epoch.subsec_micros() as i64;
 
                 if let Some(runtime_action) = mappings.get(&from_key_action) {
-                    let subscriber = match subscriber {
-                        Some(x) => x,
-                        None => { return; }
-                    };
-
                     match runtime_action {
                         RuntimeAction::ActionSequence(seq) => {
+                            let (path_hash, subscriber) = match subscriber {
+                                Some(x) => x,
+                                None => { return; }
+                            };
+
                             for action in seq {
                                 match action {
                                     RuntimeKeyAction::KeyAction(key_action) => {
                                         let ev = key_action.to_input_ev();
 
-                                        let _ = subscriber.send((path.clone(), InputEvent::Raw(ev)));
+                                        let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                     }
                                     RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
                                         let mut new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);
                                         // events.append(&mut new_events);
                                         for ev in new_events {
-                                            let _ = subscriber.send((path.clone(), InputEvent::Raw(ev)));
+                                            let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                         }
                                     }
                                 }
                             }
                         }
                         RuntimeAction::PythonCallback(from_modifiers, handler) => {
-                            // always release all trigger mods before running the callback
-                            let mut new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
-                            for ev in new_events {
-                                let _ = subscriber.send((path.clone(), InputEvent::Raw(ev)));
+                            if let Some((path_hash, subscriber)) = subscriber {
+                                // always release all trigger mods before running the callback
+                                let mut new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                                for ev in new_events {
+                                    let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
+                                }
                             }
 
                             run_python_handler(
                                 &handler,
                                 None,
-                                path,
                                 ev,
                                 self.transformer.read().unwrap().as_ref().unwrap(),
-                                Some(subscriber),
+                                subscriber,
                             );
                         }
                         RuntimeAction::NOP => {}
@@ -264,7 +263,6 @@ impl Inner {
                         run_python_handler(
                             &handler,
                             Some(args),
-                            path,
                             ev,
                             self.transformer.read().unwrap().as_ref().unwrap(),
                             subscriber,
@@ -294,7 +292,6 @@ impl Inner {
                     run_python_handler(
                         &handler,
                         Some(args),
-                        path,
                         ev,
                         self.transformer.read().unwrap().as_ref().unwrap(),
                         subscriber,
@@ -305,8 +302,8 @@ impl Inner {
             _ => {}
         }
 
-        if let Some(subscriber) = subscriber {
-            let _ = subscriber.send((path, raw_ev));
+        if let Some((path_hash, subscriber)) = subscriber {
+            let _ = subscriber.send((*path_hash, raw_ev));
         }
     }
 }
@@ -495,19 +492,24 @@ impl Mapper {
 impl Mapper {
     // linkable!();
 
-    pub fn _link(&mut self, path: Vec<Arc<Uuid>>, target: &PyAny) -> PyResult<()> {
+    pub fn _link(&mut self, mut path: Vec<Arc<Uuid>>, target: &PyAny) -> PyResult<()> {
         use crate::subscriber::*;
-
-        if target.is_none() {
-            self.subscriber_map.write().unwrap().remove(&path);
-            return Ok(());
-        }
 
         let target = match add_event_subscription(target) {
             Some(target) => target,
             None => { return Err(PyRuntimeError::new_err("unsupported link target")); }
         };
-        self.subscriber_map.write().unwrap().insert(path, target);
+
+        let mut h = DefaultHasher::new();
+        path.hash(&mut h);
+        let path_hash = h.finish();
+
+        let mut h = DefaultHasher::new();
+        path.push(self.id.clone());
+        path.hash(&mut h);
+        let next_path_hash = h.finish();
+
+        self.subscriber_map.write().unwrap().insert(path_hash, (next_path_hash, target));
         Ok(())
     }
 

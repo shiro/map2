@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use ::oneshot;
 
 use crate::*;
@@ -45,9 +46,14 @@ impl Reader {
         let id = Arc::new(Uuid::new_v4());
 
         let _id = id.clone();
+
+        let mut h = DefaultHasher::new();
+        vec![_id.clone()].hash(&mut h);
+        let path_hash = h.finish();
+
         let handler = Arc::new(move |_: &str, ev: EvdevInputEvent| {
             if let Some(subscriber) = _subscriber.load().deref() {
-                let _ = subscriber.send((vec![_id.clone()], InputEvent::Raw(ev)));
+                let _ = subscriber.send((path_hash, InputEvent::Raw(ev)));
             }
         });
 
