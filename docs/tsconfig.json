@@ -4,7 +4,7 @@
     "jsx": "preserve",
     "skipLibCheck": true,
     "strictNullChecks": true,
-    "baseUrl": "/home/shiro/project/map2/docs",
+    "baseUrl": ".",
     "paths": {
       "react": ["./node_modules/preact/compat/"],
       "react-dom": ["./node_modules/preact/compat/"],
