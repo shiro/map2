@@ -1,0 +1,34 @@
+---
+title: 'Getting started'
+description: 'Start using map2 for Linux input remapping, a simple guide'
+---
+
+A map2 script is simply a python file that uses the map2 package. There are many good python tutorials
+out there, for example the [W3Schools python tutorial](https://www.w3schools.com/python).
+
+## Running a script
+
+In most Linux setups, a regular user lacks the permissions to intercept input events for security reasons.
+If you have superuser permissions, you can simply run your script as the superuser.
+
+```bash
+sudo python my-map2-script.py
+```
+
+This is somewhat risky as the script has access to copy your data, modify files and even remove system files.
+Use this method only for code you trust or have written yourself!
+
+For a more secure setup see the [Secure setup](/map2/en/advanced/secure-setup) section.
+
+
+## My first map2 script
+
+Let's look at a simple script and go through the basics.
+
+
+```python
+import map2
+
+
+
+```

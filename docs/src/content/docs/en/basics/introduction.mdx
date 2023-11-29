@@ -13,11 +13,11 @@ There's nothing you can't remap with **map2**!
 - **Highly configurable, using Python**
 - **Remap keys, mouse events, controllers, pedals, and more!**
 
+Let's look at an example:
 
 
 ```python
 import map2
-
 
 # readers intercept all keyboard inputs and forward them
 reader = map2.Reader(patterns=["/dev/input/by-id/my-keyboard"])
@@ -28,12 +28,14 @@ writer = map2.Writer(clone_from = "/dev/input/by-id/my-keyboard")
 # finally, link nodes to control the event flow
 map2.link([reader, mapper, writer])
 
-# map the "a" key to "b"
-mapper.map("a", "b")
+# map the "a" key to "B"
+mapper.map("a", "B")
+
+# map "CTRL + ALT + u" to "META + SHIFT + w"
+mapper.map("^!u", "#+w")
 
 # key sequences are also supported
 mapper.map("s", "hello world!")
-
 
 # use the full power of Python using functions
 def custom_function(key, state):

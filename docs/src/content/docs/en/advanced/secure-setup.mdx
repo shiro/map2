@@ -1,0 +1,84 @@
+---
+title: 'Secure setup'
+description: 'Setup map2 in a more secure way'
+---
+
+As discussed in the [Getting started](map2/en/basics/getting-started) section, running your script with
+superuser access is not ideal since it allows the script to steal your data, modify your system or
+remove system files. This is especially risky when running code that you haven't written yourself.
+
+## Setting things up
+
+The more secure (and complicated) approach is to create a new user that has exclusive ownership of the
+script files and is allowed to intercept events from input devices.
+This way, even if a user account gets compromised, it would not be possible to tamper with script files
+or spy on input devices.
+
+
+
+The initial setup requires superuser access, ask your local system administrator for help if necessary.
+
+
+Create a new system user called `map2` and set a secure password for it:
+
+```bash
+# add a new system user called 'map2', also create a home directory
+sudo useradd -rm -s /bin/sh map2
+# allow it to intercept input device events
+sudo usermod -aG input map2
+# set a secure password for the new user
+sudo passwd map2
+```
+
+If you have an existing script, transfer the ownership to the `map2` user and remove all permissions
+to the file for other users, so others can't read/modify the script.
+We should also move the script to `/home/map2` in order to avoid permission issues.
+
+```bash
+# transfer all ownership, remove access for other users
+sudo chown map2:map2 my-map2-script.py
+sudo chmod 700 my-map2-script.py
+# move the script to a location owned by the map2 user
+sudo mv my-map2-script.py /home/map2
+```
+
+
+### Running the script
+
+
+Now any user can run the script without superuser access, as long as they know the password for the
+`map2` user. You can even modify the script that way.
+
+```bash
+su map2 -c 'python ~/my-map2-script.py'
+```
+
+
+## Optional extra steps
+
+It's also possible to allow the `map2` user access to only specific input devices rather than all of them.
+This is optional and usually not required unless security is very important.
+
+Copy the following into `/etc/udev/rules.d/999-map2.rules`:
+
+```
+# Assign specific input devices to the group 'map2'
+ATTRS{name}=="Gaming Keyboard", SUBSYSTEM=="input", MODE="0644", GROUP="map2"
+```
+
+And modify the filter rules to match the devices you want to grant access to. There are lots of
+guides describing udev rules, for example the [Arch Wiki](https://wiki.archlinux.org/title/udev)
+explains it pretty well.
+
+Finally reload the configuration and adjust the permissions.
+
+```bash
+# reload the udev rules since we modified them
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+# remove the map2 user from the input group
+sudo gpasswd -d map2 input
+
+
+```

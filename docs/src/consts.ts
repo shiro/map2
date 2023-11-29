@@ -34,9 +34,12 @@ export type Sidebar = Record<
 export const SIDEBAR: Sidebar = {
   en: {
     "Basics": [
-      { text: "Introduction", link: "en/introduction" },
-      { text: "Install", link: "en/install" },
-      { text: "Getting started", link: "en/getting-started" },
+      { text: "Introduction", link: "en/basics/introduction" },
+      { text: "Install", link: "en/basics/install" },
+      { text: "Getting started", link: "en/basics/getting-started" },
+    ],
+    "Advanced": [
+      { text: "Secure setup", link: "en/advanced/secure-setup" },
     ],
     "API": [
       { text: "Reader", link: "en/api/reader" },

@@ -1,12 +1,25 @@
-import { defineConfig } from 'astro/config'
+import { defineConfig } from 'astro/config';
+import mdx from '@astrojs/mdx';
+import preact from '@astrojs/preact';
+import sitemap from '@astrojs/sitemap';
+import solidJS from "@astrojs/solid-js";
 
-import mdx from '@astrojs/mdx'
-import preact from '@astrojs/preact'
-import react from '@astrojs/react'
-import sitemap from '@astrojs/sitemap'
 
 export default defineConfig({
-  integrations: [mdx(), preact(), react(), sitemap()],
-  site: 'https://shiro.github.io',
-  base: '/map2',
-})
+  integrations: [
+    mdx(),
+    sitemap(),
+    preact({
+      compat: true,
+      include: ["**/*.tsx"],
+      exclude: ["**/*.solid.tsx"]
+    }),
+    solidJS({
+      include: ["**/*.solid.tsx"],
+    }),
+  ],
+  site: "https://shiro.github.io",
+  base: "/map2",
+  compressHTML: false,
+  server: { port: 3000 },
+});

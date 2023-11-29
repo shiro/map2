@@ -120,6 +120,31 @@ body {
   --docsearch-modal-shadow: inset 0 0 8px #000;
 }
 
+:root {
+  color-scheme: light;
+
+  --primary-regular-500: #5E8CBB;
+  --primary-strong-500: #4475A6;
+  --primary-strong-800: #3C5B7B;
+
+  --primary-weak-500: #BCCFE3;
+
+  --secondary-strong-500: #A64444;
+}
+
+:root.theme-dark {
+  color-scheme: dark;
+
+  --primary-regular-500: #3C5C7D;
+  --primary-strong-500: #5C8FC2;
+  --primary-strong-800: #699CCF;
+
+  --primary-weak-500: #324A62;
+
+  --secondary-strong-500: #C25C5C;
+
+}
+
 ::selection {
   color: var(--theme-selection-color);
   background-color: var(--theme-selection-bg);

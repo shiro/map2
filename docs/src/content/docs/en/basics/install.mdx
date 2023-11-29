@@ -1,0 +1,54 @@
+---
+title: 'Install'
+description: 'Install map2 using one of various distribution options'
+---
+
+
+## Install from PyPI 
+
+```bash
+pip install map2
+```
+
+It's safe to install globally, alternatively it also works in virtual envs.
+
+
+## After installing
+
+In most Linux setups, a regular user lacks the permissions to intercept input events for security reasons.
+There are several ways to setup up map2:
+
+### Lazy way
+
+If you have superuser permissions, you can simply 
+
+```bash
+sudo python my-map2-script.py
+```
+
+
+
+
+Create a new group called `map2` and add the current user to it (this requires root permissions):
+```bash
+sudo groupadd map2
+sudo usermod -aG `whoami` map2
+```
+
+
+Copy the following into `/etc/udev/rules.d/999-map2.rules`:
+
+```
+# Assign all input devices to the group 'map2' so all members have read rights
+KERNEL=="*", SUBSYSTEM=="input", MODE="0644", GROUP="map2"
+```
+
+
+
+## Dependencies
+
+You probably already have all the dependencies unless you're on a very minimal Linux setup.
+Anyway, here's the list:
+
+- Python 3 - all user scripts are written in Python
+- XKB (`libxkbcommon`) - used by pretty much all distros for keyboard layout handling

@@ -7,13 +7,9 @@ type Props = {
 const { size } = Astro.props
 ---
 
-<svg
-  class="logo"
-  width={size}
-  height={size}
-  viewBox="0 0 256 256"
-  fill="none"
-  xmlns="http://www.w3.org/2000/svg"
->
-  <Fragment set:html={SVGLogo} />
-</svg>
+<Fragment set:html={SVGLogo} />
+
+<style is:global>
+.char-m { fill: var(--primary-strong-500) !important; }
+.char-2 { fill: var(--secondary-strong-500) !important; }
+</style>
