@@ -20,6 +20,5 @@ export default defineConfig({
   ],
   site: "https://shiro.github.io",
   base: "/map2",
-  compressHTML: false,
   server: { port: 3000 },
 });

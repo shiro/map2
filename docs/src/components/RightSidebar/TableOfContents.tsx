@@ -1,20 +1,20 @@
-import type { MarkdownHeading } from 'astro'
-import type { FunctionalComponent } from 'preact'
-import { unescape } from 'html-escaper'
-import { useState, useEffect, useRef } from 'preact/hooks'
+import type { MarkdownHeading } from "astro";
+import type { FunctionalComponent } from "preact";
+import { unescape } from "html-escaper";
+import { useState, useEffect, useRef } from "preact/hooks";
 
 type ItemOffsets = {
   id: string
   topOffset: number
-}
+};
 
 const TableOfContents: FunctionalComponent<{ headings: MarkdownHeading[] }> = ({
   headings = []
 }) => {
-  const toc = useRef<HTMLUListElement>()
-  const onThisPageID = 'on-this-page-heading'
-  const itemOffsets = useRef<ItemOffsets[]>([])
-  const [currentID, setCurrentID] = useState('overview')
+  const toc = useRef<HTMLUListElement>();
+  const onThisPageID = "on-this-page-heading";
+  const itemOffsets = useRef<ItemOffsets[]>([]);
+  const [currentID, setCurrentID] = useState("overview");
   useEffect(() => {
     const getItemOffsets = () => {
       const titles = document.querySelectorAll('article :is(h1, h2, h3, h4)')

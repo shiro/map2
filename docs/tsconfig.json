@@ -9,6 +9,7 @@
       "react": ["./node_modules/preact/compat/"],
       "react-dom": ["./node_modules/preact/compat/"],
       "@root/*": [ "src/*" ],
+      "@examples/*": [ "../examples/*" ],
       "@components/*": [ "src/components/*" ]
     }
   }
