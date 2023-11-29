@@ -7,6 +7,41 @@ description: 'Writer | map2 API documentation'
 ```python
 import map2
 
-# readers intercept all keyboard inputs and forward them
-reader = map2.Reader(patterns=["/dev/input/by-id/my-keyboard"])
+# clone existing device
+writer1 = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard")
+
+# create a new virtual device with specific capabilities
+writer2 = map2.Writer(capabilities = {"rel": True, "buttons": True})
 ```
+
+
+Creates a virtual device that can emmit output events and behaves just like
+a physical devices.
+
+
+## Options
+
+
+### clone_from
+
+- type: string?
+
+Defines which output events the virtual device can emmit based on an existing device.
+
+
+### capabilities
+
+- type: {
+    "rel": bool?,
+    "abs": bool?,
+    "buttons": bool?,
+    "keys": bool?,
+  }?
+
+Defines which output events the virtual device can emmit.
+
+
+
+## Methods
+
+This object has no methods.
