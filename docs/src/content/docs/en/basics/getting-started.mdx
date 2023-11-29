@@ -10,9 +10,10 @@ out there, for example the [W3Schools python tutorial](https://www.w3schools.com
 
 In most Linux setups, a regular user lacks the permissions to intercept input events for security reasons.
 If you have superuser permissions, you can simply run your script as the superuser.
+(the `-E` flag is important to run in the current environemnt)
 
 ```bash
-sudo python my-map2-script.py
+sudo -E python my-map2-script.py
 ```
 
 This is somewhat risky as the script has access to copy your data, modify files and even remove system files.

@@ -9,7 +9,7 @@
 
 # Documentation
 
-Visit our [official documentation](https://shiro.github.io/map2/en/examples/hello-world/).
+Visit our [official documentation](https://shiro.github.io/map2/en/basics/introduction).
 
 # Install
 

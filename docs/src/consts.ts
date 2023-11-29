@@ -40,6 +40,7 @@ export const SIDEBAR: Sidebar = {
     ],
     "Advanced": [
       { text: "Secure setup", link: "en/advanced/secure-setup" },
+      { text: "Autostart", link: "en/advanced/autostart" },
     ],
     "API": [
       { text: "Reader", link: "en/api/reader" },

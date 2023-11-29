@@ -43,6 +43,14 @@ sudo mv my-map2-script.py /home/map2
 ```
 
 
+Copy the following into `/etc/udev/rules.d/999-map2.rules`:
+
+```
+# Allow the 'input' group to manipulate input events
+SUBSYSTEM=="misc", KERNEL=="uinput", MODE="0660", GROUP="input"
+```
+
+
 ### Running the script
 
 
@@ -50,7 +58,7 @@ Now any user can run the script without superuser access, as long as they know t
 `map2` user. You can even modify the script that way.
 
 ```bash
-su map2 -c 'python ~/my-map2-script.py'
+su map2 -pc 'python ~/my-map2-script.py'
 ```
 
 
@@ -59,9 +67,12 @@ su map2 -c 'python ~/my-map2-script.py'
 It's also possible to allow the `map2` user access to only specific input devices rather than all of them.
 This is optional and usually not required unless security is very important.
 
-Copy the following into `/etc/udev/rules.d/999-map2.rules`:
+Change the contents of `/etc/udev/rules.d/999-map2.rules` to:
 
 ```
+# Allow the 'map2' group to manipulate input events
+SUBSYSTEM=="misc", KERNEL=="uinput", MODE="0660", GROUP="map2"
+
 # Assign specific input devices to the group 'map2'
 ATTRS{name}=="Gaming Keyboard", SUBSYSTEM=="input", MODE="0644", GROUP="map2"
 ```

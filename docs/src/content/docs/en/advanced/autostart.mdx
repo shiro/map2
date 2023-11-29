@@ -1,0 +1,94 @@
+---
+title: 'Autostart'
+description: 'Autostart map2 scripts on login'
+---
+
+A common use case for map2 is to run a script automatically after logging in, the way
+to do it depends on your Linux distro and system setup.
+
+This section is work in progress, check back soon!
+
+{/*
+## Preperation
+
+
+In the following command, replace `/path/to/script.py` with your script path and run it.
+
+```bash
+echo "ALL ALL=(root) NOPASSWD:SETENV: /usr/bin/python /path/to/script.py" | sudo tee -a /etc/sudoers
+```
+
+## Systemd
+
+Most distros come with [Systemd](https://wiki.archlinux.org/title/systemd), which allows
+setting up services that run commands automatically.
+
+### Basic setup
+
+
+Edit `/etc/systemd/system/map2.service`:
+
+
+```
+[Unit]
+Description=map2 autostart service
+PartOf=graphical-session.target
+
+[Service]
+Restart=always
+RestartSec=5s
+ExecStart=sudo -E python /path/to/script.py
+
+[Install]
+WantedBy=xsession.target
+```
+
+
+Now that we created a service, we need to make sure it works and enable it so it starts automatically.
+
+```bash
+# tell systemd we edited a service
+systemctl --user daemon-reload
+
+# start the service and make sure it runs the script
+systemctl --user start map2
+
+# after ensuring it works, enable it so it runs on every startup
+systemctl --user enable map2
+```
+
+
+### Secure setup
+
+First, let's create a file `~/.config/systemd/user/map2.service` with the following contents,
+also provide your own script path.
+
+```
+[Unit]
+Description=map2 autostart service
+PartOf=graphical-session.target
+
+[Service]
+Restart=always
+RestartSec=5s
+ExecStart=sudo -E python /home/me/path/to/my/script.py
+
+[Install]
+WantedBy=xsession.target
+```
+
+Now that we created a service, we need to make sure it works and enable it so it starts automatically.
+
+```bash
+# tell systemd we edited a service
+systemctl --user daemon-reload
+
+# start the service and make sure it runs the script
+systemctl --user start map2
+
+# after ensuring it works, enable it so it runs on every startup
+systemctl --user enable map2
+```
+
+Your script should now run automatically
+*/}
