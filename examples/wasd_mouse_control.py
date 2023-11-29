@@ -4,7 +4,6 @@ Move the mouse using the 'w', 'a', 's', 'd' directional keys.
 
 import map2
 import time
-import subprocess
 import threading
 
 map2.default(layout = "us")

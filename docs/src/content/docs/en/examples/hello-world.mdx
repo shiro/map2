@@ -9,5 +9,10 @@ import code from "@examples/hello_world.py?raw";
 
 <Code code={code} lang="python" />
 
-Creates a `Writer` and a `virtualReader` and links them.
+To emmit custom events, we need an output device, so we create a virtual one using [Writer](/map2/en/api/writer).
+The device needs the `keys` capability in order to emmit keyboard key events.
 
+Since we don't want to intercept a physical input device, but instead send events
+programatically, we create a [VirtualReader](/map2/en/api/virtual-reader).
+
+Finally we need to link the input and output devices, so events can flow.
