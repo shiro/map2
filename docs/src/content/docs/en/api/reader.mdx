@@ -10,3 +10,34 @@ import map2
 # readers intercept all keyboard inputs and forward them
 reader = map2.Reader(patterns=["/dev/input/by-id/my-keyboard"])
 ```
+
+
+
+All devices matching a pattern will be *grabbed*, meaning all events will be intercepted by map2
+and not forwarded to the system. If events are not passed to an output device such as [Writer](/map2/en/api/writer),
+they will be lost, please avoid locking your only keyboard when testing.
+
+
+## Options
+
+
+### Patterns
+
+- type: string[]
+
+A list of file descriptors to intercept events from.
+
+The patterns are regular expressions, if you are not familiar with them, consider reading a
+[quick tutorial](https://www.regular-expressions.info/quickstart.html).
+
+Some quick examples:
+
+- `/dev/input5`: The specific device on `/dev/input5`
+- `/dev/input\d+`: All input devices
+- `/dev/input/by-id/.*Gaming_Keyboard.*`: All devices who's ID contains `Gaming_Keyboard`
+
+
+
+## Methods
+
+This object has no methods.
