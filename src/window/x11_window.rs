@@ -13,7 +13,7 @@ pub fn x11_window_handler() -> WindowHandler {
     Box::new(|exit_rx: oneshot::Receiver<()>,
         subscription_rx: mpsc::Receiver<WindowControlMessage>| -> Result<()> {
         let x11_state = Arc::new(x11_initialize().unwrap());
-        let mut subscriptions = Arc::new(Mutex::new(HashMap::new()));
+        let subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
         loop {
             if exit_rx.try_recv().is_ok() { break; }

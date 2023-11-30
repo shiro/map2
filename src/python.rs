@@ -1,4 +1,3 @@
-use std::ops::Add;
 pub use pyo3::exceptions::PyRuntimeError;
 pub use pyo3::impl_::wrap::OkWrap;
 pub use pyo3::prelude::*;
@@ -47,7 +46,7 @@ fn default(options: Option<&PyDict>) -> PyResult<()> {
 }
 
 #[pyfunction]
-fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
+fn link(py: Python, chain: Vec<PyObject>) -> PyResult<()> {
     let mut prev: Option<PyObject> = None;
     let mut path = vec![];
 

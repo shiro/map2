@@ -1,26 +1,25 @@
-use pyo3::{pyclass, pymethods, PyResult};
-use pyo3::types::PyDict;
-
-use anyhow::{anyhow, Result};
-
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::os::fd::{AsFd, BorrowedFd, RawFd};
-use itertools::Itertools;
+use std::io::{Seek, SeekFrom, Write};
+use std::os::fd::AsFd;
 
+use anyhow::{anyhow, Result};
+use itertools::Itertools;
+use pyo3::{pyclass, pymethods, PyResult};
+use pyo3::types::PyDict;
 use tempfile::tempfile;
 use unicode_segmentation::UnicodeSegmentation;
 use wayland_client::{Connection, EventQueue, Proxy};
-use wayland_client::protocol::wl_seat;
 use wayland_client::{Dispatch, protocol::wl_registry, QueueHandle};
 use wayland_client::globals::{GlobalListContents, registry_queue_init};
+use wayland_client::protocol::wl_seat;
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_manager_v1;
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1;
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_v1;
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1;
 use wl_seat::WlSeat;
 use xkeysym::Keysym;
+
 use crate::encoding;
 
 #[pyclass]

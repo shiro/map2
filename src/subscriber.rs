@@ -8,10 +8,10 @@ pub type Subscriber = tokio::sync::mpsc::UnboundedSender<SubscribeEvent>;
 
 
 pub fn add_event_subscription(target: &PyAny) -> Option<Subscriber> {
-    if let Ok(mut target) = target.extract::<PyRefMut<Mapper>>() {
+    if let Ok(target) = target.extract::<PyRefMut<Mapper>>() {
         return Some(target.subscribe());
     }
-    if let Ok(mut target) = target.extract::<PyRefMut<Writer>>() {
+    if let Ok(target) = target.extract::<PyRefMut<Writer>>() {
         return Some(target.subscribe())
     }
     None

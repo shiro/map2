@@ -7,7 +7,7 @@ use crate::window::window_base::{ActiveWindowInfo, WindowControlMessage, WindowH
 pub fn hyprland_window_handler() -> WindowHandler {
     Box::new(|exit_rx: oneshot::Receiver<()>,
         subscription_rx: mpsc::Receiver<WindowControlMessage>| -> Result<()> {
-        let mut subscriptions = Arc::new(Mutex::new(HashMap::new()));
+        let subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
         let prev_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_info| {}));

@@ -48,7 +48,7 @@ pub(super) fn assert_nom_err<T: std::fmt::Debug>(parse_result: ParseResult<&str,
         Err(NomErr::Error(x)) => {
             assert_eq!(x.input, rest);
         }
-        Err(err) => { panic!("got other nom error: {err}") }
+        Err(err) => { panic!("got other nom error: {}", err) }
         Ok((rest, res)) => { panic!("expected nom error, but got Ok\nresult: {:?}\nrest: '{}'\n", res, rest) }
     }
 }

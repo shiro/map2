@@ -31,11 +31,9 @@ fn main() {
         )
         .custom(
             Section::new("devices")
-                .paragraph(&*vec![
-                    "In order to capture device input it is necessary to configure which devices should get captured.",
+                .paragraph(&["In order to capture device input it is necessary to configure which devices should get captured.",
                     "A list of devices can be specified by providing a device list argument or by defining a default configuration",
-                    "in the user's configuration directory ($XDG_CONFIG_HOME/map2/device.list).",
-                ].join(" ")))
+                    "in the user's configuration directory ($XDG_CONFIG_HOME/map2/device.list)."].join(" ")))
         .custom(
             Section::new("license")
                 .paragraph("MIT")

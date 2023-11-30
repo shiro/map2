@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::sync::mpsc;
 
@@ -53,7 +52,7 @@ impl TextMapper {
 
         let (msg_tx, msg_rx) = mpsc::channel();
 
-        let mut handle = Self {
+        let handle = Self {
             id,
             // route,
             // reader_msg_tx,

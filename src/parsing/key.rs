@@ -37,7 +37,7 @@ pub fn key_utf<'a>(
                 map(take(1usize), |v: &str| v.to_string())
             )),
             |key_name| {
-                let (key, mut flags) = match KEY_ALIAS_TABLE.get(&*key_name.to_uppercase()) {
+                let (key, flags) = match KEY_ALIAS_TABLE.get(&*key_name.to_uppercase()) {
                     Some(v) => *v,
                     None => {
                         // try XKB conversion

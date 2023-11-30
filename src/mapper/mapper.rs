@@ -203,7 +203,7 @@ impl Inner {
                                         let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                     }
                                     RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                        let mut new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);
+                                        let new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);
                                         // events.append(&mut new_events);
                                         for ev in new_events {
                                             let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
@@ -215,7 +215,7 @@ impl Inner {
                         RuntimeAction::PythonCallback(from_modifiers, handler) => {
                             if let Some((path_hash, subscriber)) = subscriber {
                                 // always release all trigger mods before running the callback
-                                let mut new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                                let new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
                                 for ev in new_events {
                                     let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                 }

@@ -26,7 +26,7 @@ pub fn xkb_utf32_to_keysym(utf: u32) -> Keysym {
         || utf > 0x10ffff
         || (utf & 0xfffe == 0xfffe)
     {
-        return unsafe { Keysym::from(0) };
+        return Keysym::from(0);
     }
 
     // Search main table.

@@ -33,7 +33,7 @@ fn find_fd_with_pattern(patterns: &Vec<Regex>) -> Vec<PathBuf> {
 
 pub async fn read_from_device_input_fd_thread_handler(
     device: Device,
-    mut ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
+    ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
     abort_rx: oneshot::Receiver<()>,
 ) {
     let mut read_buf: io::Result<(ReadStatus, InputEvent)>;
@@ -96,7 +96,6 @@ fn grab_device
     ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
 ) -> Result<oneshot::Sender<()>> {
     use nix::fcntl::{FcntlArg, OFlag};
-    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 
     let fd_file = fs::OpenOptions::new()
         .read(true)

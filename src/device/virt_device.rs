@@ -77,7 +77,7 @@ fn clone_code_bits(src: &Device, dst: &Device, ev_code: &EventCode, max: &EventC
     Ok(())
 }
 
-fn clone_device_props(src: &Device, mut dst: &mut Device) {
+fn clone_device_props(src: &Device, dst: &mut Device) {
     if let Some(v) = src.name() { dst.set_name(v); }
     dst.set_vendor_id(src.vendor_id());
     if let Some(v) = src.phys() { dst.set_phys(v); }
@@ -131,7 +131,7 @@ pub(crate) fn init_virtual_device(mut dev: &mut Device, name: &str, capabilities
     Ok(())
 }
 
-pub(crate) fn clone_virtual_device(mut dev: &mut Device, existing_device_fd_path: &str) -> Result<()> {
+pub(crate) fn clone_virtual_device(dev: &mut Device, existing_device_fd_path: &str) -> Result<()> {
     let fd_file = fs::OpenOptions::new()
         .read(true)
         .open(existing_device_fd_path)?;
