@@ -7,6 +7,110 @@ description: 'Mapper | map2 API documentation'
 ```python
 import map2
 
-# readers intercept all keyboard inputs and forward them
-reader = map2.Reader(patterns=["/dev/input/by-id/my-keyboard"])
+mapper = map2.Mapper()
+
+# map key to key
+mapper.map("a", "b")
+
+# map key to key sequence
+mapper.map("b", "hello world")
+
+def user_function1(key, state):
+    # map "c" to "hello world"
+    if key == "c": return "hello world"
+    # forward keys except for "z"
+    if key != "z": return True
+
+# map key to user function
+mapper.map("c", user_function1)
+
+# catch all non-mapped keys
+mapper.map_fallback("d", user_function1)
+
+# map key to key
+mapper.map_key("d", "tab")
+
+def user_function2(type, value):
+    print("move event {}: {}".format(type, value))
+
+# map mouse movements, touchscreen taps, etc.
+mapper.map_relative(user_function2)
+mapper.map_absolute(user_function2)
 ```
+
+
+Creates a mapping layer that can be used to tap into the input event stream,
+modify events and call user defined functions.
+
+
+## Options
+
+
+### model
+
+```
+string?
+```
+
+Sets the XKB keyboard model.
+
+### layout
+
+```
+string?
+```
+
+Sets the XKB keyboard layout.
+
+### variant
+
+```
+string?
+```
+
+Sets the XKB keyboard variant.
+
+### options
+
+```
+string?
+```
+
+Sets the XKB keyboard options.
+
+
+
+
+## Methods
+
+### map(key, key_sequence)
+
+Maps a key to a key sequence.
+
+- **key**: key
+- **key_sequence**: key_sequence
+
+### map_key(key_from, key_to)
+
+Maps a key to a key.
+
+- **key_from**: key
+- **key_to**: key
+
+### map_fallback(handler)
+
+Maps all keys without explicit mappings to a user function
+
+- **handler**: (key: key, state: "down" | "up" | "repeat") -> string?
+
+### map_relative(handler)
+
+Maps relative movement input events such as mouse moves to a user function.
+
+- **handler**: (type: string, value: int) -> string?
+
+### map_absolute(handler)
+
+Maps absolute movement input events such as touchscreen taps to a user function.
+
+- **handler**: (type: string, value: int) -> string?

@@ -34,16 +34,14 @@ reader_mouse = map2.Reader(patterns=["/dev/input/by-id/example-mouse"])
 writer_kbd = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard")
 writer_mouse = map2.Writer(clone_from = "/dev/input/by-id/example-mouse")
 
-# add mappers
+# add mapper
 mapper_kbd = map2.Mapper()
-mapper_mouse = map2.Mapper()
 
 # to move the mouse programmatically, we need a virtual reader
 out_mouse = map2.VirtualReader()
 
 # setup the event routing
 map2.link([reader_kbd, mapper_kbd, writer_kbd])
-map2.link([reader_mouse, mapper_mouse, writer_mouse])
 map2.link([out_mouse, writer_mouse])
 
 
