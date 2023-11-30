@@ -128,7 +128,7 @@ impl Writer {
     }
 
     #[cfg(feature = "integration")]
-    pub fn try_recv(&mut self) -> PyResult<Option<String>> {
+    pub fn __test__read_ev(&mut self) -> PyResult<Option<String>> {
         match self.ev_rx.try_recv().ok() {
             Some((_, ev)) => {
                 let ev = match ev { InputEvent::Raw(ev) => { ev } };

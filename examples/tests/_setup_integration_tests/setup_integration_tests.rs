@@ -29,7 +29,7 @@ mod integration_tests {
 pub fn writer_read(py: Python, module: &PyModule, name: &str) -> Option<EvdevInputEvent> {
     let target = module.getattr(name).unwrap().to_object(py);
 
-    target.call_method0(py, "try_recv").unwrap()
+    target.call_method0(py, "__test__read_ev").unwrap()
         .extract::<Option<String>>(py).unwrap()
         .and_then(|x| serde_json::from_str(&x).unwrap())
 }
@@ -46,7 +46,7 @@ pub fn reader_send(py: Python, module: &PyModule, name: &str, ev: &EvdevInputEve
     let target = module.getattr(name).unwrap().to_object(py);
     let ev = serde_json::to_string(ev).unwrap();
 
-    target.call_method(py, "send", (ev, ), None).unwrap();
+    target.call_method(py, "__test__write_ev", (ev, ), None).unwrap();
 }
 
 pub fn reader_send_all(py: Python, module: &PyModule, name: &str, ev_list: &Vec<EvdevInputEvent>) {
@@ -54,6 +54,6 @@ pub fn reader_send_all(py: Python, module: &PyModule, name: &str, ev_list: &Vec<
 
     for ev in ev_list.iter() {
         let ev = serde_json::to_string(ev).unwrap();
-        target.call_method(py, "send", (ev, ), None).unwrap();
+        target.call_method(py, "__test__write_ev", (ev, ), None).unwrap();
     }
 }

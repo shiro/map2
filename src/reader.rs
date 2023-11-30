@@ -81,8 +81,6 @@ impl Reader {
         })
     }
 
-    // TODO figure out if we can unify both 'send' methods
-    #[cfg(not(feature = "integration"))]
     pub fn send(&mut self, val: String) -> PyResult<()> {
         let actions = parse_key_sequence_py(val.as_str(), Some(&self.transformer))
             .map_err(|err| PyRuntimeError::new_err(
@@ -103,7 +101,7 @@ impl Reader {
     }
 
     #[cfg(feature = "integration")]
-    pub fn send(&mut self, ev: String) -> PyResult<()> {
+    pub fn __test__write_ev(&mut self, ev: String) -> PyResult<()> {
         let ev: EvdevInputEvent = serde_json::from_str(&ev).unwrap();
 
         let mut h = DefaultHasher::new();
