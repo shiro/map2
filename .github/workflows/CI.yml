@@ -30,7 +30,7 @@ jobs:
       - name: Setup git config
         run: git config --global --add safe.directory '*'
       - name: Git submodule init
-        run: git submodule sync --recursive && git submodule update --init --force; ls -la evdev-rs/evdev-sys/libevdev
+        run: git submodule sync --recursive && git submodule update --init --force
 
       # install python & rust
       - uses: actions/setup-python@v4
@@ -112,3 +112,33 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
+
+  deploy-package-aur:
+    name: Deploy packge AUR
+    runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/tags/')"
+    needs: [linux]
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: wheels
+          path: wheels
+      - name: Generate PKGBUILD
+        env:
+          TARGET: ${{ matrix.target }}
+          #RELEASE_TAG: ${{ needs.create_release.outputs.release_tag }}
+          RELEASE_TAG: ${{ github.ref }}
+        run: ./ci/generate-pkgbuild.py
+      - name: Publish to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v2.5.0
+        with:
+          pkgname: python-map2
+          pkgbuild: ./dist/aur/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          #commit_message: ${{ needs.create_release.outputs.release_tag }}
+          commit_message: ${{ github.ref }}
+          force_push: 'true'
