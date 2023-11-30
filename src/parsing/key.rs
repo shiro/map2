@@ -138,28 +138,29 @@ mod tests {
     #[test]
     fn key_special() {
         let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
+        use EV_KEY::*;
 
-        assert_eq!(key_utf(Some(&t))("BACKSPACE"), nom_ok((*KEY_BACKSPACE, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("BTN_LEFT"), nom_ok((*BTN_LEFT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("BTN_MIDDLE"), nom_ok((*BTN_MIDDLE, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("BTN_RIGHT"), nom_ok((*BTN_RIGHT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("CAPSLOCK"), nom_ok((Key::from_str("capslock").unwrap(), KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("DOWN"), nom_ok((*KEY_DOWN, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("ESC"), nom_ok((*KEY_ESC, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("LEFT"), nom_ok((*KEY_LEFT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("PAGE_DOWN"), nom_ok((*KEY_PAGEDOWN, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("PAGE_UP"), nom_ok((*KEY_PAGEUP, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("RIGHT"), nom_ok((*KEY_RIGHT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("SHIFT"), nom_ok((*KEY_LEFTSHIFT, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("SPACE"), nom_ok((Key::from_str("space").unwrap(), KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("TAB"), nom_ok((Key::from_str("tab").unwrap(), KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("UP"), nom_ok((*KEY_UP, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("keypad_1"), nom_ok((*KEY_KPD1, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("kp1"), nom_ok((*KEY_KPD1, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KEYPAD_9"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
-        assert_eq!(key_utf(Some(&t))("KP9"), nom_ok((*KEY_KPD9, KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("BACKSPACE"), nom_ok((KEY_BACKSPACE.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("BTN_LEFT"), nom_ok((BTN_LEFT.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("BTN_MIDDLE"), nom_ok((BTN_MIDDLE.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("BTN_RIGHT"), nom_ok((BTN_RIGHT.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("CAPSLOCK"), nom_ok((KEY_CAPSLOCK.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("DOWN"), nom_ok((KEY_DOWN.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("ESC"), nom_ok((KEY_ESC.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("LEFT"), nom_ok((KEY_LEFT.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("PAGE_DOWN"), nom_ok((KEY_PAGEDOWN.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("PAGE_UP"), nom_ok((KEY_PAGEUP.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("RIGHT"), nom_ok((KEY_RIGHT.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("SHIFT"), nom_ok((KEY_LEFTSHIFT.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("SPACE"), nom_ok((KEY_SPACE.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("TAB"), nom_ok((KEY_TAB.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("UP"), nom_ok((KEY_UP.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("keypad_1"), nom_ok((KEY_KP1.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("kp1"), nom_ok((KEY_KP1.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KEYPAD_9"), nom_ok((KEY_KP9.into(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("KP9"), nom_ok((KEY_KP9.into(), KeyModifierFlags::new())));
 
-        assert_eq!(key_utf(Some(&t))("F11"), nom_ok((Key::from_str("f11").unwrap(), KeyModifierFlags::new())));
+        assert_eq!(key_utf(Some(&t))("F11"), nom_ok((KEY_F11.into(), KeyModifierFlags::new())));
     }
 
     #[test]

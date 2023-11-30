@@ -44,9 +44,9 @@ mod tests {
         ]));
 
         assert_eq!(key_sequence("{shift down}a{shift up}"), nom_ok(vec![
-            ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_LEFTSHIFT, TYPE_DOWN, KeyModifierFlags::new())),
+            ParsedKeyAction::KeyAction(KeyActionWithMods::new(KEY_LEFTSHIFT.into(), TYPE_DOWN, KeyModifierFlags::new())),
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("a").unwrap(), modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyAction(KeyActionWithMods::new(*KEY_LEFTSHIFT, TYPE_UP, KeyModifierFlags::new())),
+            ParsedKeyAction::KeyAction(KeyActionWithMods::new(KEY_LEFTSHIFT.into(), TYPE_UP, KeyModifierFlags::new())),
         ]));
     }
 
@@ -63,13 +63,13 @@ mod tests {
 
         assert_eq!(key_sequence_utf(Some(&t))("\\{"), nom_ok(vec![
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
-                *KEY_LEFTBRACE, KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                KEY_LEFTBRACE.into(), KeyModifierFlags::new().tap_mut(|x| x.shift()),
             )),
         ]));
 
         assert_eq!(key_sequence_utf(Some(&t))("\\}"), nom_ok(vec![
             ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
-                *KEY_RIGHTBRACE, KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                KEY_RIGHTBRACE.into(), KeyModifierFlags::new().tap_mut(|x| x.shift()),
             )),
         ]));
     }

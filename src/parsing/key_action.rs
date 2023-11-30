@@ -20,28 +20,28 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
         self.into_iter()
             .fold(vec![], |mut acc, v| match v {
                 ParsedKeyAction::KeyAction(action) => {
-                    if action.modifiers.ctrl { acc.push(KeyAction::new(*KEY_LEFTCTRL, TYPE_DOWN)); }
-                    if action.modifiers.shift { acc.push(KeyAction::new(*KEY_LEFTSHIFT, TYPE_DOWN)); }
-                    if action.modifiers.alt { acc.push(KeyAction::new(*KEY_LEFTALT, TYPE_DOWN)); }
-                    if action.modifiers.meta { acc.push(KeyAction::new(*KEY_LEFTMETA, TYPE_DOWN)); }
+                    if action.modifiers.ctrl { acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN)); }
+                    if action.modifiers.shift { acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN)); }
+                    if action.modifiers.alt { acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN)); }
+                    if action.modifiers.meta { acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN)); }
                     acc.push(KeyAction::new(action.key, action.value));
-                    if action.modifiers.ctrl { acc.push(KeyAction::new(*KEY_LEFTCTRL, TYPE_UP)); }
-                    if action.modifiers.shift { acc.push(KeyAction::new(*KEY_LEFTSHIFT, TYPE_UP)); }
-                    if action.modifiers.alt { acc.push(KeyAction::new(*KEY_LEFTALT, TYPE_UP)); }
-                    if action.modifiers.meta { acc.push(KeyAction::new(*KEY_LEFTMETA, TYPE_UP)); }
+                    if action.modifiers.ctrl { acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_UP)); }
+                    if action.modifiers.shift { acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_UP)); }
+                    if action.modifiers.alt { acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_UP)); }
+                    if action.modifiers.meta { acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_UP)); }
                     acc
                 }
                 ParsedKeyAction::KeyClickAction(action) => {
-                    if action.modifiers.ctrl { acc.push(KeyAction::new(*KEY_LEFTCTRL, TYPE_DOWN)); }
-                    if action.modifiers.shift { acc.push(KeyAction::new(*KEY_LEFTSHIFT, TYPE_DOWN)); }
-                    if action.modifiers.alt { acc.push(KeyAction::new(*KEY_LEFTALT, TYPE_DOWN)); }
-                    if action.modifiers.meta { acc.push(KeyAction::new(*KEY_LEFTMETA, TYPE_DOWN)); }
+                    if action.modifiers.ctrl { acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN)); }
+                    if action.modifiers.shift { acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN)); }
+                    if action.modifiers.alt { acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN)); }
+                    if action.modifiers.meta { acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN)); }
                     acc.push(KeyAction::new(action.key, TYPE_DOWN));
                     acc.push(KeyAction::new(action.key, TYPE_UP));
-                    if action.modifiers.ctrl { acc.push(KeyAction::new(*KEY_LEFTCTRL, TYPE_UP)); }
-                    if action.modifiers.shift { acc.push(KeyAction::new(*KEY_LEFTSHIFT, TYPE_UP)); }
-                    if action.modifiers.alt { acc.push(KeyAction::new(*KEY_LEFTALT, TYPE_UP)); }
-                    if action.modifiers.meta { acc.push(KeyAction::new(*KEY_LEFTMETA, TYPE_UP)); }
+                    if action.modifiers.ctrl { acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_UP)); }
+                    if action.modifiers.shift { acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_UP)); }
+                    if action.modifiers.alt { acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_UP)); }
+                    if action.modifiers.meta { acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_UP)); }
                     acc
                 }
                 ParsedKeyAction::Action(action) => {
@@ -281,7 +281,7 @@ mod tests {
         )));
 
         assert_eq!(single_key_action_utf_with_flags_utf(Some(&t))("page_down"), nom_ok(ParsedKeyAction::KeyClickAction(
-            KeyClickActionWithMods::new_with_mods(*KEY_PAGEDOWN, KeyModifierFlags::new())
+            KeyClickActionWithMods::new_with_mods(KEY_PAGEDOWN.into(), KeyModifierFlags::new())
         )));
     }
 

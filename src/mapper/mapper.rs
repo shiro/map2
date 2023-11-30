@@ -46,22 +46,22 @@ fn release_restore_modifiers(
     };
 
     if from_flags.ctrl && !to_flags.ctrl {
-        release_or_restore_modifier(&actual_state.left_ctrl, &*KEY_LEFTCTRL);
-        release_or_restore_modifier(&actual_state.right_ctrl, &*KEY_RIGHTCTRL);
+        release_or_restore_modifier(&actual_state.left_ctrl, &KEY_LEFTCTRL.into());
+        release_or_restore_modifier(&actual_state.right_ctrl, &KEY_RIGHTCTRL.into());
     }
     if from_flags.shift && !to_flags.shift {
-        release_or_restore_modifier(&actual_state.left_shift, &*KEY_LEFTSHIFT);
-        release_or_restore_modifier(&actual_state.right_shift, &*KEY_RIGHTSHIFT);
+        release_or_restore_modifier(&actual_state.left_shift, &KEY_LEFTSHIFT.into());
+        release_or_restore_modifier(&actual_state.right_shift, &KEY_RIGHTSHIFT.into());
     }
     if from_flags.alt && !to_flags.alt {
-        release_or_restore_modifier(&actual_state.left_alt, &*KEY_LEFTALT);
+        release_or_restore_modifier(&actual_state.left_alt, &KEY_LEFTALT.into());
     }
     if from_flags.right_alt && !to_flags.right_alt {
-        release_or_restore_modifier(&actual_state.right_alt, &*KEY_RIGHTALT);
+        release_or_restore_modifier(&actual_state.right_alt, &KEY_RIGHTALT.into());
     }
     if from_flags.meta && !to_flags.meta {
-        release_or_restore_modifier(&actual_state.left_meta, &*KEY_LEFTMETA);
-        release_or_restore_modifier(&actual_state.right_meta, &*KEY_RIGHTMETA);
+        release_or_restore_modifier(&actual_state.left_meta, &KEY_LEFTMETA.into());
+        release_or_restore_modifier(&actual_state.right_meta, &KEY_RIGHTMETA.into());
     }
 
     if output_events.len() > 0 {

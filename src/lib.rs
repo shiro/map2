@@ -21,6 +21,11 @@ use std::sync::{Arc, mpsc, Mutex, RwLock, Weak};
 use std::thread;
 use std::time::Duration;
 
+pub use evdev_rs::enums::EV_KEY::*;
+pub use evdev_rs::enums::EV_REL::*;
+pub use evdev_rs::enums::EV_ABS::*;
+pub use key_primitives::Key;
+
 pub use anyhow::{anyhow, Result};
 use arc_swap::ArcSwapOption;
 use evdev_rs::enums::EventCode;

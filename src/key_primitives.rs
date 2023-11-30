@@ -27,6 +27,11 @@ impl Key {
     }
 }
 
+impl From<evdev_rs::enums::EV_KEY> for Key {
+    fn from(value: evdev_rs::enums::EV_KEY) -> Self {
+        Self { event_code: EventCode::EV_KEY(value) }
+    }
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 #[allow(unused)]
