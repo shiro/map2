@@ -46,7 +46,6 @@ export const SIDEBAR: Sidebar = {
       { text: "Reader", link: "en/api/reader" },
       { text: "Mapper", link: "en/api/mapper" },
       { text: "Writer", link: "en/api/writer" },
-      { text: "VirtualReader", link: "en/api/virtual-reader" },
       { text: "VirtualWriter", link: "en/api/virtual-writer" },
     ],
     "Examples": [

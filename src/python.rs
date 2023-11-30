@@ -1,6 +1,4 @@
 use std::ops::Add;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time;
 pub use pyo3::exceptions::PyRuntimeError;
 pub use pyo3::impl_::wrap::OkWrap;
 pub use pyo3::prelude::*;
@@ -8,12 +6,10 @@ pub use pyo3::PyClass;
 pub use pyo3::types::PyDict;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use tokio::runtime::Runtime;
-use xkeysym::key::hebrew_ayin;
 
 use crate::*;
 use crate::mapper::mapper::KeyMapperSnapshot;
 use crate::text_mapper::TextMapper;
-use crate::virtual_reader::VirtualReader;
 use crate::virtual_writer::VirtualWriter;
 use crate::window::Window;
 
@@ -58,10 +54,6 @@ fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
     for target in chain.into_iter() {
         if let Some(source) = prev {
             if let Ok(mut source) = source.extract::<PyRefMut<Reader>>(py) {
-                source._link(target.as_ref(py))?;
-                path.push(source.id.clone());
-            }
-            if let Ok(mut source) = source.extract::<PyRefMut<VirtualReader>>(py) {
                 source._link(target.as_ref(py))?;
                 path.push(source.id.clone());
             }
@@ -123,7 +115,6 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<TextMapper>()?;
     m.add_class::<Writer>()?;
     m.add_class::<VirtualWriter>()?;
-    m.add_class::<VirtualReader>()?;
     m.add_class::<Window>()?;
 
     Ok(())

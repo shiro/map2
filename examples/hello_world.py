@@ -6,10 +6,12 @@ import time
 
 map2.default(layout = "us")
 
+reader = map2.Reader()
 writer = map2.Writer(capabilities = {"keys": True})
 
-out = map2.VirtualReader()
-map2.link([out, writer])
-out.send("Hello world!")
+map2.link([reader, writer])
 
+reader.send("Hello world!")
+
+# keep running for 1sec so the event can be processed
 time.sleep(1)

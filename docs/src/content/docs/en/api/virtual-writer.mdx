@@ -7,6 +7,33 @@ description: 'VirtualWriter | map2 API documentation'
 ```python
 import map2
 
-# readers intercept all keyboard inputs and forward them
-reader = map2.Reader(patterns=["/dev/input/by-id/my-keyboard"])
+writer = map2.VirtualWriter()
+
+# send any text
+writer.send("hello world")
+# including really weird characters
+writer.send("∇⋅∇ψ = ρ")
 ```
+
+Creates a virtual output device that is able to type any text. It's different from a regular
+[Writer](/map2/en/api/writer) in that it doesn't simulate a physical device, but rather sends text directly to the
+desktop environment.
+
+Supported on:
+- ✅ Hyprland
+- ❌ X11
+- ❌ Gnome (wayland)
+- ❌ KDE plasma (wayland)
+
+## Options
+
+This object has no options.
+
+
+## Methods
+
+### send(input)
+
+Sends an arbitrary text input to the desktop environment.
+
+- **input**: string

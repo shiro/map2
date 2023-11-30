@@ -67,7 +67,6 @@ pub mod testing;
 
 pub mod python;
 pub mod reader;
-pub mod virtual_reader;
 pub mod mapper;
 pub mod writer;
 pub mod virtual_writer;

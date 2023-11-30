@@ -26,23 +26,22 @@ class setInterval:
     def cancel(self):
         self.stopEvent.set()
 
-# read from input devices
+# read from keyboard
 reader_kbd = map2.Reader(patterns=["/dev/input/by-id/example-keyboard"])
-reader_mouse = map2.Reader(patterns=["/dev/input/by-id/example-mouse"])
+
+# to move the mouse programmatically, we need a mouse reader we can write into
+reader_mouse = map2.Reader()
 
 # add new virtual output devices
 writer_kbd = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard")
-writer_mouse = map2.Writer(clone_from = "/dev/input/by-id/example-mouse")
+writer_mouse = map2.Writer(capabilities = {"rel": True, "buttons": True})
 
 # add mapper
 mapper_kbd = map2.Mapper()
 
-# to move the mouse programmatically, we need a virtual reader
-out_mouse = map2.VirtualReader()
-
 # setup the event routing
 map2.link([reader_kbd, mapper_kbd, writer_kbd])
-map2.link([out_mouse, writer_mouse])
+map2.link([reader_mouse, writer_mouse])
 
 
 # we keep a map of intervals that maps each key to the associated interval
@@ -59,7 +58,7 @@ def mouse_ctrl(key, state, axis, multiplier):
         # this function will move our mouse using the virtual reader from earlier
         def send():
             value = 15 * multiplier
-            out_mouse.send("{{relative {} {}}}".format(axis, value))
+            reader_mouse.send("{{relative {} {}}}".format(axis, value))
 
         # we call it once to move the mouse a bit immediately on key down
         send()

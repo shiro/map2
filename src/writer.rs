@@ -43,7 +43,6 @@ impl Writer {
             None => HashMap::new()
         };
 
-
         let device_name = match options.get("name") {
             Some(option) => option.extract::<String>()
                 .map_err(|_| PyRuntimeError::new_err("'name' must be a string"))?,
