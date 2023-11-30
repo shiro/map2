@@ -7,7 +7,7 @@ import { Code } from 'astro:components';
 import code from "@examples/hello_world.py?raw";
 
 
-<Code code={code} lang="python" />
+<Code experimentalThemes={{light: "github-light", dark: "github-dark"}} code={code} lang="python" />
 
 To emmit custom events, we need an output device, so we create a virtual one using [Writer](/map2/en/api/writer).
 The device needs the `keys` capability in order to emmit keyboard key events.

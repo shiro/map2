@@ -6,7 +6,8 @@ description: 'Control the mouse with WASD directional keys'
 import { Code } from 'astro:components';
 import code from "@examples/wasd_mouse_control.py?raw";
 
-<Code code={code} lang="python" />
+
+<Code experimentalThemes={{light: "github-light", dark: "github-dark"}} code={code} lang="python" />
 
 
 Allows moving the mouse by binding the WASD directional keys to functions
