@@ -1,0 +1,54 @@
+---
+title: 'map2'
+description: 'map2 | map2 API documentation'
+---
+
+
+```python
+import map2
+
+# speicfy the default XKB keyboard layout
+map2.default(layout = "us")
+
+# everything will use the default layout unless specified otherwise
+reader = map2.Reader()
+mapper = map2.Mapper()
+writer = map2.Writer(capabilities = {"keys": True)
+
+# define the event flow
+map2.link([reader, mapper, writer])
+```
+
+
+A collection of global functions that interact with other objects.
+
+
+Supported on:
+- ✅ Hyprland
+- ✅ X11
+- ✅ Gnome (wayland)
+- ✅ KDE plasma (wayland)
+
+
+## Options
+
+This object has no options.
+
+
+
+## Methods
+
+### default(**options)
+
+Sets global default values such as keyboard layout.
+
+- **options.model**: string?
+- **options.layout**: string?
+- **options.variant**: string?
+- **options.options**: string?
+
+### link(path)
+
+Links objects and defines the event flow.
+
+- **path**: ([Reader](map2/en/api/reader) | [Mapper](map2/en/api/mapper) | [Writer](map2/en/api/writer))[]

@@ -9,6 +9,9 @@ import map2
 
 # readers intercept all keyboard inputs and forward them
 reader = map2.Reader(patterns=["/dev/input/by-id/my-keyboard"])
+
+# send keys as if they were read from a physical device
+reader.send("{ctrl down}a{ctrl up}")
 ```
 
 
@@ -49,4 +52,8 @@ Some quick examples:
 
 ## Methods
 
-This object has no methods.
+### send(input)
+
+Sends keys as if they were read from a physical device.
+
+- **input**: key_sequence

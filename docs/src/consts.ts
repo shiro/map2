@@ -43,10 +43,12 @@ export const SIDEBAR: Sidebar = {
       { text: "Autostart", link: "en/advanced/autostart" },
     ],
     "API": [
+      { text: "map2", link: "en/api/map2" },
       { text: "Reader", link: "en/api/reader" },
       { text: "Mapper", link: "en/api/mapper" },
       { text: "Writer", link: "en/api/writer" },
       { text: "VirtualWriter", link: "en/api/virtual-writer" },
+      { text: "Window", link: "en/api/window" },
     ],
     "Examples": [
       { text: "Hello world", link: "en/examples/hello-world" },

@@ -1,0 +1,44 @@
+---
+title: 'Window'
+description: 'Window | map2 API documentation'
+---
+
+
+```python
+import map2
+
+window = map2.Window()
+
+def on_window_change(active_window_class):
+    if active_window_class == "firefox":
+        print("firefox is in focus")
+    else:
+        print("firefox is not in focus")
+
+# the user function will be called whenever the active window changes
+window.on_window_change(on_window_change)
+```
+
+Listens to window change events from the desktop environemnt and calls the provided
+user function with the active window information.
+
+
+Supported on:
+- ✅ Hyprland
+- ✅ X11
+- ❌ Gnome (wayland)
+- ❌ KDE plasma (wayland)
+
+
+## Options
+
+This object has no options.
+
+
+## Methods
+
+### on_window_change(handler)
+
+Register a user function that gets called when the active window changes.
+
+- **handler**: (active_window_class: string?) -> None
