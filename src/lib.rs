@@ -12,6 +12,8 @@ extern crate regex;
 
 use std::{fs, io};
 use std::borrow::BorrowMut;
+// #[macro_use]
+// use subscriber::linkable;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, mpsc, Mutex, RwLock, Weak};
