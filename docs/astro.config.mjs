@@ -18,6 +18,14 @@ export default defineConfig({
       include: ["**/*.solid.tsx"],
     }),
   ],
+  markdown: {
+    shikiConfig: {
+      experimentalThemes: {
+        light: "github-light",
+        dark: "github-dark",
+      },
+    },
+  },
   site: "https://shiro.github.io",
   base: "/map2",
   server: { port: 3000 },

@@ -9,20 +9,6 @@ use crate::device::*;
 use crate::device::virt_device::DeviceCapabilities;
 use crate::subscriber::{SubscribeEvent, Subscriber};
 
-// struct Inner {
-//     out_ev_tx: mpsc::Sender<EvdevInputEvent>,
-// }
-
-// impl Inner {
-//     fn handle(&self, id: &str, ev: InputEvent) {
-//         match ev {
-//             InputEvent::Raw(ev) => {
-//                 let _ = self.out_ev_tx.send(ev);
-//             }
-//         }
-//     }
-// }
-
 
 #[pyclass]
 pub struct Writer {
