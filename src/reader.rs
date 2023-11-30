@@ -5,7 +5,6 @@ use crate::*;
 use crate::python::*;
 use crate::event::InputEvent;
 use crate::parsing::key_action::ParsedKeyActionVecExt;
-use crate::parsing::python::parse_key_sequence_py;
 use crate::subscriber::{Subscriber, add_event_subscription};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -82,7 +81,7 @@ impl Reader {
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
-        let actions = parse_key_sequence_py(val.as_str(), Some(&self.transformer))
+        let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("key sequence parse error: {}", err.to_string())
             ))?

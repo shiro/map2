@@ -16,7 +16,7 @@ fn format_err(err: NomErr<CustomError<&str>>, input: &str) -> Error {
     }
 }
 
-pub fn parse_key_action_with_mods_py(raw: &str, transformer: Option<&XKBTransformer>) -> Result<ParsedKeyAction> {
+pub fn parse_key_action_with_mods(raw: &str, transformer: Option<&XKBTransformer>) -> Result<ParsedKeyAction> {
     let from = single_key_action_utf_with_flags_utf(transformer)(raw)
         .map_err(|err| format_err(err, raw))?;
 
@@ -26,7 +26,7 @@ pub fn parse_key_action_with_mods_py(raw: &str, transformer: Option<&XKBTransfor
     Ok(from)
 }
 
-pub fn parse_key_sequence_py(raw: &str, transformer: Option<&XKBTransformer>) -> Result<Vec<ParsedKeyAction>> {
+pub fn parse_key_sequence(raw: &str, transformer: Option<&XKBTransformer>) -> Result<Vec<ParsedKeyAction>> {
     let (rest, res) = key_sequence_utf(transformer)(raw)
         .map_err(|err| format_err(err, raw))?;
 

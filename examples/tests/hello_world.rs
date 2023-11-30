@@ -1,4 +1,3 @@
-use map2::key_primitives::Key;
 use crate::*;
 
 #[pyo3_asyncio::tokio::test]

@@ -1,5 +1,4 @@
 use anyhow::*;
-use evdev_rs::enums::EventType;
 use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
@@ -10,13 +9,14 @@ use nom::multi::{many0, many1};
 use nom::sequence::terminated;
 use tap::Tap;
 
-use motion_action::*;
 use custom_combinators::*;
 use error::*;
 use identifier::*;
 use key::*;
 use key_action::*;
 use key_sequence::*;
+use motion_action::*;
+pub use public_parsing_api::*;
 
 use crate::*;
 
@@ -28,8 +28,7 @@ pub mod action_state;
 pub mod key_action;
 mod key_sequence;
 mod error;
-pub mod python;
-
+mod public_parsing_api;
 
 #[cfg(test)]
 pub(super) fn nom_ok<'a, T>(value: T) -> ParseResult<&'a str, T> { Ok(("", value)) }

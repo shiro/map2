@@ -7,7 +7,6 @@ use crate::event_loop::{args_to_py, PythonArgument};
 use crate::mapper::{RuntimeAction, RuntimeKeyAction};
 use crate::mapper::mapping_functions::*;
 use crate::parsing::key_action::*;
-use crate::parsing::python::*;
 use crate::python::*;
 use crate::subscriber::{SubscribeEvent, Subscriber};
 use crate::xkb::XKBTransformer;
@@ -118,7 +117,7 @@ fn run_python_handler(
 
             match ret {
                 Some(PythonReturn::String(ret)) => {
-                    let seq = parse_key_sequence_py(&ret, Some(transformer))?;
+                    let seq = parse_key_sequence(&ret, Some(transformer))?;
 
                     if let Some((path_hash, subscriber)) = subscriber {
                         for action in seq.to_key_actions() {
@@ -375,13 +374,13 @@ impl Mapper {
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
-        let from = parse_key_action_with_mods_py(&from, Some(&self.transformer.as_ref().unwrap()))
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer.as_ref().unwrap()))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("mapping error on the 'from' side: {}", err.to_string())
             ))?;
 
         if let Ok(to) = to.extract::<String>(py) {
-            let to = parse_key_sequence_py(&to, Some(&self.transformer.as_ref().unwrap()))
+            let to = parse_key_sequence(&to, Some(&self.transformer.as_ref().unwrap()))
                 .map_err(|err| PyRuntimeError::new_err(
                     format!("mapping error on the 'to' side: {}", err.to_string())
                 ))?;
@@ -403,12 +402,12 @@ impl Mapper {
     pub fn map_key(&mut self, from: String, to: String) -> PyResult<()> {
         self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
-        let from = parse_key_action_with_mods_py(&from, Some(&self.transformer.as_ref().unwrap()))
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer.as_ref().unwrap()))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("mapping error on the 'from' side: {}", err.to_string())
             ))?;
 
-        let to = parse_key_action_with_mods_py(&to, Some(&self.transformer.as_ref().unwrap()))
+        let to = parse_key_action_with_mods(&to, Some(&self.transformer.as_ref().unwrap()))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("mapping error on the 'to' side: {}", err.to_string())
             ))?;
@@ -448,7 +447,7 @@ impl Mapper {
     }
 
     pub fn nop(&mut self, from: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods_py(&from, Some(&self.transformer.as_ref().unwrap()))
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer.as_ref().unwrap()))
             .map_err(|err| PyRuntimeError::new_err(
                 format!("mapping error on the 'from' side: {}", err.to_string())
             ))?;

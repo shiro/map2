@@ -25,6 +25,7 @@ pub use evdev_rs::enums::EV_KEY::*;
 pub use evdev_rs::enums::EV_REL::*;
 pub use evdev_rs::enums::EV_ABS::*;
 pub use key_primitives::Key;
+pub use parsing::*;
 
 pub use anyhow::{anyhow, Result};
 use arc_swap::ArcSwapOption;

@@ -7,7 +7,6 @@ use pyo3::types::PyDict;
 
 use crate::*;
 use crate::parsing::key_action::*;
-use crate::parsing::python::*;
 
 struct Node {
     children: Option<HashMap<u8, Node>>,
