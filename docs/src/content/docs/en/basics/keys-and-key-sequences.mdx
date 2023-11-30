@@ -1,0 +1,83 @@
+---
+title: 'Keys and key sequences'
+description: 'Learn about map2 keys and key sequences'
+---
+import ValidKeysTable from "@root/components/ValidKeysTable.solid";
+
+
+All of map2's functions that deal with mapping keys and emmiting virtual input events accept
+a specific syntax for defining such events.
+
+## Single keys
+
+Let's look at an example, the [Mapper::map_key(key, key)](/map2/en/api/mapper) function:
+
+```python
+import map2
+
+mapper = map2.Mapper()
+mapper.map_key("a", "tab")
+```
+
+This function maps the "a" key to the "tab" key and expects a `key` type for both sides.
+When functions expect a `key`, it means that only a single key with optional modifiers is allowed.
+
+Passing in additional modifiers is possible by prepending the keys with one or more of the following special
+characters:
+
+- `^`: ctrl
+- `!`: alt
+- `+`: shift
+- `#`: meta
+
+Let's map `ALT + a` to `CTRL + tab`:
+
+```python
+import map2
+
+mapper = map2.Mapper()
+
+# "ALT + b" to "CTRL + tab"
+mapper.map_key("!b", "^tab")
+
+# if we want to map the "!" key, we need to escape it with "\"
+mapper.map_key("\\!", "^tab")
+
+# note that we used two "\" since it's a python string
+```
+
+
+## Key sequences
+
+Sometimes functions accept more than one key, in which case we need to use the more explicit syntax.
+Let's look at the [Mapper::map(key, key_sequence)](/map2/en/api/mapper) function:
+
+```python
+mapper.map("!a", "Hello!")
+mapper.map("b", "{ctrl down}{tab}{ctrl up}")
+
+# mixing regular characters with special ones is also allowed
+mapper.map("#c", "type this and CTRL+w{ctrl down}w{ctrl up}")
+```
+
+Notice that the first argument is a `key` type while the second argument is a `key_sequence`.
+The special modifier characters are treated as normal characters, instead there are only two
+special characters in sequences: `{` and `}`.
+
+Special keys now need to be surrounded by curly braces, i.e. "tab" becomes `{tab}`, which
+will result in tab being pressed and released right after.
+
+In many cases, we want a key to be held for some time, which can be achieved by specifying a
+`state` after the key name, i.e. `{ctrl down}` will press the control key, but not release it.
+
+Valid states are:
+- `down`
+- `up`
+- `repeat`
+
+
+## Special key list
+
+Here's a list of all special key names you can use with `{KEY_NAME}`.
+
+<ValidKeysTable />

@@ -6,11 +6,12 @@
     "strictNullChecks": true,
     "baseUrl": ".",
     "paths": {
-      "react": ["./node_modules/preact/compat/"],
-      "react-dom": ["./node_modules/preact/compat/"],
+      "@project/*": [ "../*" ],
       "@root/*": [ "src/*" ],
       "@examples/*": [ "../examples/*" ],
-      "@components/*": [ "src/components/*" ]
+      "@components/*": [ "src/components/*" ],
+      "react": ["./node_modules/preact/compat/"],
+      "react-dom": ["./node_modules/preact/compat/"]
     }
   }
 }
