@@ -1,6 +1,8 @@
 use std::thread;
 use std::time::Duration;
-use evdev_rs::enums::{EV_REL, EventCode};
+
+use evdev_rs::enums::EventCode;
+
 use map2::key_primitives::Key;
 
 use crate::*;
@@ -20,8 +22,8 @@ async fn wasd_mouse_control() -> PyResult<()> {
         assert_eq!(
             writer_read_all(py, m, "writer_mouse"),
             vec![
-                EvdevInputEvent::new(&Default::default(), &EventCode::EV_REL(EV_REL::REL_Y), -15),
-                EvdevInputEvent::new(&Default::default(), &EventCode::EV_REL(EV_REL::REL_Y), -15),
+                EvdevInputEvent::new(&Default::default(), &EventCode::EV_REL(REL_Y), -15),
+                EvdevInputEvent::new(&Default::default(), &EventCode::EV_REL(REL_Y), -15),
             ]
         );
 

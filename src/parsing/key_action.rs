@@ -12,6 +12,7 @@ pub enum ParsedKeyAction {
 
 pub trait ParsedKeyActionVecExt {
     fn to_key_actions(self) -> Vec<KeyAction>;
+    fn to_input_ev(self) -> Vec<EvdevInputEvent>;
 }
 
 impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
@@ -49,6 +50,13 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
                     acc
                 }
             })
+    }
+
+    fn to_input_ev(self) -> Vec<EvdevInputEvent> {
+        self.to_key_actions()
+            .into_iter()
+            .map(|x| x.to_input_ev())
+            .collect()
     }
 }
 

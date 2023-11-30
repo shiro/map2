@@ -57,3 +57,7 @@ pub fn reader_send_all(py: Python, module: &PyModule, name: &str, ev_list: &Vec<
         target.call_method(py, "__test__write_ev", (ev, ), None).unwrap();
     }
 }
+
+pub fn keys(input: &str) -> Vec<EvdevInputEvent> {
+    parse_key_sequence(input, Some(&Default::default())).unwrap().to_input_ev()
+}

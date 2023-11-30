@@ -9,6 +9,7 @@ use xkeysym::Keysym;
 
 use crate::*;
 use crate::{encoding, Key};
+use crate::xkb_transformer_registry::TransformerParams;
 
 #[derive(Clone)]
 pub struct XKBTransformer {
@@ -122,6 +123,18 @@ impl XKBTransformer {
         self.raw_to_utf_map.get(&(*key, *state))
             .cloned()
             .and_then(|x| if x.chars().next() == Some('\0') { None } else { Some(x) })
+    }
+}
+
+impl Default for XKBTransformer {
+    fn default() -> Self {
+        let params = TransformerParams::default();
+        Self::new(
+            &params.model,
+            &params.layout,
+            params.variant.as_deref(),
+            params.options.clone(),
+        ).unwrap()
     }
 }
 

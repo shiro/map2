@@ -72,10 +72,10 @@ fn resolve_key_utf8(key: &str, transformer: &XKBTransformer) -> Result<(Key, Key
     // the rest are modifiers we have to collect
     for ev in seq.iter() {
         match ev {
-            Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_LEFTALT) } => { flags.alt(); }
-            Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_RIGHTALT) } => { flags.right_alt(); }
-            Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_LEFTSHIFT) } => { flags.shift(); }
-            Key { event_code: EventCode::EV_KEY(EV_KEY::KEY_RIGHTSHIFT) } => { flags.shift(); }
+            Key { event_code: EventCode::EV_KEY(KEY_LEFTALT) } => { flags.alt(); }
+            Key { event_code: EventCode::EV_KEY(KEY_RIGHTALT) } => { flags.right_alt(); }
+            Key { event_code: EventCode::EV_KEY(KEY_LEFTSHIFT) } => { flags.shift(); }
+            Key { event_code: EventCode::EV_KEY(KEY_RIGHTSHIFT) } => { flags.shift(); }
             _ => { unreachable!("unhandled modifier") }
         }
     }

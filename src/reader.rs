@@ -4,7 +4,6 @@ use ::oneshot;
 use crate::*;
 use crate::python::*;
 use crate::event::InputEvent;
-use crate::parsing::key_action::ParsedKeyActionVecExt;
 use crate::subscriber::{Subscriber, add_event_subscription};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};

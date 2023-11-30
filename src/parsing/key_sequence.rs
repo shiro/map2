@@ -18,20 +18,40 @@ pub fn key_sequence_utf<'a>(
 
 #[cfg(test)]
 mod tests {
-    use evdev_rs::enums::EV_REL;
     use super::*;
 
     #[test]
     fn sequence_input() {
+        let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
+        let key_sequence = key_sequence_utf(Some(&t));
+
         assert_eq!(key_sequence("abc"), nom_ok(vec![
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("a").unwrap(), modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("b").unwrap(), modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("c").unwrap(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_A.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_B.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_C.into(), modifiers: KeyModifierFlags::new() }),
+        ]));
+
+        assert_eq!(key_sequence("Hi there!"), nom_ok(vec![
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods {
+                key: KEY_H.into(),
+                modifiers: KeyModifierFlags::new().tap_mut(|x| x.shift()),
+            }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_I.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_SPACE.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_T.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_H.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_E.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_R.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_E.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods {
+                key: KEY_1.into(),
+                modifiers: KeyModifierFlags::new().tap_mut(|x| x.shift()),
+            }),
         ]));
 
         assert_eq!(key_sequence("a{b down}"), nom_ok(vec![
-            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: Key::from_str("a").unwrap(), modifiers: KeyModifierFlags::new() }),
-            ParsedKeyAction::KeyAction(KeyActionWithMods { key: Key::from_str("b").unwrap(), value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyClickAction(KeyClickActionWithMods { key: KEY_A.into(), modifiers: KeyModifierFlags::new() }),
+            ParsedKeyAction::KeyAction(KeyActionWithMods { key: KEY_B.into(), value: TYPE_DOWN, modifiers: KeyModifierFlags::new() }),
         ]));
     }
 
@@ -53,7 +73,7 @@ mod tests {
     #[test]
     fn sequence_special_chars() {
         assert_eq!(key_sequence("{relative X 55}"), nom_ok(vec![
-            ParsedKeyAction::Action(KeyAction::new(Key { event_code: EventCode::EV_REL(EV_REL::REL_X) }, 55)),
+            ParsedKeyAction::Action(KeyAction::new(Key { event_code: EventCode::EV_REL(REL_X) }, 55)),
         ]));
     }
 

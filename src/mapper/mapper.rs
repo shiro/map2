@@ -6,7 +6,6 @@ use crate::event::InputEvent;
 use crate::event_loop::{args_to_py, PythonArgument};
 use crate::mapper::{RuntimeAction, RuntimeKeyAction};
 use crate::mapper::mapping_functions::*;
-use crate::parsing::key_action::*;
 use crate::python::*;
 use crate::subscriber::{SubscribeEvent, Subscriber};
 use crate::xkb::XKBTransformer;
