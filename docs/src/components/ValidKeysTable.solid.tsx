@@ -31,7 +31,10 @@ const keys = (() => {
   return snippet
     .split(",")
     .map(x => x.trim())
-    .map(x => x.slice("KEY_".length, x.indexOf(" ")))
+    .map(x => x.slice(
+      x.startsWith("KEY_") ? "KEY_".length : 0,
+      x.indexOf(" "))
+    )
     .map(x => x.toLowerCase())
     .filter(x => x.length > 1)
     .filter(x => !literals.has(x));
