@@ -6,28 +6,27 @@ description: 'Autostart map2 scripts on login'
 A common use case for map2 is to run a script automatically after logging in, the way
 to do it depends on your Linux distro and system setup.
 
-This section is work in progress, check back soon!
+We'll use [Systemd](https://wiki.archlinux.org/title/systemd) since most distros ship with
+it, but changing the commands to work on other systems should be pretty easy as well.
 
-{/*
-## Preperation
+## Setting things up
 
+The way to prepare things depends on how you are running your map2 scripts, please check the
+[Secure setup](/map2/en/advanced/secure-setup) section.
 
-In the following command, replace `/path/to/script.py` with your script path and run it.
-
-```bash
-echo "ALL ALL=(root) NOPASSWD:SETENV: /usr/bin/python /path/to/script.py" | sudo tee -a /etc/sudoers
-```
-
-## Systemd
-
-Most distros come with [Systemd](https://wiki.archlinux.org/title/systemd), which allows
-setting up services that run commands automatically.
-
-### Basic setup
+If you are running your scripts as **superuser** as shown in the [Getting started](/map2/en/basics/getting-started)
+section, please first complete any of the ways in [Secure setup](/map2/en/advanced/secure-setup) and continue
+with the appropriate section below.
 
 
-Edit `/etc/systemd/system/map2.service`:
+### The lazy way
 
+Uset this method if you are using:
+
+- the **_lazy way_** from the [Secure setup](/map2/en/advanced/secure-setup#the-lazy-way) section.
+
+
+Copy the service definition into `~/.config/systemd/user/map2.service`.
 
 ```
 [Unit]
@@ -35,13 +34,65 @@ Description=map2 autostart service
 PartOf=graphical-session.target
 
 [Service]
+ExecStart=python /path/to/my-map2-script.py
 Restart=always
 RestartSec=5s
-ExecStart=sudo -E python /path/to/script.py
 
 [Install]
-WantedBy=xsession.target
+WantedBy=graphical-session.target
 ```
+
+And change `/path/to/my-map2-script.py` to your script path.
+
+
+### The secure way
+
+
+Uset this method if you are using:
+
+- the **_secure way_** from the [Secure setup](/map2/en/advanced/secure-setup#the-secure-way) section.
+
+In the following section, replace `/home/map2/my-map2-script.py` with your script path.
+
+
+Create a shell script file in `/home/map2/autostart.sh`:
+
+```bash
+#!/bin/bash
+# map 2 autostart script
+# runs a map2 script by switching to the map2 user
+
+su map2 -pc 'python /home/map2/my-map2-script.py'
+```
+
+And run the following commands:
+
+```bash
+# make the autostart script executable
+chmod +x /home/map2/autostart.sh
+
+# allow everyone to run the autostart script
+echo "ALL ALL=(root) NOPASSWD:SETENV: /home/map2/autostart.sh" | sudo tee -a /etc/sudoers
+```
+
+Copy the following into `~/.config/systemd/user/map2.service`:
+
+```
+[Unit]
+Description=map2 autostart service
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=sudo -E /home/map2/autostart.sh
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=graphical-session.target
+```
+
+
+## Running the service
 
 
 Now that we created a service, we need to make sure it works and enable it so it starts automatically.
@@ -57,38 +108,4 @@ systemctl --user start map2
 systemctl --user enable map2
 ```
 
-
-### Secure setup
-
-First, let's create a file `~/.config/systemd/user/map2.service` with the following contents,
-also provide your own script path.
-
-```
-[Unit]
-Description=map2 autostart service
-PartOf=graphical-session.target
-
-[Service]
-Restart=always
-RestartSec=5s
-ExecStart=sudo -E python /home/me/path/to/my/script.py
-
-[Install]
-WantedBy=xsession.target
-```
-
-Now that we created a service, we need to make sure it works and enable it so it starts automatically.
-
-```bash
-# tell systemd we edited a service
-systemctl --user daemon-reload
-
-# start the service and make sure it runs the script
-systemctl --user start map2
-
-# after ensuring it works, enable it so it runs on every startup
-systemctl --user enable map2
-```
-
-Your script should now run automatically
-*/}
+Your script should now run automatically when you login to your desktop environment.

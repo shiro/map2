@@ -7,7 +7,37 @@ As discussed in the [Getting started](map2/en/basics/getting-started) section, r
 superuser access is not ideal since it allows the script to steal your data, modify your system or
 remove system files. This is especially risky when running code that you haven't written yourself.
 
-## Setting things up
+
+The initial setup **always** requires superuser access, ask your local system administrator for help if necessary.
+
+
+## The lazy way
+
+A quick way to avoid running as superuser is to be a member of the `input` group, however this
+also allows other processes to listen in on input events (keyloggers, etc.).
+If possible, please use [the secure way](#the-secure-way).  
+Just to demonstrate, we'll go over the *quick and insecure* approach in this section.
+
+Add the current user into the `input` group.
+
+```bash
+# allow the current user to intercept input device events
+sudo usermod -aG input `whoami`
+```
+
+By default, modifying input events always requires superuser access, so we need to change that as
+well.
+Copy the following into `/etc/udev/rules.d/999-map2.rules`.
+
+```
+# Allow the 'input' group to manipulate input events
+SUBSYSTEM=="misc", KERNEL=="uinput", MODE="0660", GROUP="input"
+```
+
+With this the current user should be able to run map2 scripts without superuser permissions.
+
+
+## The secure way
 
 The more secure (and complicated) approach is to create a new user that has exclusive ownership of the
 script files and is allowed to intercept events from input devices.
@@ -15,8 +45,6 @@ This way, even if a user account gets compromised, it would not be possible to t
 or spy on input devices.
 
 
-
-The initial setup requires superuser access, ask your local system administrator for help if necessary.
 
 
 Create a new system user called `map2` and set a secure password for it:
@@ -42,14 +70,24 @@ sudo chmod 700 my-map2-script.py
 sudo mv my-map2-script.py /home/map2
 ```
 
-
-Copy the following into `/etc/udev/rules.d/999-map2.rules`:
+To also allow the `input` group to modify input events,
+copy the following into  
+`/etc/udev/rules.d/999-map2.rules`.
 
 ```
 # Allow the 'input' group to manipulate input events
 SUBSYSTEM=="misc", KERNEL=="uinput", MODE="0660", GROUP="input"
 ```
 
+And apply the configuration changes.
+
+```bash
+# reload the udev rules since we modified them
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+After this, superuser access is no longer needed.
 
 ### Running the script
 
@@ -62,7 +100,7 @@ su map2 -pc 'python ~/my-map2-script.py'
 ```
 
 
-## Optional extra steps
+### Optional extra steps
 
 It's also possible to allow the `map2` user access to only specific input devices rather than all of them.
 This is optional and usually not required unless security is very important.
@@ -90,6 +128,4 @@ sudo udevadm trigger
 
 # remove the map2 user from the input group
 sudo gpasswd -d map2 input
-
-
 ```
