@@ -1,5 +1,8 @@
+#[cfg(not(feature = "integration"))]
 use std::sync::mpsc;
+#[cfg(not(feature = "integration"))]
 use std::sync::mpsc::TryRecvError;
+#[cfg(not(feature = "integration"))]
 use evdev_rs::enums::EventType::EV_SYN;
 
 use python::*;

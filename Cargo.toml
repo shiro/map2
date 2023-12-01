@@ -12,7 +12,6 @@ default = ["extension-module"]
 [lib]
 name = "map2"
 crate-type = ["lib", "cdylib"]
-#proc-macro = true
 
 [dependencies]
 anyhow = "1.0"

@@ -53,11 +53,11 @@ fn link(py: Python, chain: Vec<PyObject>) -> PyResult<()> {
     for target in chain.into_iter() {
         if let Some(source) = prev {
             if let Ok(mut source) = source.extract::<PyRefMut<Reader>>(py) {
-                source._link(target.as_ref(py))?;
+                source.link(target.as_ref(py))?;
                 path.push(source.id.clone());
             }
             if let Ok(mut source) = source.extract::<PyRefMut<Mapper>>(py) {
-                source._link(path.clone(), target.as_ref(py))?;
+                source.link(path.clone(), target.as_ref(py))?;
                 path.push(source.id.clone());
             }
         }

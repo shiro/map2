@@ -1,12 +1,47 @@
 use std::fmt::Display;
 
-use nom::{Compare, CompareResult, Err, InputLength, InputTake};
+use nom::{Compare, CompareResult, Err, InputLength, InputTake, Parser};
 use nom::IResult;
 use nom::sequence::Tuple;
 
 use crate::parsing::error::FromTagError;
 
 use super::*;
+
+
+pub fn many1_with_last_err<I, O,E,  F>(mut f: F) -> impl FnMut(I) -> IResult<I, (Vec<O>, E), E>
+    where
+        I: Clone + InputLength,
+        F: Parser<I, O, E>,
+        E: nom::error::ParseError<I>,
+{
+    move |mut i: I| match f.parse(i.clone()) {
+        Err(Err::Error(err)) => Err(Err::Error(E::append(i, nom::error::ErrorKind::Many1, err))),
+        Err(e) => Err(e),
+        Ok((i1, o)) => {
+            let mut acc = Vec::with_capacity(4);
+            acc.push(o);
+            i = i1;
+
+            loop {
+                let len = i.input_len();
+                match f.parse(i.clone()) {
+                    Err(Err::Error(err)) => return Ok((i, (acc, err))),
+                    Err(e) => return Err(e),
+                    Ok((i1, o)) => {
+                        // infinite loop check: the parser must always consume
+                        if i1.input_len() == len {
+                            return Err(Err::Error(E::from_error_kind(i, nom::error::ErrorKind::Many1)));
+                        }
+
+                        i = i1;
+                        acc.push(o);
+                    }
+                }
+            }
+        }
+    }
+}
 
 pub fn tuple<I: Clone, O, List: Tuple<I, O, CustomError<I>>>(
     mut l: List,

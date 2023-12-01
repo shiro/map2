@@ -3,13 +3,22 @@ use crate::xkb::XKBTransformer;
 
 use super::*;
 
-fn format_err(err: NomErr<CustomError<&str>>, input: &str) -> Error {
+fn format_err(err: NomErr<CustomError<&str>>, input: &str, pos: usize) -> Error {
     match err {
         NomErr::Error(err) => {
             if err.expected.len() > 0 {
-                anyhow!("failed to parse input '{}', expected one of: {}", input, err.expected.iter().unique().join(", "))
+                anyhow!(
+                    "{}\n{: >pos$}^ expected one of: {}",
+                    input,
+                    "",
+                    err.expected.iter().unique().join(", ")
+                )
             } else {
-                anyhow!("failed to parse input '{}'", input)
+                anyhow!(
+                    "{}\n{: >pos$}^ failed here",
+                    input,
+                    "",
+                )
             }
         }
         _ => anyhow!("failed to parse key mapping value")
@@ -17,20 +26,23 @@ fn format_err(err: NomErr<CustomError<&str>>, input: &str) -> Error {
 }
 
 pub fn parse_key_action_with_mods(raw: &str, transformer: Option<&XKBTransformer>) -> Result<ParsedKeyAction> {
-    let from = single_key_action_utf_with_flags_utf(transformer)(raw)
-        .map_err(|err| format_err(err, raw))?;
+    let (rest, from) = single_key_action_utf_with_flags_utf(transformer)(raw)
+        .map_err(|err| format_err(err, raw, 0))?;
 
-    if !from.0.is_empty() { return Err(anyhow!("expected exactly 1 key action")); }
+    if !rest.is_empty() { return Err(anyhow!("expected exactly 1 key action from input '{}'", raw)); }
 
-    let from = from.1;
     Ok(from)
 }
 
 pub fn parse_key_sequence(raw: &str, transformer: Option<&XKBTransformer>) -> Result<Vec<ParsedKeyAction>> {
-    let (rest, res) = key_sequence_utf(transformer)(raw)
-        .map_err(|err| format_err(err, raw))?;
+    let (rest, (res, last_err)) = key_sequence_utf(transformer)(raw)
+        .map_err(|err| format_err(err, raw, 0))?;
 
-    if !rest.is_empty() { return Err(anyhow!("failed to parse key sequence")); }
+    if !rest.is_empty() {
+        return Err(
+            format_err(NomErr::Error(last_err), raw, raw.len() - rest.len())
+        );
+    }
 
     Ok(res)
 }

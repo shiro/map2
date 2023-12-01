@@ -81,9 +81,9 @@ impl Reader {
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
         let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
-            .map_err(|err| PyRuntimeError::new_err(
-                format!("key sequence parse error: {}", err.to_string())
-            ))?
+            .map_err(|err|
+                ApplicationError::KeySequenceParse(err.to_string()).into_py()
+            )?
             .to_key_actions();
 
         let mut h = DefaultHasher::new();
@@ -114,7 +114,7 @@ impl Reader {
 }
 
 impl Reader {
-    pub fn _link(&mut self, target: &PyAny) -> PyResult<()> {
+    pub fn link(&mut self, target: &PyAny) -> PyResult<()> {
         use crate::subscriber::*;
 
         if target.is_none() {

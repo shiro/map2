@@ -147,7 +147,7 @@ struct Inner {
     id: Arc<Uuid>,
     subscriber_map: Arc<RwLock<SubscriberMap>>,
     state: RwLock<State>,
-    transformer: RwLock<Option<Arc<XKBTransformer>>>,
+    transformer: Arc<XKBTransformer>,
     mappings: RwLock<Mappings>,
 
     fallback_handler: RwLock<Option<PyObject>>,
@@ -225,7 +225,7 @@ impl Inner {
                                 &handler,
                                 None,
                                 ev,
-                                self.transformer.read().unwrap().as_ref().unwrap(),
+                                &self.transformer,
                                 subscriber,
                             );
                         }
@@ -240,10 +240,7 @@ impl Inner {
                 // don't trigger the fallback handler with modifier keys
                 if !was_modifier {
                     if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
-                        let _transformer = self.transformer.read().unwrap();
-                        let transformer = _transformer.as_ref().unwrap();
-
-                        let name = transformer.raw_to_utf(key, &*state.modifiers)
+                        let name = self.transformer.raw_to_utf(key, &*state.modifiers)
                             .unwrap_or_else(|| format!("{key:?}").to_string());
 
                         let value = match *value {
@@ -262,7 +259,7 @@ impl Inner {
                             &handler,
                             Some(args),
                             ev,
-                            self.transformer.read().unwrap().as_ref().unwrap(),
+                            &self.transformer,
                             subscriber,
                         );
 
@@ -291,7 +288,7 @@ impl Inner {
                         &handler,
                         Some(args),
                         ev,
-                        self.transformer.read().unwrap().as_ref().unwrap(),
+                        &self.transformer,
                         subscriber,
                     );
                     return;
@@ -313,8 +310,7 @@ pub struct Mapper {
     subscriber_map: Arc<RwLock<SubscriberMap>>,
     ev_tx: Subscriber,
     inner: Arc<Inner>,
-    transformer: Option<Arc<XKBTransformer>>,
-    transformer_params: TransformerParams,
+    transformer: Arc<XKBTransformer>,
 }
 
 #[pymethods]
@@ -331,12 +327,9 @@ impl Mapper {
         let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
-        let transformer_params =
-            if kbd_model.is_some() || kbd_layout.is_some() || kbd_variant.is_some() || kbd_options.is_some() {
-                TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options)
-            } else {
-                global::DEFAULT_TRANSFORMER_PARAMS.read().unwrap().clone()
-            };
+        let transformer = XKB_TRANSFORMER_REGISTRY
+            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
+            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
         let subscriber_map: Arc<RwLock<SubscriberMap>> = Arc::new(RwLock::new(HashMap::new()));
         let id = Arc::new(Uuid::new_v4());
@@ -364,25 +357,24 @@ impl Mapper {
             subscriber_map,
             ev_tx,
             inner,
-            transformer: None,
-            transformer_params,
+            transformer,
         })
     }
 
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
-        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
-
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer.as_ref().unwrap()))
-            .map_err(|err| PyRuntimeError::new_err(
-                format!("mapping error on the 'from' side: {}", err.to_string())
-            ))?;
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer))
+            .map_err(|err| PyRuntimeError::new_err(format!(
+                "mapping error on the 'from' side:\n{}",
+                ApplicationError::KeyParse(err.to_string()),
+            )))?;
 
         if let Ok(to) = to.extract::<String>(py) {
-            let to = parse_key_sequence(&to, Some(&self.transformer.as_ref().unwrap()))
-                .map_err(|err| PyRuntimeError::new_err(
-                    format!("mapping error on the 'to' side: {}", err.to_string())
-                ))?;
+            let to = parse_key_sequence(&to, Some(&self.transformer))
+                .map_err(|err| PyRuntimeError::new_err(format!(
+                    "mapping error on the 'to' side:\n{}",
+                    ApplicationError::KeySequenceParse(err.to_string()),
+                )))?;
 
             self._map_key(from, to)?;
             return Ok(());
@@ -399,25 +391,23 @@ impl Mapper {
     }
 
     pub fn map_key(&mut self, from: String, to: String) -> PyResult<()> {
-        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer))
+            .map_err(|err| PyRuntimeError::new_err(format!(
+                "mapping error on the 'from' side:\n{}",
+                ApplicationError::KeyParse(err.to_string()),
+            )))?;
 
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer.as_ref().unwrap()))
-            .map_err(|err| PyRuntimeError::new_err(
-                format!("mapping error on the 'from' side: {}", err.to_string())
-            ))?;
-
-        let to = parse_key_action_with_mods(&to, Some(&self.transformer.as_ref().unwrap()))
-            .map_err(|err| PyRuntimeError::new_err(
-                format!("mapping error on the 'to' side: {}", err.to_string())
-            ))?;
+        let to = parse_key_action_with_mods(&to, Some(&self.transformer))
+            .map_err(|err| PyRuntimeError::new_err(format!(
+                "mapping error on the 'to' side:\n{}",
+                ApplicationError::KeyParse(err.to_string()),
+            )))?;
 
         self._map_key(from, vec![to])?;
         Ok(())
     }
 
     pub fn map_fallback(&mut self, py: Python, fallback_handler: PyObject) -> PyResult<()> {
-        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
-
         if fallback_handler.as_ref(py).is_callable() {
             *self.inner.fallback_handler.write().unwrap() = Some(fallback_handler);
             return Ok(());
@@ -426,8 +416,6 @@ impl Mapper {
     }
 
     pub fn map_relative(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
-        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
-
         if handler.as_ref(py).is_callable() {
             *self.inner.relative_handler.write().unwrap() = Some(handler);
             return Ok(());
@@ -436,8 +424,6 @@ impl Mapper {
     }
 
     pub fn map_absolute(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
-        self.init_transformer().map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
-
         if handler.as_ref(py).is_callable() {
             *self.inner.absolute_handler.write().unwrap() = Some(handler);
             return Ok(());
@@ -446,10 +432,11 @@ impl Mapper {
     }
 
     pub fn nop(&mut self, from: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer.as_ref().unwrap()))
-            .map_err(|err| PyRuntimeError::new_err(
-                format!("mapping error on the 'from' side: {}", err.to_string())
-            ))?;
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer))
+            .map_err(|err| PyRuntimeError::new_err(format!(
+                "mapping error on the 'from' side:\n{}",
+                ApplicationError::KeyParse(err.to_string()),
+            )))?;
 
         match from {
             ParsedKeyAction::KeyAction(from) => {
@@ -488,14 +475,12 @@ impl Mapper {
 }
 
 impl Mapper {
-    // linkable!();
-
-    pub fn _link(&mut self, mut path: Vec<Arc<Uuid>>, target: &PyAny) -> PyResult<()> {
+    pub fn link(&mut self, mut path: Vec<Arc<Uuid>>, target: &PyAny) -> PyResult<()> {
         use crate::subscriber::*;
 
         let target = match add_event_subscription(target) {
             Some(target) => target,
-            None => { return Err(PyRuntimeError::new_err("unsupported link target")); }
+            None => { return Err(ApplicationError::InvalidLinkTarget.into()); }
         };
 
         let mut h = DefaultHasher::new();
@@ -612,15 +597,6 @@ impl Mapper {
             }
         }
 
-        Ok(())
-    }
-
-    fn init_transformer(&mut self) -> Result<()> {
-        if self.transformer.is_none() {
-            let transformer = XKB_TRANSFORMER_REGISTRY.get(&self.transformer_params)?;
-            self.transformer = Some(transformer.clone());
-            *self.inner.transformer.write().unwrap() = Some(transformer);
-        }
         Ok(())
     }
 }
