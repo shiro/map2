@@ -11,13 +11,15 @@ use crate::*;
 use crate::device::*;
 use crate::device::virt_device::DeviceCapabilities;
 use crate::subscriber::{SubscribeEvent, Subscriber};
+use crate::xkb::XKBTransformer;
+use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 
 
 #[pyclass]
 pub struct Writer {
     ev_tx: Subscriber,
     exit_tx: tokio::sync::mpsc::UnboundedSender<()>,
-
+    transformer: Arc<XKBTransformer>,
     #[cfg(feature = "integration")]
     ev_rx: tokio::sync::mpsc::UnboundedReceiver<SubscribeEvent>,
 }
@@ -69,6 +71,14 @@ impl Writer {
             }
         };
 
+        let kbd_model = options.get("model").and_then(|x| x.extract().ok());
+        let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
+        let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
+        let kbd_options = options.get("options").and_then(|x| x.extract().ok());
+        let transformer = XKB_TRANSFORMER_REGISTRY
+            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
+            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
         let (exit_tx, mut exit_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
 
@@ -98,7 +108,6 @@ impl Writer {
 
                         // this is a hack that stops successive events to not get registered
                         if let EventCode::EV_KEY(_) = ev.event_code {
-                            // thread::sleep(Duration::from_millis(1));
                             tokio::time::sleep(Duration::from_millis(1)).await;
                         }
                     }
@@ -108,12 +117,26 @@ impl Writer {
 
         let handle = Self {
             ev_tx,
+            exit_tx,
+            transformer,
             #[cfg(feature = "integration")]
             ev_rx,
-            exit_tx,
         };
 
         Ok(handle)
+    }
+
+    pub fn send(&mut self, val: String) -> PyResult<()> {
+        let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
+            .map_err(|err|
+                ApplicationError::KeySequenceParse(err.to_string()).into_py()
+            )?
+            .to_key_actions();
+
+        for action in actions {
+            let _ = self.ev_tx.send((0, InputEvent::Raw(action.to_input_ev())));
+        }
+        Ok(())
     }
 
     #[cfg(feature = "integration")]
