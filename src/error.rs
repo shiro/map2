@@ -4,9 +4,7 @@ use crate::python::*;
 
 #[derive(Error, Debug)]
 pub enum ApplicationError {
-    #[error("expected a callable object")]
-    NotCallable,
-    #[error("unsupported platform, supported platforms are: Hyprland, X11")]
+    #[error("[UNSUPPORTED_PLATFORM] unsupported platform, supported platforms are: Hyprland, X11")]
     UnsupportedPlatform,
     #[error("[KEY_PARSE] invalid key:\n{0}")]
     KeyParse(String),
@@ -14,9 +12,12 @@ pub enum ApplicationError {
     KeySequenceParse(String),
     #[error("[INVALID_LINK_TARGET] invalid link target")]
     InvalidLinkTarget,
-}
+    #[error("[NOT_CALLABLE] expected a callable object (i.e. a function)")]
+    NotCallable,
+    #[error("[UNEXPECTED_NON_BUTTON_INPUT] expected only button inputs")]
+    NonButton,
 
-// impl Into<PyErr> for ApplicationError { fn into(self) -> PyErr { PyRuntimeError::new_err(self.to_string()) } }
+}
 
 impl From<ApplicationError> for PyErr {
     fn from(value: ApplicationError) -> Self {

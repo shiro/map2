@@ -329,7 +329,7 @@ impl Mapper {
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
         let transformer = XKB_TRANSFORMER_REGISTRY
             .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
-            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+            .map_err(err_to_py)?;
 
         let subscriber_map: Arc<RwLock<SubscriberMap>> = Arc::new(RwLock::new(HashMap::new()));
         let id = Arc::new(Uuid::new_v4());
@@ -387,7 +387,7 @@ impl Mapper {
             return Ok(());
         }
 
-        Err(PyRuntimeError::new_err("expected a callable object"))
+        Err(ApplicationError::NotCallable.into())
     }
 
     pub fn map_key(&mut self, from: String, to: String) -> PyResult<()> {
@@ -449,7 +449,7 @@ impl Mapper {
                 }
             }
             ParsedKeyAction::Action(_) => {
-                return Err(PyRuntimeError::new_err(format!("this method accepts only button mappings")));
+                return Err(ApplicationError::NonButton.into());
             }
         }
 
@@ -520,7 +520,7 @@ impl Mapper {
                 );
             }
             ParsedKeyAction::Action(_) => {
-                return Err(PyRuntimeError::new_err(format!("this method accepts only button mappings")));
+                return Err(ApplicationError::NonButton.into());
             }
         }
 
@@ -593,7 +593,7 @@ impl Mapper {
                 });
             }
             ParsedKeyAction::Action(_) => {
-                return Err(PyRuntimeError::new_err(format!("this method accepts only button mappings")));
+                return Err(ApplicationError::NonButton.into());
             }
         }
 
