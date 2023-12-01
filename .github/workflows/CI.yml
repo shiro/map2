@@ -129,7 +129,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
           #RELEASE_TAG: ${{ needs.create_release.outputs.release_tag }}
-          RELEASE_TAG: ${{ github.ref }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: ./ci/generate-pkgbuild.py
       - name: Publish to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v2.5.0
@@ -140,5 +140,5 @@ jobs:
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           #commit_message: ${{ needs.create_release.outputs.release_tag }}
-          commit_message: ${{ github.ref }}
+          commit_message: ${{ github.ref_name }}
           force_push: 'true'
