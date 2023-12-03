@@ -58,8 +58,6 @@ const aliases = (() => {
     );
 })();
 
-console.log(aliases);
-
 
 const descriptions = {
   brl_dot1: "braille dot 1",
