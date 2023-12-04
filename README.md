@@ -21,7 +21,16 @@ Visit our [official documentation](https://shiro.github.io/map2/en/basics/introd
 
 ## Install
 
-Check out the [Install documentation](https://shiro.github.io/map2/en/basics/install/).
+The easiest way is to use `pip`:
+
+```bash
+pip install map2
+```
+
+For more, check out the [Install documentation](https://shiro.github.io/map2/en/basics/install/).
+
+After installing, please read the
+[Getting started documentation](https://shiro.github.io/map2/en/basics/getting-started).
 
 ## Example
 
