@@ -15,9 +15,8 @@ There's nothing you can't remap with **map2**!
 - **Blazingly fast, written in Rust**
 - **Tiny install size (around 5Mb), almost no dependencies**
 
-## Documentation
-
-Visit our [official documentation](https://shiro.github.io/map2/en/basics/introduction).
+Visit our [official documentation](https://shiro.github.io/map2/en/basics/introduction)
+for the full feature list and API.
 
 ## Install
 
