@@ -19,6 +19,7 @@ export const KNOWN_LANGUAGE_CODES = Object.values(KNOWN_LANGUAGES)
 export const EDIT_URL = `https://github.com/shiro/map2/docs`;
 
 export const COMMUNITY_INVITE_URL = `https://discord.gg/brKgH43XQN`;
+export const DONATE_URL = `https://ko-fi.com/shiroi_usagi`;
 
 // See "Algolia" section of the README for more information.
 export const ALGOLIA = {
