@@ -179,11 +179,6 @@ impl Inner {
                     modifiers: from_modifiers,
                 };
 
-                // let since_the_epoch = time::SystemTime::now()
-                //     .duration_since(time::UNIX_EPOCH)
-                //     .unwrap();
-                // let mut usec = since_the_epoch.subsec_micros() as i64;
-
                 if let Some(runtime_action) = mappings.get(&from_key_action) {
                     match runtime_action {
                         RuntimeAction::ActionSequence(seq) => {
