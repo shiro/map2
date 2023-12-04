@@ -7,13 +7,21 @@
   [![Build](https://github.com/shiro/map2/actions/workflows/CI.yml/badge.svg)](https://github.com/shiro/map2/actions/workflows/CI.yml)
 </div>
 
+Want to remap your input devices like keyboards, mice, controllers and more?  
+There's nothing you can't remap with **map2**!
+
+- **Remap keys, mouse events, controllers, pedals, and more!**
+- **Highly configurable, using Python**
+- **Blazingly fast, written in Rust**
+- **Tiny install size (around 5Mb), almost no dependencies**
+
 ## Documentation
 
 Visit our [official documentation](https://shiro.github.io/map2/en/basics/introduction).
 
 ## Install
 
-Check out the [Install docs](https://shiro.github.io/map2/en/install/).
+Check out the [Install docs](https://shiro.github.io/map2/en/basics/install/).
 
 ## Example
 
