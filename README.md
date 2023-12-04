@@ -21,7 +21,7 @@ Visit our [official documentation](https://shiro.github.io/map2/en/basics/introd
 
 ## Install
 
-Check out the [Install docs](https://shiro.github.io/map2/en/basics/install/).
+Check out the [Install documentation](https://shiro.github.io/map2/en/basics/install/).
 
 ## Example
 
