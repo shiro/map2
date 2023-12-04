@@ -7,24 +7,76 @@
   [![Build](https://github.com/shiro/map2/actions/workflows/CI.yml/badge.svg)](https://github.com/shiro/map2/actions/workflows/CI.yml)
 </div>
 
-# Documentation
+## Documentation
 
 Visit our [official documentation](https://shiro.github.io/map2/en/basics/introduction).
 
-# Install
+## Install
 
 Check out the [Install docs](https://shiro.github.io/map2/en/install/).
 
-# Contributing
+## Example
+
+```python
+import map2
+
+# readers intercept all keyboard inputs and forward them
+reader = map2.Reader(patterns=["/dev/input/by-id/my-keyboard"])
+# mappers change inputs, you can also chain multiple mappers!
+mapper = map2.Mapper()
+# writers create new virtual devices we can write into
+writer = map2.Writer(clone_from = "/dev/input/by-id/my-keyboard")
+# finally, link nodes to control the event flow
+map2.link([reader, mapper, writer])
+
+# map the "a" key to "B"
+mapper.map("a", "B")
+
+# map "CTRL + ALT + u" to "META + SHIFT + w"
+mapper.map("^!u", "#+w")
+
+# key sequences are also supported
+mapper.map("s", "hello world!")
+
+# use the full power of Python using functions
+def custom_function(key, state):
+  print("called custom function")
+
+  # custom conditions and complex sequences
+  if key == "d":
+    return "{ctrl down}a{ctrl up}"
+  return True
+
+mapper.map("d", custom_function)
+```
+
+## Build from source
+
+To build from source, make sure python and rust are installed.
+
+```bash
+# create a python virtual environment
+python -m venv .env
+source .env/bin/activate
+
+# build the library
+maturin develop
+```
+
+While the virtual environment is activated, all scripts ran from this terminal
+will use the newly built version of map2.
+
+
+## Contributing
 
 If you want to report bugs, add suggestions or help out with development please
 check the [Discord channel](https://discord.gg/brKgH43XQN) and the [issues page](https://github.com/shiro/map2/issues) and open an issue
 if it doesn't exist yet.
 
-# License
+## License
 
 MIT
 
-# Authors
+## Authors
 
 - shiro <shiro@usagi.io>
