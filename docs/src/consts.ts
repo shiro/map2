@@ -38,6 +38,7 @@ export const SIDEBAR: Sidebar = {
       { text: "Install", link: "en/basics/install" },
       { text: "Getting started", link: "en/basics/getting-started" },
       { text: "Keys and key sequences", link: "en/basics/keys-and-key-sequences" },
+      { text: "Routing", link: "en/basics/routing" },
     ],
     "Advanced": [
       { text: "Secure setup", link: "en/advanced/secure-setup" },

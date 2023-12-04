@@ -21,15 +21,45 @@ Use this method only for code you trust or have written yourself!
 
 For a more secure setup see the [Secure setup](/map2/en/advanced/secure-setup) section.
 
+## Input devices
+
+On Linux, all connected input devices are listed in `/dev/inputX` where `X` is a number.
+To get more information about a device (label, ID, etc.), the following command can be used:
+
+```bash
+udevadm info -q all -a /dev/inputX
+```
+
+Some devices will also show up in `/dev/input/by-id` and `/dev/input/by-path`. This devices
+are just symbolic links to the appropriate `/dev/inputX` device, but with more
+descriptive names.
+
+
 
 ## My first map2 script
 
-Let's look at a simple script and go through the basics.
-
+Now that we know which input device we want to map on, let's write a short python script!
 
 ```python
+import time
 import map2
 
+# readers intercept all keyboard inputs and forward them
+reader = map2.Reader(patterns=["/dev/input/by-id/my-keyboard"])
 
+# mappers change inputs, you can also chain multiple mappers!
+mapper = map2.Mapper()
 
+# writers create new virtual devices we can write into
+writer = map2.Writer(clone_from = "/dev/input/by-id/my-keyboard")
+
+# finally, link nodes to control the event flow
+map2.link([reader, mapper, writer])
+
+mapper.map("a", "hello world")
+
+# keep running for 7 seconds
+time.sleep(7)
 ```
+
+After running the script, pressing the `a` key should emmit `hello world` instead!

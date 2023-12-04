@@ -1,0 +1,129 @@
+---
+title: 'Routing'
+description: 'Routing using map2: define the input event flow'
+---
+
+Routing in map2 refers to linking nodes such as [Reader](/map2/en/api/reader) and [Writer](/map2/en/api/writer),
+defining the input event flow chain.
+
+Let's look at a basic example:
+
+
+```python
+import map2
+
+reader_kbd = map2.Reader(patterns=["/dev/input/by-id/example-keyboard"])
+reader_mouse = map2.Reader(patterns=["/dev/input/by-id/example-mouse"])
+
+mapper_kbd = map2.Mapper()
+mapper_mouse = map2.Mapper()
+
+writer_kbd = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard")
+writer_mouse = map2.Writer(clone_from = "/dev/input/by-id/example-mouse")
+
+map2.link([reader_kbd, mapper_kbd, writer_kbd])
+map2.link([reader_mouse, mapper_mouse, writer_mouse])
+```
+
+Here, we define two separate event chains, one for each input device, routing events
+from the respective reader, through a mapper and to a writer.
+
+## Nodes
+
+Each object that can be placed in a chain is called a node.
+
+There exist 3 types of nodes:
+
+- **input**: needs to be at the beginning of a chain
+- **passthrough**: can't be at the beginning or end of a chain
+- **output**: needs to be at the end of a chain
+
+A good example for the 3 types of nodes are [Reader](/map2/en/api/reader),
+[Mapper](/map2/en/api/mapper) and [Writer](/map2/en/api/writer) respectively.
+
+
+### Input nodes
+
+Input nodes collect input events, either from a physical device or from
+other inputs, and pass them on to the next node in the chain.
+
+Currently every input node can only appear in a **single chain**.
+This means the following code is invalid:
+
+```python
+import map2
+
+reader = map2.Reader(patterns=["/dev/input/by-id/example-keyboard"])
+writer1 = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard1")
+writer2 = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard1")
+
+# error: every reader can only appear in a single chain
+map2.link([reader, writer1])
+map2.link([reader, writer2])
+```
+
+### Passthrough nodes
+
+Passthrough nodes receive input events from the previous node in the chain,
+and pass them on to the next node in the chain, potentially modifying,
+removing or creating new input events.
+
+A passtrhough node can appear in more than one chain at a time, let's look at
+an example:
+
+```python
+import map2
+
+reader1 = map2.Reader(patterns=["/dev/input/by-id/example-keyboard-1"])
+reader2 = map2.Reader(patterns=["/dev/input/by-id/example-keyboard-1"])
+mapper = map2.Mapper()
+writer1 = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard-1")
+writer2 = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard-1")
+
+map2.link([reader1, mapper, writer1])
+map2.link([reader2, mapper, writer2])
+```
+
+In this example, events from `reader1` flow through `mapper` and into `writer1`, while
+events from `reader2` flow through `mapper` into `writer2`.
+
+An important thing to note is, that the modifier state for each chain is separate, i.e.
+emmiting `shift down` from `reader1` does not affect the mapping behaviour of
+inputs coming from `reader2`.
+
+It's also possible to chain multiple passthrough nodes.
+
+```python
+import map2
+
+reader = map2.Reader(patterns=["/dev/input/by-id/example-keyboard-1"])
+mapper1 = map2.Mapper()
+mapper2 = map2.Mapper()
+mapper3 = map2.Mapper()
+writer = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard-1")
+
+map2.link([reader, mapper1, mapper2, mapper3, writer])
+```
+
+This can be useful for creating *mapping layers*, where each layer maps independently
+on the inputs received from the previous layer.
+
+### Output nodes
+
+Output nodes consume events and usually pass them to a physical device, to the destop
+environment, etc.
+
+Linking multiple chains to an output node is allowed, let's look at an example:
+
+```python
+import map2
+
+reader1 = map2.Reader(patterns=["/dev/input/by-id/example-keyboard-1"])
+reader2 = map2.Reader(patterns=["/dev/input/by-id/example-keyboard-1"])
+writer = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard-1")
+
+map2.link([reader1, writer])
+map2.link([reader2, writer])
+```
+
+In this example, a single writer consumes events from multiple chains.
