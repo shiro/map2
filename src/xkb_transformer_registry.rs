@@ -18,8 +18,11 @@ impl TransformerParams {
         variant: Option<String>,
         options: Option<String>,
     ) -> Self {
-        let model = model.unwrap_or("pc105".to_string());
-        let layout = layout.unwrap_or("us".to_string());
+        let default = global::DEFAULT_TRANSFORMER_PARAMS.read().unwrap();
+        let model = model.unwrap_or(default.model.clone());
+        let layout = layout.unwrap_or(default.layout.clone());
+        let variant = variant.or(default.variant.clone());
+        let options = options.or(default.options.clone());
         Self { model, layout, variant, options }
     }
 }
