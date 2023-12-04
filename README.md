@@ -12,11 +12,11 @@
 Want to remap your input devices like keyboards, mice, controllers and more?  
 There's nothing you can't remap with **map2**!
 
-- :computer_mouse:  **Remap keys, mouse events, controllers, pedals, and more!**
-- :wrench:  **Highly configurable**, using Python
-- :rocket: **Blazingly fast**, written in Rust
-- :package: **Tiny install size** (around 5Mb), almost no dependencies
-- :heart: **Open source**, made with love
+- 🖱️ **Remap keys, mouse events, controllers, pedals, and more!**
+- 🔧  **Highly configurable**, using Python
+- 🚀 **Blazingly fast**, written in Rust
+- 📦 **Tiny install size** (around 5Mb), almost no dependencies
+- ❤️ **Open source**, made with love
 
 Visit our [official documentation](https://shiro.github.io/map2/en/basics/introduction)
 for the full feature list and API.
