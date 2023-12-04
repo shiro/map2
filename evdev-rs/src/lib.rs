@@ -122,6 +122,7 @@ pub struct DeviceId {
 }
 
 /// used by EVIOCGABS/EVIOCSABS ioctls
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AbsInfo {
     /// latest reported value for the axis
     pub value: i32,

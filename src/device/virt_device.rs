@@ -7,14 +7,14 @@ use evdev_rs::enums::*;
 
 use crate::*;
 
+#[derive(Default)]
 pub struct DeviceCapabilities {
+    abs_bits: HashSet<(EventCode, AbsInfo)>,
     bits: HashSet<EventCode>,
 }
 
 impl DeviceCapabilities {
-    pub(crate) fn new() -> Self {
-        Self { bits: HashSet::new() }
-    }
+    pub(crate) fn new() -> Self { Default::default() }
 
     fn set_bit_range(&mut self, min: &EventCode, max: &EventCode) {
         for code in min.iter() {
@@ -26,24 +26,47 @@ impl DeviceCapabilities {
     }
 
     pub fn enable_keyboard(&mut self) {
-        self.set_bit_range(&EventCode::EV_KEY(EV_KEY::KEY_RESERVED), &EventCode::EV_KEY(EV_KEY::KEY_MAX));
+        for bit in ALL_KEYS {
+            self.bits.insert(EventCode::EV_KEY(*bit));
+        }
         self.bits.insert(EventCode::EV_MSC(EV_MSC::MSC_SCAN));
     }
     pub fn enable_buttons(&mut self) {
-        self.set_bit_range(&EventCode::EV_KEY(EV_KEY::BTN_0), &EventCode::EV_KEY(EV_KEY::BTN_TRIGGER_HAPPY40));
+        for bit in ALL_BUTTONS {
+            self.bits.insert(EventCode::EV_KEY(*bit));
+        }
     }
     pub fn enable_rel(&mut self) {
-        self.set_bit_range(&EventCode::EV_REL(EV_REL::REL_X), &EventCode::EV_REL(EV_REL::REL_MAX));
+        for bit in ALL_REL {
+            self.bits.insert(EventCode::EV_REL(*bit));
+        }
     }
     pub fn enable_abs(&mut self) {
-        self.set_bit_range(&EventCode::EV_ABS(EV_ABS::ABS_X), &EventCode::EV_ABS(EV_ABS::ABS_MAX));
+        for bit in ALL_ABS {
+            self.abs_bits.insert((
+                EventCode::EV_ABS(*bit),
+                AbsInfo {
+                    value: 128,
+                    minimum: 0,
+                    maximum: 255,
+                    fuzz: 0,
+                    flat: 0,
+                    resolution: 0,
+                }
+            ));
+        }
     }
 }
 
 pub fn enable_device_capabilities(dev: &mut Device, capabilities: &DeviceCapabilities) -> Result<()> {
+    for (code, abs_info) in capabilities.abs_bits.iter() {
+        dev.enable_event_code(code, Some(abs_info))
+            .map_err(|err| anyhow!("failed to enable code bit '{}': {}", code, err))?;
+    }
+
     for code in capabilities.bits.iter() {
         dev.enable(code)
-            .map_err(|err| anyhow!("failed to enable code bit: {}", err))?;
+            .map_err(|err| anyhow!("failed to enable code bit '{}': {}", code, err))?;
     }
 
     Ok(())
@@ -99,24 +122,24 @@ fn clone_device_bits(src: &Device, dst: &Device) -> Result<()> {
     for ev_type in EventType::EV_SYN.iter() {
         match ev_type {
             EventType::EV_KEY => clone_code_bits(src, dst,
-                                                 &EventCode::EV_KEY(EV_KEY::KEY_RESERVED),
-                                                 &EventCode::EV_KEY(EV_KEY::KEY_MAX),
+                &EventCode::EV_KEY(EV_KEY::KEY_RESERVED),
+                &EventCode::EV_KEY(EV_KEY::KEY_MAX),
             )?,
             EventType::EV_REL => clone_code_bits(src, dst,
-                                                 &EventCode::EV_REL(EV_REL::REL_X),
-                                                 &EventCode::EV_REL(EV_REL::REL_MAX),
+                &EventCode::EV_REL(REL_X),
+                &EventCode::EV_REL(REL_MAX),
             )?,
             EventType::EV_ABS => clone_code_bits(src, dst,
-                                                 &EventCode::EV_ABS(EV_ABS::ABS_X),
-                                                 &EventCode::EV_ABS(EV_ABS::ABS_MAX),
+                &EventCode::EV_ABS(ABS_X),
+                &EventCode::EV_ABS(ABS_MAX),
             )?,
             EventType::EV_LED => clone_code_bits(src, dst,
-                                                 &EventCode::EV_LED(EV_LED::LED_NUML),
-                                                 &EventCode::EV_LED(EV_LED::LED_MAX),
+                &EventCode::EV_LED(EV_LED::LED_NUML),
+                &EventCode::EV_LED(EV_LED::LED_MAX),
             )?,
             EventType::EV_MSC => clone_code_bits(src, dst,
-                                                 &EventCode::EV_MSC(EV_MSC::MSC_SERIAL),
-                                                 &EventCode::EV_MSC(EV_MSC::MSC_MAX),
+                &EventCode::EV_MSC(EV_MSC::MSC_SERIAL),
+                &EventCode::EV_MSC(EV_MSC::MSC_MAX),
             )?,
             _ => (),
         }

@@ -238,7 +238,11 @@ mod tests {
         )));
 
         assert_eq!(key_action("{relative X 99}"), nom_ok(ParsedKeyAction::Action(
-            KeyAction { key: Key { event_code: EventCode::EV_REL(EV_REL::REL_X) }, value: 99 }
+            KeyAction { key: Key { event_code: EventCode::EV_REL(REL_X) }, value: 99 }
+        )));
+
+        assert_eq!(key_action("{absolute X 99}"), nom_ok(ParsedKeyAction::Action(
+            KeyAction { key: Key { event_code: EventCode::EV_ABS(ABS_X) }, value: 99 }
         )));
     }
 
