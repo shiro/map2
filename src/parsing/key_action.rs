@@ -24,11 +24,13 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
                     if action.modifiers.ctrl { acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN)); }
                     if action.modifiers.shift { acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN)); }
                     if action.modifiers.alt { acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN)); }
+                    if action.modifiers.right_alt { acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_DOWN)); }
                     if action.modifiers.meta { acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN)); }
                     acc.push(KeyAction::new(action.key, action.value));
                     if action.modifiers.ctrl { acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_UP)); }
                     if action.modifiers.shift { acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_UP)); }
                     if action.modifiers.alt { acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_UP)); }
+                    if action.modifiers.right_alt { acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_UP)); }
                     if action.modifiers.meta { acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_UP)); }
                     acc
                 }
@@ -36,12 +38,14 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
                     if action.modifiers.ctrl { acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN)); }
                     if action.modifiers.shift { acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN)); }
                     if action.modifiers.alt { acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN)); }
+                    if action.modifiers.right_alt { acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_DOWN)); }
                     if action.modifiers.meta { acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN)); }
                     acc.push(KeyAction::new(action.key, TYPE_DOWN));
                     acc.push(KeyAction::new(action.key, TYPE_UP));
                     if action.modifiers.ctrl { acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_UP)); }
                     if action.modifiers.shift { acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_UP)); }
                     if action.modifiers.alt { acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_UP)); }
+                    if action.modifiers.right_alt { acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_UP)); }
                     if action.modifiers.meta { acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_UP)); }
                     acc
                 }

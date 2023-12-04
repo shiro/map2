@@ -11,6 +11,9 @@ pub fn add_event_subscription(target: &PyAny) -> Option<Subscriber> {
     if let Ok(target) = target.extract::<PyRefMut<Mapper>>() {
         return Some(target.subscribe());
     }
+    if let Ok(target) = target.extract::<PyRefMut<TextMapper>>() {
+        return Some(target.subscribe());
+    }
     if let Ok(target) = target.extract::<PyRefMut<Writer>>() {
         return Some(target.subscribe())
     }

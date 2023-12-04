@@ -7,8 +7,6 @@ use signal_hook::{consts::SIGINT, iterator::Signals};
 use tokio::runtime::Runtime;
 
 use crate::*;
-use crate::mapper::mapper::KeyMapperSnapshot;
-use crate::text_mapper::TextMapper;
 use crate::virtual_writer::VirtualWriter;
 use crate::window::Window;
 
@@ -57,6 +55,10 @@ fn link(py: Python, chain: Vec<PyObject>) -> PyResult<()> {
                 path.push(source.id.clone());
             }
             if let Ok(mut source) = source.extract::<PyRefMut<Mapper>>(py) {
+                source.link(path.clone(), target.as_ref(py))?;
+                path.push(source.id.clone());
+            }
+            if let Ok(mut source) = source.extract::<PyRefMut<TextMapper>>(py) {
                 source.link(path.clone(), target.as_ref(py))?;
                 path.push(source.id.clone());
             }

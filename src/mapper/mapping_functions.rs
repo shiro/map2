@@ -157,3 +157,57 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     let repeat_mapping = (KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers.clone() }, RuntimeAction::NOP);
     [down_mapping, up_mapping, repeat_mapping]
 }
+
+
+pub fn release_restore_modifiers(
+    actual_state: &KeyModifierState,
+    from_flags: &KeyModifierFlags,
+    to_flags: &KeyModifierFlags,
+    to_type: &i32,
+) -> Vec<evdev_rs::InputEvent> {
+    let mut output_events = vec![];
+
+    // takes into account the actual state of a modifier and decides whether to release/restore it or not
+    let mut release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
+        if *to_type == 1 { // restore mods if actual mod is still pressed
+            if *is_actual_down {
+                output_events.push(
+                    KeyAction { key: *key, value: *to_type }.to_input_ev()
+                );
+            }
+        } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
+            if *is_actual_down {
+                output_events.push(
+                    KeyAction { key: *key, value: *to_type }.to_input_ev()
+                );
+            }
+        }
+    };
+
+    if from_flags.ctrl && !to_flags.ctrl {
+        release_or_restore_modifier(&actual_state.left_ctrl, &KEY_LEFTCTRL.into());
+        release_or_restore_modifier(&actual_state.right_ctrl, &KEY_RIGHTCTRL.into());
+    }
+    if from_flags.shift && !to_flags.shift {
+        release_or_restore_modifier(&actual_state.left_shift, &KEY_LEFTSHIFT.into());
+        release_or_restore_modifier(&actual_state.right_shift, &KEY_RIGHTSHIFT.into());
+    }
+    if from_flags.alt && !to_flags.alt {
+        release_or_restore_modifier(&actual_state.left_alt, &KEY_LEFTALT.into());
+    }
+    if from_flags.right_alt && !to_flags.right_alt {
+        release_or_restore_modifier(&actual_state.right_alt, &KEY_RIGHTALT.into());
+    }
+    if from_flags.meta && !to_flags.meta {
+        release_or_restore_modifier(&actual_state.left_meta, &KEY_LEFTMETA.into());
+        release_or_restore_modifier(&actual_state.right_meta, &KEY_RIGHTMETA.into());
+    }
+
+    if output_events.len() > 0 {
+        output_events.push(SYN_REPORT.clone());
+    }
+
+    output_events
+
+    // TODO eat keys we just released, un-eat keys we just restored
+}

@@ -1,8 +1,4 @@
-use std::sync::RwLock;
-use pyo3::impl_::wrap::SomeWrap;
-
 use crate::*;
-use crate::event::InputEvent;
 use crate::event_loop::{args_to_py, PythonArgument};
 use crate::mapper::{RuntimeAction, RuntimeKeyAction};
 use crate::mapper::mapping_functions::*;
@@ -16,60 +12,6 @@ pub enum ControlMessage {
     AddMapping(KeyActionWithMods, RuntimeAction),
 }
 
-
-fn release_restore_modifiers(
-    state: &mut State,
-    from_flags: &KeyModifierFlags,
-    to_flags: &KeyModifierFlags,
-    to_type: &i32,
-) -> Vec<evdev_rs::InputEvent> {
-    let actual_state = &state.modifiers;
-    let mut output_events = vec![];
-
-    // takes into account the actual state of a modifier and decides whether to release/restore it or not
-    let mut release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
-        if *to_type == 1 { // restore mods if actual mod is still pressed
-            if *is_actual_down {
-                output_events.push(
-                    KeyAction { key: *key, value: *to_type }.to_input_ev()
-                );
-            }
-        } else { // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
-            if *is_actual_down {
-                output_events.push(
-                    KeyAction { key: *key, value: *to_type }.to_input_ev()
-                );
-            }
-        }
-    };
-
-    if from_flags.ctrl && !to_flags.ctrl {
-        release_or_restore_modifier(&actual_state.left_ctrl, &KEY_LEFTCTRL.into());
-        release_or_restore_modifier(&actual_state.right_ctrl, &KEY_RIGHTCTRL.into());
-    }
-    if from_flags.shift && !to_flags.shift {
-        release_or_restore_modifier(&actual_state.left_shift, &KEY_LEFTSHIFT.into());
-        release_or_restore_modifier(&actual_state.right_shift, &KEY_RIGHTSHIFT.into());
-    }
-    if from_flags.alt && !to_flags.alt {
-        release_or_restore_modifier(&actual_state.left_alt, &KEY_LEFTALT.into());
-    }
-    if from_flags.right_alt && !to_flags.right_alt {
-        release_or_restore_modifier(&actual_state.right_alt, &KEY_RIGHTALT.into());
-    }
-    if from_flags.meta && !to_flags.meta {
-        release_or_restore_modifier(&actual_state.left_meta, &KEY_LEFTMETA.into());
-        release_or_restore_modifier(&actual_state.right_meta, &KEY_RIGHTMETA.into());
-    }
-
-    if output_events.len() > 0 {
-        output_events.push(SYN_REPORT.clone());
-    }
-
-    output_events
-
-    // TODO eat keys we just released, un-eat keys we just restored
-}
 
 #[derive(Debug, Clone)]
 enum PythonReturn {
@@ -155,7 +97,7 @@ struct Inner {
 }
 
 impl Inner {
-    fn handle(&self, path_hash: u64, raw_ev: InputEvent, state: &mut State) {
+    fn handle(&self, path_hash: u64, raw_ev: InputEvent, state: &mut MapperState) {
         let mappings = self.mappings.read().unwrap();
 
         let subscriber_map = self.subscriber_map.read().unwrap();
@@ -195,7 +137,7 @@ impl Inner {
                                         let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                     }
                                     RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                        let new_events = release_restore_modifiers(state, from_flags, to_flags, to_type);
+                                        let new_events = release_restore_modifiers(&state.modifiers, from_flags, to_flags, to_type);
                                         // events.append(&mut new_events);
                                         for ev in new_events {
                                             let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
@@ -207,7 +149,7 @@ impl Inner {
                         RuntimeAction::PythonCallback(from_modifiers, handler) => {
                             if let Some((path_hash, subscriber)) = subscriber {
                                 // always release all trigger mods before running the callback
-                                let new_events = release_restore_modifiers(state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                                let new_events = release_restore_modifiers(&state.modifiers, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
                                 for ev in new_events {
                                     let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                 }
@@ -227,7 +169,7 @@ impl Inner {
                     return;
                 }
 
-                let was_modifier = event_handlers::update_modifiers(state, &KeyAction::from_input_ev(&ev));
+                let was_modifier = event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
 
                 // don't trigger the fallback handler with modifier keys
                 if !was_modifier {

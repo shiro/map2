@@ -1,14 +1,14 @@
 use crate::*;
 
 #[derive(Default)]
-pub struct State {
+pub struct MapperState {
     pub modifiers: Arc<KeyModifierState>,
 }
 
 
-impl State {
+impl MapperState {
     pub fn new() -> Self {
-        State {
+        MapperState {
             modifiers: Arc::new(KeyModifierState::new()),
         }
     }

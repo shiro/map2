@@ -35,7 +35,7 @@ use tap::Tap;
 use uuid::Uuid;
 
 use event_loop::EVENT_LOOP;
-pub use mapper::mapper::Mapper;
+pub use mapper::*;
 pub use python::err_to_py;
 use reader::Reader;
 use subscriber_map::SubscriberMap;
@@ -75,5 +75,4 @@ pub mod reader;
 pub mod mapper;
 pub mod writer;
 pub mod virtual_writer;
-pub mod text_mapper;
 pub mod window;

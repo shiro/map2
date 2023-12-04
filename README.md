@@ -3,9 +3,9 @@
   <h3>Linux input remapping<br />Remap your keyboard, mouse, controller and more!</h3>
 
   [![GitHub](https://img.shields.io/badge/GitHub-code-blue?logo=github)](https://github.com/shiro/map2)
-  [![MIT License](https://img.shields.io/github/license/shiro/map2?color=43A047)](https://github.com/shiro/map2/blob/main/LICENSE)
+  [![MIT License](https://img.shields.io/github/license/shiro/map2?color=43A047&logo=linux&logoColor=white)](https://github.com/shiro/map2/blob/master/LICENSE)
   [![Discord](https://img.shields.io/discord/1178929723208896543?label=Discord&color=5E35B1&logo=discord&logoColor=ffffff)](https://discord.gg/brKgH43XQN)
-  [![Build](https://img.shields.io/github/actions/workflow/status/shiro/map2/CI.yml?color=00897B)](https://github.com/shiro/map2/actions/workflows/CI.yml)
+  [![Build](https://img.shields.io/github/actions/workflow/status/shiro/map2/CI.yml?color=00897B&logo=github-actions&logoColor=white)](https://github.com/shiro/map2/actions/workflows/CI.yml)
   [![Donate](https://img.shields.io/badge/Ko--Fi-donate-orange?logo=ko-fi&color=E53935)](https://ko-fi.com/C0C3RTCCI)
 </div>
 
