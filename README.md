@@ -2,21 +2,33 @@
   <h1>map2</h1>
   <h3>Linux input remapping<br />Remap your keyboard, mouse, controller and more!</h3>
 
-  [![MIT License](https://img.shields.io/github/license/shiro/map2)](https://github.com/shiro/map2/blob/main/LICENSE)
-  [![Discord](https://img.shields.io/discord/1178929723208896543?color=7389D8&label&logo=discord&logoColor=ffffff)](https://discord.gg/brKgH43XQN)
-  [![Build](https://github.com/shiro/map2/actions/workflows/CI.yml/badge.svg)](https://github.com/shiro/map2/actions/workflows/CI.yml)
+  [![GitHub](https://img.shields.io/badge/GitHub-code-blue?logo=github)](https://github.com/shiro/map2)
+  [![MIT License](https://img.shields.io/github/license/shiro/map2?color=43A047)](https://github.com/shiro/map2/blob/main/LICENSE)
+  [![Discord](https://img.shields.io/discord/1178929723208896543?label=Discord&color=5E35B1&logo=discord&logoColor=ffffff)](https://discord.gg/brKgH43XQN)
+  [![Build](https://img.shields.io/github/actions/workflow/status/shiro/map2/CI.yml?color=00897B)](https://github.com/shiro/map2/actions/workflows/CI.yml)
+  [![Donate](https://img.shields.io/badge/Ko--Fi-donate-orange?logo=ko-fi&color=E53935)](https://ko-fi.com/C0C3RTCCI)
 </div>
 
 Want to remap your input devices like keyboards, mice, controllers and more?  
 There's nothing you can't remap with **map2**!
 
-- **Remap keys, mouse events, controllers, pedals, and more!**
-- **Highly configurable, using Python**
-- **Blazingly fast, written in Rust**
-- **Tiny install size (around 5Mb), almost no dependencies**
+- :computer_mouse:  **Remap keys, mouse events, controllers, pedals, and more!**
+- :wrench:  **Highly configurable**, using Python
+- :rocket: **Blazingly fast**, written in Rust
+- :package: **Tiny install size** (around 5Mb), almost no dependencies
+- :heart: **Open source**, made with love
 
 Visit our [official documentation](https://shiro.github.io/map2/en/basics/introduction)
 for the full feature list and API.
+
+---
+
+<div align="center">
+    <b>If you like open source, consider supporting</b>
+    <br/>
+    <br/>
+    <a href='https://ko-fi.com/C0C3RTCCI' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi3.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+</div>
 
 ## Install
 
