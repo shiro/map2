@@ -146,7 +146,6 @@ fn run_python_handler(
 struct Inner {
     id: Arc<Uuid>,
     subscriber_map: Arc<RwLock<SubscriberMap>>,
-    state: RwLock<State>,
     transformer: Arc<XKBTransformer>,
     mappings: RwLock<Mappings>,
 
@@ -156,9 +155,7 @@ struct Inner {
 }
 
 impl Inner {
-    fn handle(&self, path_hash: u64, raw_ev: InputEvent) {
-        let mut state_guard = self.state.write().unwrap();
-        let mut state = state_guard.deref_mut();
+    fn handle(&self, path_hash: u64, raw_ev: InputEvent, state: &mut State) {
         let mappings = self.mappings.read().unwrap();
 
         let subscriber_map = self.subscriber_map.read().unwrap();
@@ -203,7 +200,7 @@ impl Inner {
                                         let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                     }
                                     RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                        let new_events = release_restore_modifiers(&mut state, from_flags, to_flags, to_type);
+                                        let new_events = release_restore_modifiers(state, from_flags, to_flags, to_type);
                                         // events.append(&mut new_events);
                                         for ev in new_events {
                                             let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
@@ -215,7 +212,7 @@ impl Inner {
                         RuntimeAction::PythonCallback(from_modifiers, handler) => {
                             if let Some((path_hash, subscriber)) = subscriber {
                                 // always release all trigger mods before running the callback
-                                let new_events = release_restore_modifiers(&mut state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                                let new_events = release_restore_modifiers(state, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
                                 for ev in new_events {
                                     let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                 }
@@ -235,7 +232,7 @@ impl Inner {
                     return;
                 }
 
-                let was_modifier = event_handlers::update_modifiers(&mut state, &KeyAction::from_input_ev(&ev));
+                let was_modifier = event_handlers::update_modifiers(state, &KeyAction::from_input_ev(&ev));
 
                 // don't trigger the fallback handler with modifier keys
                 if !was_modifier {
@@ -337,7 +334,6 @@ impl Mapper {
         let inner = Arc::new(Inner {
             id: id.clone(),
             subscriber_map: subscriber_map.clone(),
-            state: RwLock::new(State::new()),
             mappings: RwLock::new(Mappings::new()),
             ..Default::default()
         });
@@ -346,9 +342,12 @@ impl Mapper {
 
         let _inner = inner.clone();
         get_runtime().spawn(async move {
+            let mut state_map = HashMap::new();
+
             loop {
-                let (path, ev) = ev_rx.recv().await.unwrap();
-                _inner.handle(path, ev);
+                let (path_hash, ev) = ev_rx.recv().await.unwrap();
+                let state = state_map.entry(path_hash).or_default();
+                _inner.handle(path_hash, ev, state);
             }
         });
 
