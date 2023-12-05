@@ -1,4 +1,6 @@
+use evdev_rs::enums::EV_ABS;
 use itertools::Itertools;
+use nom::combinator::all_consuming;
 use crate::xkb::XKBTransformer;
 
 use super::*;
@@ -45,4 +47,10 @@ pub fn parse_key_sequence(raw: &str, transformer: Option<&XKBTransformer>) -> Re
     }
 
     Ok(res)
+}
+
+pub fn parse_abs_tag(input: &str) -> Result<EV_ABS> {
+    all_consuming(abs_tag)(input)
+        .map(|(_, x)| x)
+        .map_err(|_|anyhow!("invalid input"))
 }

@@ -65,6 +65,7 @@ pub mod error;
 pub mod global;
 pub mod platform;
 pub mod subscriber_map;
+pub mod capabilities;
 
 #[cfg(feature = "integration")]
 pub mod testing;

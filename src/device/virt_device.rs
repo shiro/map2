@@ -25,23 +25,23 @@ impl DeviceCapabilities {
         }
     }
 
-    pub fn enable_keyboard(&mut self) {
+    pub fn enable_all_keyboard(&mut self) {
         for bit in ALL_KEYS {
             self.bits.insert(EventCode::EV_KEY(*bit));
         }
         self.bits.insert(EventCode::EV_MSC(EV_MSC::MSC_SCAN));
     }
-    pub fn enable_buttons(&mut self) {
+    pub fn enable_all_buttons(&mut self) {
         for bit in ALL_BUTTONS {
             self.bits.insert(EventCode::EV_KEY(*bit));
         }
     }
-    pub fn enable_rel(&mut self) {
+    pub fn enable_all_rel(&mut self) {
         for bit in ALL_REL {
             self.bits.insert(EventCode::EV_REL(*bit));
         }
     }
-    pub fn enable_abs(&mut self) {
+    pub fn enable_all_abs(&mut self) {
         for bit in ALL_ABS {
             self.abs_bits.insert((
                 EventCode::EV_ABS(*bit),
@@ -55,6 +55,9 @@ impl DeviceCapabilities {
                 }
             ));
         }
+    }
+    pub fn enable_abs(&mut self, code: EV_ABS, info: AbsInfo) {
+        self.abs_bits.insert((EventCode::EV_ABS(code), info));
     }
 }
 

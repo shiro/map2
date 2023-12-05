@@ -4,6 +4,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::TryRecvError;
 #[cfg(not(feature = "integration"))]
 use evdev_rs::enums::EventType::EV_SYN;
+use pythonize::depythonize;
 
 use python::*;
 
@@ -42,17 +43,42 @@ impl Writer {
 
         let mut capabilities = DeviceCapabilities::new();
         if let Some(_capabilities) = options.get("capabilities") {
-            let _capabilities: HashMap<&str, &PyAny> = _capabilities.extract()
-                .map_err(|_| PyRuntimeError::new_err("the 'capabilities' object must be a dict"))?;
+            let _capabilities: capabilities::Capabilities = depythonize(_capabilities)
+                .map_err(|_| PyRuntimeError::new_err("object 'capabilities' did not match the schema"))?;
 
-            if _capabilities.contains_key("keyboard") { capabilities.enable_keyboard(); }
-            if _capabilities.contains_key("buttons") { capabilities.enable_buttons(); }
-            if _capabilities.contains_key("rel") { capabilities.enable_rel(); }
-            if _capabilities.contains_key("abs") { capabilities.enable_abs(); }
+            if _capabilities.keys { capabilities.enable_all_keyboard(); }
+            if _capabilities.buttons { capabilities.enable_all_buttons(); }
+            if _capabilities.rel { capabilities.enable_all_rel(); }
+            match _capabilities.abs {
+                capabilities::Abs::Bool(x) if x => { capabilities.enable_all_abs() }
+                capabilities::Abs::Specification(x) => {
+                    for (key, value) in x.iter() {
+                        let tag = parse_abs_tag(key)
+                            .map_err(|_| PyRuntimeError::new_err("invalid key '{key}'"))?;
+
+                        if let Some(abs_info) = match value {
+                            &capabilities::AbsSpec::Bool(x) if x =>
+                                Some(capabilities::AbsInfo {
+                                    value: 128,
+                                    minimum: 0,
+                                    maximum: 255,
+                                    fuzz: 0,
+                                    flat: 0,
+                                    resolution: 0,
+                                }),
+                            capabilities::AbsSpec::AbsInfo(x) => Some(x.clone()),
+                            _ => None
+                        } {
+                            capabilities.enable_abs(tag, abs_info.into_evdev());
+                        }
+                    }
+                }
+                _ => {}
+            }
         } else {
-            capabilities.enable_keyboard();
-            capabilities.enable_buttons();
-            capabilities.enable_rel();
+            capabilities.enable_all_keyboard();
+            capabilities.enable_all_buttons();
+            capabilities.enable_all_rel();
         }
 
         let device_init_policy = match options.get("clone_from") {

@@ -761,6 +761,7 @@ dependencies = [
  "pyo3",
  "pyo3-asyncio",
  "pytests",
+ "pythonize",
  "regex",
  "serde",
  "serde_json",
@@ -1173,6 +1174,16 @@ dependencies = [
 [[package]]
 name = "pytests"
 version = "1.0.0"
+
+[[package]]
+name = "pythonize"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffd1c3ef39c725d63db5f9bc455461bafd80540cb7824c61afb823501921a850"
+dependencies = [
+ "pyo3",
+ "serde",
+]
 
 [[package]]
 name = "quick-xml"

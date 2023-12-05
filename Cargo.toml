@@ -49,6 +49,7 @@ nix = "0.26.4"
 thiserror = "1.0.50"
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = { version = "1.0.108" }
+pythonize = { version = "0.20.0" }
 
 # wayland
 wayland-client = "0.31.1"
