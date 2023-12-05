@@ -97,7 +97,7 @@ pub fn motion_action(input: &str) -> ParseResult<&str, KeyAction> {
         |((tag1, _, tag2), _, value)| {
             let event_code = match &*tag1 {
                 "relative" => {
-                    match &*tag2 {
+                    match &*tag2.to_uppercase() {
                         "X" => EventCode::EV_REL(REL_X),
                         "Y" => EventCode::EV_REL(REL_Y),
                         "Z" => EventCode::EV_REL(REL_Z),
@@ -116,7 +116,7 @@ pub fn motion_action(input: &str) -> ParseResult<&str, KeyAction> {
                     }
                 }
                 "absolute" => {
-                    match &*tag2 {
+                    match &*tag2.to_uppercase() {
                         "X" => EventCode::EV_ABS(ABS_X),
                         "Y" => EventCode::EV_ABS(ABS_Y),
                         "Z" => EventCode::EV_ABS(ABS_Z),
@@ -180,18 +180,23 @@ mod tests {
     #[test]
     fn motion_action_input() {
         assert_eq!(motion_action("relative X 33"), nom_ok(
-            KeyAction { key: Key { event_code: EventCode::EV_REL(EV_REL::REL_X) }, value: 33 }
+            KeyAction { key: Key { event_code: EventCode::EV_REL(REL_X) }, value: 33 }
         ));
+
         assert_eq!(motion_action("relative Y 99"), nom_ok(
-            KeyAction { key: Key { event_code: EventCode::EV_REL(EV_REL::REL_Y) }, value: 99 }
+            KeyAction { key: Key { event_code: EventCode::EV_REL(REL_Y) }, value: 99 }
         ));
 
         assert_eq!(motion_action("absolute Z 99"), nom_ok(
-            KeyAction { key: Key { event_code: EventCode::EV_ABS(EV_ABS::ABS_Z) }, value: 99 }
+            KeyAction { key: Key { event_code: EventCode::EV_ABS(ABS_Z) }, value: 99 }
+        ));
+
+        assert_eq!(motion_action("absolute hat0x 1"), nom_ok(
+            KeyAction { key: Key { event_code: EventCode::EV_ABS(ABS_HAT0X) }, value: 1 }
         ));
 
         assert_eq!(motion_action("absolute TILT_X -5"), nom_ok(
-            KeyAction { key: Key { event_code: EventCode::EV_ABS(EV_ABS::ABS_TILT_X) }, value: -5 }
+            KeyAction { key: Key { event_code: EventCode::EV_ABS(ABS_TILT_X) }, value: -5 }
         ));
     }
 
