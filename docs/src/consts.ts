@@ -56,6 +56,7 @@ export const SIDEBAR: Sidebar = {
     "Examples": [
       { text: "Hello world", link: "en/examples/hello-world" },
       { text: "WASD mouse control", link: "en/examples/wasd-mouse-control" },
+      { text: "Keyboard to controller", link: "en/examples/keyboard_to_controller" },
     ]
   }
 }

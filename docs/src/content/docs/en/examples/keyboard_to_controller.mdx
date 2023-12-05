@@ -1,0 +1,17 @@
+---
+title: 'Keyboard to controller'
+description: 'Control a virtual controller using your keyboard'
+---
+
+import { Code } from 'astro:components';
+import code from "@examples/keyboard_to_controller.py?raw";
+
+
+<Code experimentalThemes={{light: "github-light", dark: "github-dark"}} code={code} lang="python" />
+
+
+Creates a new virtual controller device and binds keyboard buttons to
+various actions.
+
+This example simulates a controller with 2 joysticks, a dpad, A/B/X/Y buttons,
+start/select buttons and 2 shoulder buttons on each side.
