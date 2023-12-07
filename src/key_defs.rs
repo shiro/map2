@@ -493,7 +493,7 @@ pub static ALL_KEYS: &'static [evdev_rs::enums::EV_KEY] = &[
     KEY_KBD_LCD_MENU3,
     KEY_KBD_LCD_MENU4,
     KEY_KBD_LCD_MENU5,
-    KEY_MAX,
+    // KEY_MAX,
 ];
 
 pub static ALL_BUTTONS: &'static [evdev_rs::enums::EV_KEY] = &[
@@ -621,7 +621,7 @@ pub static ALL_REL: &'static [evdev_rs::enums::EV_REL] = &[
     REL_RESERVED,
     REL_WHEEL_HI_RES,
     REL_HWHEEL_HI_RES,
-    REL_MAX,
+    // REL_MAX,
 ];
 
 pub static ALL_ABS: &'static [evdev_rs::enums::EV_ABS] = &[
@@ -667,7 +667,7 @@ pub static ALL_ABS: &'static [evdev_rs::enums::EV_ABS] = &[
     ABS_MT_DISTANCE,
     ABS_MT_TOOL_X,
     ABS_MT_TOOL_Y,
-    ABS_MAX,
+    // ABS_MAX,
 ];
 
 lazy_static! {
