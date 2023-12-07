@@ -543,7 +543,8 @@ pub static ALL_BUTTONS: &'static [evdev_rs::enums::EV_KEY] = &[
     BTN_MODE,
     BTN_THUMBL,
     BTN_THUMBR,
-    BTN_TOOL_PEN,
+    // TODO figure out why this breaks mouse setups
+    // BTN_TOOL_PEN,
     BTN_TOOL_RUBBER,
     BTN_TOOL_BRUSH,
     BTN_TOOL_PENCIL,
