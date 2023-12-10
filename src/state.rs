@@ -5,7 +5,6 @@ pub struct MapperState {
     pub modifiers: Arc<KeyModifierState>,
 }
 
-
 impl MapperState {
     pub fn new() -> Self {
         MapperState {

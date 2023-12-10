@@ -1,13 +1,12 @@
-use std::hash::{Hash, Hasher};
 use ::oneshot;
+use std::hash::{Hash, Hasher};
 
-use crate::*;
-use crate::python::*;
 use crate::event::InputEvent;
-use crate::subscriber::{Subscriber, add_event_subscription};
+use crate::python::*;
+use crate::subscriber::{add_event_subscription, Subscriber};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
-
+use crate::*;
 
 #[pyclass]
 pub struct Reader {
@@ -20,7 +19,6 @@ pub struct Reader {
     reader_thread_handle: Option<thread::JoinHandle<Result<()>>>,
 }
 
-
 #[pymethods]
 impl Reader {
     #[new]
@@ -28,13 +26,16 @@ impl Reader {
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(options) => options.extract()?,
-            None => HashMap::new()
+            None => HashMap::new(),
         };
 
         let patterns: Vec<&str> = match options.get("patterns") {
-            Some(patterns) => patterns.extract()
+            Some(patterns) => patterns
+                .extract()
                 .map_err(|_| PyRuntimeError::new_err("'patterns' must be of type 'string[]?'"))?,
-            None => { vec![] }
+            None => {
+                vec![]
+            }
         };
 
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());
@@ -42,11 +43,16 @@ impl Reader {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
         let transformer = XKB_TRANSFORMER_REGISTRY
-            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
+            .get(&TransformerParams::new(
+                kbd_model,
+                kbd_layout,
+                kbd_variant,
+                kbd_options,
+            ))
             .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
         #[cfg(not(feature = "integration"))]
-            let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
+        let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
 
         let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
         let _subscriber = subscriber.clone();
@@ -54,7 +60,7 @@ impl Reader {
         let id = Arc::new(Uuid::new_v4());
 
         #[cfg(not(feature = "integration"))]
-            let reader_thread_handle = if !patterns.is_empty() {
+        let reader_thread_handle = if !patterns.is_empty() {
             let mut h = DefaultHasher::new();
             vec![id.clone()].hash(&mut h);
             let path_hash = h.finish();
@@ -66,7 +72,9 @@ impl Reader {
             });
 
             Some(grab_udev_inputs(&patterns, handler, reader_exit_rx).map_err(err_to_py)?)
-        } else { None };
+        } else {
+            None
+        };
 
         Ok(Self {
             id,
@@ -81,9 +89,7 @@ impl Reader {
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
         let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
-            .map_err(|err|
-                ApplicationError::KeySequenceParse(err.to_string()).into_py()
-            )?
+            .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
 
         let mut h = DefaultHasher::new();
@@ -124,7 +130,9 @@ impl Reader {
 
         let target = match add_event_subscription(target) {
             Some(target) => target,
-            None => { return Err(PyRuntimeError::new_err("unsupported link target")); }
+            None => {
+                return Err(PyRuntimeError::new_err("unsupported link target"));
+            }
         };
         self.subscriber.store(Some(Arc::new(target)));
         Ok(())

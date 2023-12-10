@@ -5,14 +5,14 @@ use std::os::fd::AsFd;
 
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
-use pyo3::{pyclass, pymethods, PyResult};
 use pyo3::types::PyDict;
+use pyo3::{pyclass, pymethods, PyResult};
 use tempfile::tempfile;
 use unicode_segmentation::UnicodeSegmentation;
-use wayland_client::{Connection, EventQueue, Proxy};
-use wayland_client::{Dispatch, protocol::wl_registry, QueueHandle};
-use wayland_client::globals::{GlobalListContents, registry_queue_init};
+use wayland_client::globals::{registry_queue_init, GlobalListContents};
 use wayland_client::protocol::wl_seat;
+use wayland_client::{protocol::wl_registry, Dispatch, QueueHandle};
+use wayland_client::{Connection, EventQueue, Proxy};
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_manager_v1;
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1;
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_v1;
@@ -33,9 +33,7 @@ impl VirtualWriter {
     #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let keyboard = VirtualKeyboard::new().unwrap();
-        Ok(Self {
-            keyboard,
-        })
+        Ok(Self { keyboard })
     }
 
     pub fn send(&mut self, val: String) {
@@ -59,7 +57,8 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for AppData {
         data: &GlobalListContents,
         conn: &Connection,
         qhandle: &QueueHandle<AppData>,
-    ) {}
+    ) {
+    }
 }
 
 impl Dispatch<WlSeat, ()> for AppData {
@@ -70,7 +69,8 @@ impl Dispatch<WlSeat, ()> for AppData {
         data: &(),
         conn: &Connection,
         qhandle: &QueueHandle<AppData>,
-    ) {}
+    ) {
+    }
 }
 
 impl Dispatch<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1, ()> for AppData {
@@ -81,9 +81,9 @@ impl Dispatch<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1, ()> 
         data: &(),
         conn: &Connection,
         qhandle: &QueueHandle<AppData>,
-    ) {}
+    ) {
+    }
 }
-
 
 impl Dispatch<zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1, ()> for AppData {
     fn event(
@@ -93,7 +93,8 @@ impl Dispatch<zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1, ()> for AppData {
         data: &(),
         conn: &Connection,
         qhandle: &QueueHandle<AppData>,
-    ) {}
+    ) {
+    }
 }
 
 struct VirtualKeyboard {
@@ -111,8 +112,10 @@ impl VirtualKeyboard {
         event_queue.roundtrip(&mut AppData).unwrap();
 
         let seat: WlSeat = globals.bind(&event_queue.handle(), 7..=8, ()).unwrap();
-        let keybaord_manager: ZwpVirtualKeyboardManagerV1 = globals.bind(&event_queue.handle(), 1..=1, ()).unwrap();
-        let mut keyboard = keybaord_manager.create_virtual_keyboard(&seat, &event_queue.handle(), ());
+        let keybaord_manager: ZwpVirtualKeyboardManagerV1 =
+            globals.bind(&event_queue.handle(), 1..=1, ()).unwrap();
+        let mut keyboard =
+            keybaord_manager.create_virtual_keyboard(&seat, &event_queue.handle(), ());
 
         event_queue.roundtrip(&mut AppData).unwrap();
 
@@ -152,12 +155,14 @@ impl VirtualKeyboard {
     }
 }
 
-
 struct KeymapEntry {
     keysym: Keysym,
 }
 
-fn init_virtual_keyboard_v2(keyboard: &ZwpVirtualKeyboardV1, keymap: &HashMap<Keysym, u32>) -> Result<()> {
+fn init_virtual_keyboard_v2(
+    keyboard: &ZwpVirtualKeyboardV1,
+    keymap: &HashMap<Keysym, u32>,
+) -> Result<()> {
     let mut keymap_file = tempfile().map_err(|_| anyhow!("unable to create temporary file"))?;
 
     keymap_file.write_all("xkb_keymap {\n".as_bytes())?;
@@ -172,7 +177,8 @@ fn init_virtual_keyboard_v2(keyboard: &ZwpVirtualKeyboardV1, keymap: &HashMap<Ke
     keymap_file.write_all("};\n".as_bytes())?;
 
     keymap_file.write_all("xkb_types \"(unnamed)\" { include \"complete\" };\n".as_bytes())?;
-    keymap_file.write_all("xkb_compatibility \"(unnamed)\" { include \"complete\" };\n".as_bytes())?;
+    keymap_file
+        .write_all("xkb_compatibility \"(unnamed)\" { include \"complete\" };\n".as_bytes())?;
 
     keymap_file.write_all("xkb_symbols \"(unnamed)\" {\n".as_bytes())?;
 

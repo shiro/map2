@@ -1,7 +1,7 @@
 use std::io::Write;
 
-use map2::*;
 use map2::python::*;
+use map2::*;
 
 #[pyo3_asyncio::tokio::main]
 async fn main() -> pyo3::PyResult<()> {
@@ -10,7 +10,8 @@ async fn main() -> pyo3::PyResult<()> {
         // .arg("--")
         // .arg("--cfg").arg("test")
         // .arg("--cfg").arg("integration")
-        .arg("--features").arg("integration")
+        .arg("--features")
+        .arg("integration")
         .output()?;
 
     if !cmd.status.success() {
@@ -29,8 +30,11 @@ mod integration_tests {
 pub fn writer_read(py: Python, module: &PyModule, name: &str) -> Option<EvdevInputEvent> {
     let target = module.getattr(name).unwrap().to_object(py);
 
-    target.call_method0(py, "__test__read_ev").unwrap()
-        .extract::<Option<String>>(py).unwrap()
+    target
+        .call_method0(py, "__test__read_ev")
+        .unwrap()
+        .extract::<Option<String>>(py)
+        .unwrap()
         .and_then(|x| serde_json::from_str(&x).unwrap())
 }
 
@@ -46,7 +50,9 @@ pub fn reader_send(py: Python, module: &PyModule, name: &str, ev: &EvdevInputEve
     let target = module.getattr(name).unwrap().to_object(py);
     let ev = serde_json::to_string(ev).unwrap();
 
-    target.call_method(py, "__test__write_ev", (ev, ), None).unwrap();
+    target
+        .call_method(py, "__test__write_ev", (ev,), None)
+        .unwrap();
 }
 
 pub fn reader_send_all(py: Python, module: &PyModule, name: &str, ev_list: &Vec<EvdevInputEvent>) {
@@ -54,10 +60,14 @@ pub fn reader_send_all(py: Python, module: &PyModule, name: &str, ev_list: &Vec<
 
     for ev in ev_list.iter() {
         let ev = serde_json::to_string(ev).unwrap();
-        target.call_method(py, "__test__write_ev", (ev, ), None).unwrap();
+        target
+            .call_method(py, "__test__write_ev", (ev,), None)
+            .unwrap();
     }
 }
 
 pub fn keys(input: &str) -> Vec<EvdevInputEvent> {
-    parse_key_sequence(input, Some(&Default::default())).unwrap().to_input_ev()
+    parse_key_sequence(input, Some(&Default::default()))
+        .unwrap()
+        .to_input_ev()
 }

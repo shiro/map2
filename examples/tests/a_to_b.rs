@@ -10,12 +10,11 @@ async fn hello_world() -> PyResult<()> {
 
         reader_send_all(py, m, "reader", &keys("a"));
 
-        py.allow_threads(|| { thread::sleep(Duration::from_millis(25)); });
+        py.allow_threads(|| {
+            thread::sleep(Duration::from_millis(25));
+        });
 
-        assert_eq!(
-            writer_read_all(py, m, "writer"),
-            keys("b"),
-        );
+        assert_eq!(writer_read_all(py, m, "writer"), keys("b"),);
 
         Ok(())
     })?;

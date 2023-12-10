@@ -1,17 +1,16 @@
-use crate::*;
 use crate::event_loop::{args_to_py, PythonArgument};
-use crate::mapper::{RuntimeAction, RuntimeKeyAction};
 use crate::mapper::mapping_functions::*;
+use crate::mapper::{RuntimeAction, RuntimeKeyAction};
 use crate::python::*;
 use crate::subscriber::{SubscribeEvent, Subscriber};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
+use crate::*;
 
 #[derive(Debug)]
 pub enum ControlMessage {
     AddMapping(KeyActionWithMods, RuntimeAction),
 }
-
 
 #[derive(Debug, Clone)]
 enum PythonReturn {
@@ -27,11 +26,12 @@ fn run_python_handler(
     subscriber: Option<&(u64, Subscriber)>,
 ) {
     let ret = Python::with_gil(|py| -> Result<()> {
-        let asyncio = py.import("asyncio")
+        let asyncio = py
+            .import("asyncio")
             .expect("python runtime error: failed to import 'asyncio', is it installed?");
 
         let is_async_callback: bool = asyncio
-            .call_method1("iscoroutinefunction", (handler.as_ref(py), ))
+            .call_method1("iscoroutinefunction", (handler.as_ref(py),))
             .expect("python runtime error: 'iscoroutinefunction' lookup failed")
             .extract()
             .expect("python runtime error: 'iscoroutinefunction' call failed");
@@ -41,10 +41,13 @@ fn run_python_handler(
             Ok(())
         } else {
             let args = args_to_py(py, args.unwrap_or(vec![]));
-            let ret = handler.call(py, args, None)
+            let ret = handler
+                .call(py, args, None)
                 .map_err(|err| anyhow!("{}", err))
                 .and_then(|ret| {
-                    if ret.is_none(py) { return Ok(None); }
+                    if ret.is_none(py) {
+                        return Ok(None);
+                    }
 
                     if let Ok(ret) = ret.extract::<String>(py) {
                         return Ok(Some(PythonReturn::String(ret)));
@@ -62,7 +65,8 @@ fn run_python_handler(
 
                     if let Some((path_hash, subscriber)) = subscriber {
                         for action in seq.to_key_actions() {
-                            let _ = subscriber.send((*path_hash, InputEvent::Raw(action.to_input_ev())));
+                            let _ = subscriber
+                                .send((*path_hash, InputEvent::Raw(action.to_input_ev())));
                         }
                     }
                 }
@@ -83,7 +87,6 @@ fn run_python_handler(
     }
 }
 
-
 #[derive(Default)]
 struct Inner {
     id: Arc<Uuid>,
@@ -103,11 +106,17 @@ impl Inner {
         let subscriber_map = self.subscriber_map.read().unwrap();
         let subscriber = subscriber_map.get(&path_hash);
 
-        let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
+        let ev = match &raw_ev {
+            InputEvent::Raw(ev) => ev,
+        };
 
         match ev {
             // key event
-            EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+            EvdevInputEvent {
+                event_code: EventCode::EV_KEY(key),
+                value,
+                ..
+            } => {
                 let mut from_modifiers = KeyModifierFlags::new();
                 from_modifiers.ctrl = state.modifiers.is_ctrl();
                 from_modifiers.alt = state.modifiers.is_alt();
@@ -116,7 +125,9 @@ impl Inner {
                 from_modifiers.meta = state.modifiers.is_meta();
 
                 let from_key_action = KeyActionWithMods {
-                    key: Key { event_code: ev.event_code },
+                    key: Key {
+                        event_code: ev.event_code,
+                    },
                     value: ev.value,
                     modifiers: from_modifiers,
                 };
@@ -126,7 +137,9 @@ impl Inner {
                         RuntimeAction::ActionSequence(seq) => {
                             let (path_hash, subscriber) = match subscriber {
                                 Some(x) => x,
-                                None => { return; }
+                                None => {
+                                    return;
+                                }
                             };
 
                             for action in seq {
@@ -136,11 +149,21 @@ impl Inner {
 
                                         let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                     }
-                                    RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                        let new_events = release_restore_modifiers(&state.modifiers, from_flags, to_flags, to_type);
+                                    RuntimeKeyAction::ReleaseRestoreModifiers(
+                                        from_flags,
+                                        to_flags,
+                                        to_type,
+                                    ) => {
+                                        let new_events = release_restore_modifiers(
+                                            &state.modifiers,
+                                            from_flags,
+                                            to_flags,
+                                            to_type,
+                                        );
                                         // events.append(&mut new_events);
                                         for ev in new_events {
-                                            let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
+                                            let _ =
+                                                subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                         }
                                     }
                                 }
@@ -149,19 +172,18 @@ impl Inner {
                         RuntimeAction::PythonCallback(from_modifiers, handler) => {
                             if let Some((path_hash, subscriber)) = subscriber {
                                 // always release all trigger mods before running the callback
-                                let new_events = release_restore_modifiers(&state.modifiers, from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                                let new_events = release_restore_modifiers(
+                                    &state.modifiers,
+                                    from_modifiers,
+                                    &KeyModifierFlags::new(),
+                                    &TYPE_UP,
+                                );
                                 for ev in new_events {
                                     let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                 }
                             }
 
-                            run_python_handler(
-                                &handler,
-                                None,
-                                ev,
-                                &self.transformer,
-                                subscriber,
-                            );
+                            run_python_handler(&handler, None, ev, &self.transformer, subscriber);
                         }
                         RuntimeAction::NOP => {}
                     }
@@ -169,12 +191,17 @@ impl Inner {
                     return;
                 }
 
-                let was_modifier = event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
+                let was_modifier = event_handlers::update_modifiers(
+                    &mut state.modifiers,
+                    &KeyAction::from_input_ev(&ev),
+                );
 
                 // don't trigger the fallback handler with modifier keys
                 if !was_modifier {
                     if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
-                        let name = self.transformer.raw_to_utf(key, &*state.modifiers)
+                        let name = self
+                            .transformer
+                            .raw_to_utf(key, &*state.modifiers)
                             .unwrap_or_else(|| format!("{key:?}").to_string());
 
                         let value = match *value {
@@ -182,49 +209,41 @@ impl Inner {
                             1 => "down",
                             2 => "repeat",
                             _ => unreachable!(),
-                        }.to_string();
+                        }
+                        .to_string();
 
-                        let args = vec![
-                            PythonArgument::String(name),
-                            PythonArgument::String(value),
-                        ];
+                        let args =
+                            vec![PythonArgument::String(name), PythonArgument::String(value)];
 
-                        run_python_handler(
-                            &handler,
-                            Some(args),
-                            ev,
-                            &self.transformer,
-                            subscriber,
-                        );
+                        run_python_handler(&handler, Some(args), ev, &self.transformer, subscriber);
 
                         return;
                     }
                 }
             }
             // rel/abs event
-            EvdevInputEvent { event_code, value, .. }
-            if matches!(event_code, EventCode::EV_REL(..)) || matches!(event_code, EventCode::EV_ABS(..))
-            => {
+            EvdevInputEvent {
+                event_code, value, ..
+            } if matches!(event_code, EventCode::EV_REL(..))
+                || matches!(event_code, EventCode::EV_ABS(..)) =>
+            {
                 let (key, handler) = match event_code {
-                    EventCode::EV_REL(key) => (format!("{key:?}").to_string(), self.relative_handler.read().unwrap()),
-                    EventCode::EV_ABS(key) => (format!("{key:?}").to_string(), self.absolute_handler.read().unwrap()),
-                    _ => unreachable!()
+                    EventCode::EV_REL(key) => (
+                        format!("{key:?}").to_string(),
+                        self.relative_handler.read().unwrap(),
+                    ),
+                    EventCode::EV_ABS(key) => (
+                        format!("{key:?}").to_string(),
+                        self.absolute_handler.read().unwrap(),
+                    ),
+                    _ => unreachable!(),
                 };
                 if let Some(handler) = handler.as_ref() {
                     let name = format!("{key:?}");
                     // remove prefix REL_ / ABS_
                     let name = name[4..name.len()].to_string();
-                    let args = vec![
-                        PythonArgument::String(name),
-                        PythonArgument::Number(*value),
-                    ];
-                    run_python_handler(
-                        &handler,
-                        Some(args),
-                        ev,
-                        &self.transformer,
-                        subscriber,
-                    );
+                    let args = vec![PythonArgument::String(name), PythonArgument::Number(*value)];
+                    run_python_handler(&handler, Some(args), ev, &self.transformer, subscriber);
                     return;
                 }
             }
@@ -236,7 +255,6 @@ impl Inner {
         }
     }
 }
-
 
 #[pyclass]
 pub struct Mapper {
@@ -254,7 +272,7 @@ impl Mapper {
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),
-            None => HashMap::new()
+            None => HashMap::new(),
         };
 
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());
@@ -262,7 +280,12 @@ impl Mapper {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
         let transformer = XKB_TRANSFORMER_REGISTRY
-            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
+            .get(&TransformerParams::new(
+                kbd_model,
+                kbd_layout,
+                kbd_variant,
+                kbd_options,
+            ))
             .map_err(err_to_py)?;
 
         let subscriber_map: Arc<RwLock<SubscriberMap>> = Arc::new(RwLock::new(HashMap::new()));
@@ -297,20 +320,21 @@ impl Mapper {
         })
     }
 
-
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer))
-            .map_err(|err| PyRuntimeError::new_err(format!(
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer)).map_err(|err| {
+            PyRuntimeError::new_err(format!(
                 "mapping error on the 'from' side:\n{}",
                 ApplicationError::KeyParse(err.to_string()),
-            )))?;
+            ))
+        })?;
 
         if let Ok(to) = to.extract::<String>(py) {
-            let to = parse_key_sequence(&to, Some(&self.transformer))
-                .map_err(|err| PyRuntimeError::new_err(format!(
+            let to = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
+                PyRuntimeError::new_err(format!(
                     "mapping error on the 'to' side:\n{}",
                     ApplicationError::KeySequenceParse(err.to_string()),
-                )))?;
+                ))
+            })?;
 
             self._map_key(from, to)?;
             return Ok(());
@@ -327,17 +351,19 @@ impl Mapper {
     }
 
     pub fn map_key(&mut self, from: String, to: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer))
-            .map_err(|err| PyRuntimeError::new_err(format!(
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer)).map_err(|err| {
+            PyRuntimeError::new_err(format!(
                 "mapping error on the 'from' side:\n{}",
                 ApplicationError::KeyParse(err.to_string()),
-            )))?;
+            ))
+        })?;
 
-        let to = parse_key_action_with_mods(&to, Some(&self.transformer))
-            .map_err(|err| PyRuntimeError::new_err(format!(
+        let to = parse_key_action_with_mods(&to, Some(&self.transformer)).map_err(|err| {
+            PyRuntimeError::new_err(format!(
                 "mapping error on the 'to' side:\n{}",
                 ApplicationError::KeyParse(err.to_string()),
-            )))?;
+            ))
+        })?;
 
         self._map_key(from, vec![to])?;
         Ok(())
@@ -368,20 +394,29 @@ impl Mapper {
     }
 
     pub fn nop(&mut self, from: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer))
-            .map_err(|err| PyRuntimeError::new_err(format!(
+        let from = parse_key_action_with_mods(&from, Some(&self.transformer)).map_err(|err| {
+            PyRuntimeError::new_err(format!(
                 "mapping error on the 'from' side:\n{}",
                 ApplicationError::KeyParse(err.to_string()),
-            )))?;
+            ))
+        })?;
 
         match from {
             ParsedKeyAction::KeyAction(from) => {
-                self.inner.mappings.write().unwrap().insert(from, RuntimeAction::NOP);
+                self.inner
+                    .mappings
+                    .write()
+                    .unwrap()
+                    .insert(from, RuntimeAction::NOP);
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 for value in 0..=2 {
                     let from = KeyActionWithMods::new(from.key, value, from.modifiers);
-                    self.inner.mappings.write().unwrap().insert(from, RuntimeAction::NOP);
+                    self.inner
+                        .mappings
+                        .write()
+                        .unwrap()
+                        .insert(from, RuntimeAction::NOP);
                 }
             }
             ParsedKeyAction::Action(_) => {
@@ -392,7 +427,10 @@ impl Mapper {
         Ok(())
     }
 
-    pub fn snapshot(&self, existing: Option<&KeyMapperSnapshot>) -> PyResult<Option<KeyMapperSnapshot>> {
+    pub fn snapshot(
+        &self,
+        existing: Option<&KeyMapperSnapshot>,
+    ) -> PyResult<Option<KeyMapperSnapshot>> {
         if let Some(existing) = existing {
             *self.inner.mappings.write().unwrap() = existing.mappings.clone();
             *self.inner.fallback_handler.write().unwrap() = existing.fallback_handler.clone();
@@ -416,7 +454,9 @@ impl Mapper {
 
         let target = match add_event_subscription(target) {
             Some(target) => target,
-            None => { return Err(ApplicationError::InvalidLinkTarget.into()); }
+            None => {
+                return Err(ApplicationError::InvalidLinkTarget.into());
+            }
         };
 
         let mut h = DefaultHasher::new();
@@ -428,7 +468,10 @@ impl Mapper {
         path.hash(&mut h);
         let next_path_hash = h.finish();
 
-        self.subscriber_map.write().unwrap().insert(path_hash, (next_path_hash, target));
+        self.subscriber_map
+            .write()
+            .unwrap()
+            .insert(path_hash, (next_path_hash, target));
         Ok(())
     }
 
@@ -439,21 +482,27 @@ impl Mapper {
     fn _map_callback(&mut self, from: ParsedKeyAction, to: PyObject) -> PyResult<()> {
         match from {
             ParsedKeyAction::KeyAction(from) => {
-                self.inner.mappings.write().unwrap().insert(from, RuntimeAction::PythonCallback(from.modifiers, to));
+                self.inner
+                    .mappings
+                    .write()
+                    .unwrap()
+                    .insert(from, RuntimeAction::PythonCallback(from.modifiers, to));
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 self.inner.mappings.write().unwrap().insert(
                     from.to_key_action(1),
                     RuntimeAction::PythonCallback(from.modifiers, to),
                 );
-                self.inner.mappings.write().unwrap().insert(
-                    from.to_key_action(0),
-                    RuntimeAction::NOP,
-                );
-                self.inner.mappings.write().unwrap().insert(
-                    from.to_key_action(2),
-                    RuntimeAction::NOP,
-                );
+                self.inner
+                    .mappings
+                    .write()
+                    .unwrap()
+                    .insert(from.to_key_action(0), RuntimeAction::NOP);
+                self.inner
+                    .mappings
+                    .write()
+                    .unwrap()
+                    .insert(from.to_key_action(2), RuntimeAction::NOP);
             }
             ParsedKeyAction::Action(_) => {
                 return Err(ApplicationError::NonButton.into());
@@ -472,17 +521,32 @@ impl Mapper {
                         // key action to click
                         ParsedKeyAction::KeyClickAction(to) => {
                             let mapping = map_action_to_click(&from, &to);
-                            self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
+                            self.inner
+                                .mappings
+                                .write()
+                                .unwrap()
+                                .insert(mapping.0, mapping.1);
                         }
                         // key action to key action
                         ParsedKeyAction::KeyAction(to) => {
                             let mapping = map_action_to_action(&from, &to);
-                            self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
+                            self.inner
+                                .mappings
+                                .write()
+                                .unwrap()
+                                .insert(mapping.0, mapping.1);
                         }
                         // key action to action
                         ParsedKeyAction::Action(to) => {
-                            let mapping = map_action_to_action(&from, &to.to_key_action_with_mods(Default::default()));
-                            self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
+                            let mapping = map_action_to_action(
+                                &from,
+                                &to.to_key_action_with_mods(Default::default()),
+                            );
+                            self.inner
+                                .mappings
+                                .write()
+                                .unwrap()
+                                .insert(mapping.0, mapping.1);
                         }
                     }
                     return Ok(());
@@ -490,7 +554,11 @@ impl Mapper {
 
                 // action to seq
                 let mapping = map_action_to_seq(from, to);
-                self.inner.mappings.write().unwrap().insert(mapping.0, mapping.1);
+                self.inner
+                    .mappings
+                    .write()
+                    .unwrap()
+                    .insert(mapping.0, mapping.1);
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 if to.len() == 1 {
@@ -536,7 +604,6 @@ impl Mapper {
         Ok(())
     }
 }
-
 
 #[pyclass]
 pub struct KeyMapperSnapshot {
