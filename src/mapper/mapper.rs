@@ -191,34 +191,38 @@ impl Inner {
                     return;
                 }
 
-                let was_modifier = event_handlers::update_modifiers(
+                event_handlers::update_modifiers(
                     &mut state.modifiers,
                     &KeyAction::from_input_ev(&ev),
                 );
 
-                // don't trigger the fallback handler with modifier keys
-                if !was_modifier {
-                    if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
-                        let name = self
+                if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
+                    let name = match key {
+                        KEY_SPACE => "space".to_string(),
+                        KEY_TAB => "tab".to_string(),
+                        KEY_ENTER => "enter".to_string(),
+                        _ => self
                             .transformer
                             .raw_to_utf(key, &*state.modifiers)
-                            .unwrap_or_else(|| format!("{key:?}").to_string());
+                            .unwrap_or_else(|| {
+                                let name = format!("{key:?}").to_string();
+                                name[4..name.len()].to_lowercase()
+                            }),
+                    };
 
-                        let value = match *value {
-                            0 => "up",
-                            1 => "down",
-                            2 => "repeat",
-                            _ => unreachable!(),
-                        }
-                        .to_string();
-
-                        let args =
-                            vec![PythonArgument::String(name), PythonArgument::String(value)];
-
-                        run_python_handler(&handler, Some(args), ev, &self.transformer, subscriber);
-
-                        return;
+                    let value = match *value {
+                        0 => "up",
+                        1 => "down",
+                        2 => "repeat",
+                        _ => unreachable!(),
                     }
+                    .to_string();
+
+                    let args = vec![PythonArgument::String(name), PythonArgument::String(value)];
+
+                    run_python_handler(&handler, Some(args), ev, &self.transformer, subscriber);
+
+                    return;
                 }
             }
             // rel/abs event
