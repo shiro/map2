@@ -50,10 +50,11 @@ const aliases = (() => {
 
   return Object.fromEntries(
     snippet
+      .replaceAll("\n", " ")
       .split(";")
       .map(x => x.trim())
       .filter(Boolean)
-      .map(x => new RegExp(`"(.*)".*KEY_([^.]+)`).exec(x).slice(1, 3))
+      .map(x => new RegExp(`"(.*)".*KEY_([^.]+)`).exec(x)!.slice(1, 3))
       .map(([alias, key]) => [key.toLowerCase(), alias.toLowerCase()])
     );
 })();
