@@ -1,6 +1,6 @@
 [package]
 name = "map2"
-version = "2.0.10"
+version = "2.0.11"
 authors = ["shiro <shiro@usagi.io>"]
 edition = "2018"
 
