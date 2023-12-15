@@ -7,3 +7,4 @@
 *.zst
 *.tar.gz
 /dist
+.vim/
