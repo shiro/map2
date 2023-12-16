@@ -1,7 +1,9 @@
 mod mapper;
-mod text_mapper;
 mod mapping_functions;
+mod suffix_tree;
+mod text_mapper;
 
+pub use mapper::{KeyMapperSnapshot, Mapper};
 pub use mapping_functions::*;
-pub use mapper::{Mapper, KeyMapperSnapshot};
-pub use text_mapper::{TextMapper};
+pub use text_mapper::TextMapper;
+

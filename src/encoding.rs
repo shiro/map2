@@ -1,7 +1,6 @@
 use xkbcommon::xkb::Keysym;
 use xkeysym::{key, RawKeysym};
 
-
 pub fn xkb_utf32_to_keysym(utf: u32) -> Keysym {
     // First check for Latin-1 characters (1:1 mapping).
     if matches!(utf, 0x0020..=0x007e) || matches!(utf, 0x00a0..=0x00ff) {
@@ -69,11 +68,8 @@ pub fn xkb_keysym_to_utf32(sym: RawKeysym) -> u32 {
     KEYSYMTAB
         .iter()
         .find(|pair| pair.keysym as u32 == sym)
-        .map_or(0, |pair| {
-            pair.ucs as u32
-        })
+        .map_or(0, |pair| pair.ucs as u32)
 }
-
 
 struct CodePair {
     keysym: u16,

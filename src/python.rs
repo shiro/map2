@@ -1,14 +1,14 @@
 pub use pyo3::exceptions::PyRuntimeError;
 pub use pyo3::impl_::wrap::OkWrap;
 pub use pyo3::prelude::*;
-pub use pyo3::PyClass;
 pub use pyo3::types::PyDict;
+pub use pyo3::PyClass;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use tokio::runtime::Runtime;
 
-use crate::*;
 use crate::virtual_writer::VirtualWriter;
 use crate::window::Window;
+use crate::*;
 
 #[pyclass]
 struct PyKey {
@@ -18,13 +18,12 @@ struct PyKey {
     value: i32,
 }
 
-
 #[pyfunction]
 #[pyo3(signature = (* * options))]
 fn default(options: Option<&PyDict>) -> PyResult<()> {
     let options: HashMap<&str, &PyAny> = match options {
         Some(py_dict) => py_dict.extract().unwrap(),
-        None => HashMap::new()
+        None => HashMap::new(),
     };
 
     let kbd_model: Option<String> = options.get("model").and_then(|x| x.extract().ok());
@@ -32,13 +31,22 @@ fn default(options: Option<&PyDict>) -> PyResult<()> {
     let kbd_variant: Option<Option<String>> = options.get("variant").and_then(|x| x.extract().ok());
     let kbd_options: Option<Option<String>> = options.get("options").and_then(|x| x.extract().ok());
 
-    if kbd_model.is_some() || kbd_layout.is_some() || kbd_variant.is_some() || kbd_options.is_some() {
+    if kbd_model.is_some() || kbd_layout.is_some() || kbd_variant.is_some() || kbd_options.is_some()
+    {
         let mut default_params = global::DEFAULT_TRANSFORMER_PARAMS.write().unwrap();
 
-        if let Some(model) = kbd_model { default_params.model = model; }
-        if let Some(layout) = kbd_layout { default_params.layout = layout; }
-        if let Some(variant) = kbd_variant { default_params.variant = variant; }
-        if let Some(options) = kbd_options { default_params.options = options; }
+        if let Some(model) = kbd_model {
+            default_params.model = model;
+        }
+        if let Some(layout) = kbd_layout {
+            default_params.layout = layout;
+        }
+        if let Some(variant) = kbd_variant {
+            default_params.variant = variant;
+        }
+        if let Some(options) = kbd_options {
+            default_params.options = options;
+        }
     }
     Ok(())
 }
@@ -73,7 +81,9 @@ pub fn err_to_py(err: anyhow::Error) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
 
-pub fn get_runtime<'a>() -> &'a Runtime { pyo3_asyncio::tokio::get_runtime() }
+pub fn get_runtime<'a>() -> &'a Runtime {
+    pyo3_asyncio::tokio::get_runtime()
+}
 
 #[pyfunction]
 fn wait(py: Python) {
@@ -95,11 +105,12 @@ fn exit(exit_code: Option<i32>) {
 #[cfg(feature = "integration")]
 #[pyfunction]
 fn __test() -> PyResult<Vec<String>> {
-    Ok(global::TEST_PIPE.lock().unwrap()
+    Ok(global::TEST_PIPE
+        .lock()
+        .unwrap()
         .iter()
         .map(|x| serde_json::to_string(x).unwrap())
-        .collect()
-    )
+        .collect())
 }
 
 #[pymodule]

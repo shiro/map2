@@ -1,21 +1,21 @@
-use nom::Slice;
-use crate::*;
-use crate::mapper::RuntimeKeyAction;
 use crate::mapper::mapping_functions::*;
+use crate::mapper::RuntimeKeyAction;
 use crate::python::*;
 use crate::subscriber::{SubscribeEvent, Subscriber};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
+use crate::*;
+use nom::Slice;
+
+use super::suffix_tree::SuffixTree;
 
 type Mappings = SuffixTree<Vec<RuntimeKeyAction>>;
-
 
 #[derive(Default)]
 struct State {
     pub modifiers: Arc<KeyModifierState>,
     pub window: Vec<char>,
 }
-
 
 impl State {
     pub fn new() -> Self {
@@ -27,73 +27,20 @@ impl State {
 }
 
 fn _map(from: &KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> Vec<RuntimeKeyAction> {
-    let mut seq: Vec<RuntimeKeyAction> = to.to_key_actions()
+    let mut seq: Vec<RuntimeKeyAction> = to
+        .to_key_actions()
         .into_iter()
         .map(|action| RuntimeKeyAction::KeyAction(action))
         .collect();
-    seq.insert(0, RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP));
+    seq.insert(
+        0,
+        RuntimeKeyAction::ReleaseRestoreModifiers(
+            from.modifiers.clone(),
+            KeyModifierFlags::new(),
+            TYPE_UP,
+        ),
+    );
     seq
-}
-
-#[derive(Default)]
-struct SuffixTree<Value> {
-    root: HashMap<char, SuffixTreeNode<Value>>,
-}
-
-impl<Value> SuffixTree<Value> {
-    pub fn new() -> Self { Self { root: HashMap::new() } }
-
-    pub fn insert(&mut self, key: String, value: Value) {
-        self.root.entry(key.chars().last().unwrap()).or_default().insert(&key[0..key.len() - 1], value);
-    }
-
-    pub fn get(&self, key: &String) -> Option<&Value> {
-        self.root.get(&key.chars().last().unwrap()).and_then(|x| x.get(&key[0..key.len() - 1]))
-    }
-}
-
-impl<Value: Clone> Clone for SuffixTree<Value> {
-    fn clone(&self) -> Self { Self { root: self.root.clone() } }
-}
-
-struct SuffixTreeNode<Value> {
-    value: Option<Value>,
-    children: HashMap<char, SuffixTreeNode<Value>>,
-}
-
-impl<Value> Default for SuffixTreeNode<Value> {
-    fn default() -> Self { Self { value: None, children: HashMap::new() } }
-}
-
-impl<Value> SuffixTreeNode<Value> {
-    pub fn new() -> Self {
-        Self { value: None, children: HashMap::new() }
-    }
-
-    pub fn insert(&mut self, key: &str, value: Value) {
-        if let Some(ch) = key.chars().last() {
-            self.children.entry(ch).or_default().insert(key.slice(0..key.len() - 1), value);
-        } else {
-            self.value = Some(value);
-        }
-    }
-
-    pub fn get(&self, key: &str) -> Option<&Value> {
-        if let Some(ch) = key.chars().last() {
-            self.children.get(&ch).and_then(|x| x.get(key.slice(0..key.len() - 1)))
-        } else {
-            self.value.as_ref()
-        }
-    }
-}
-
-impl<Value: Clone> Clone for SuffixTreeNode<Value> {
-    fn clone(&self) -> Self {
-        Self {
-            value: self.value.clone(),
-            children: self.children.clone(),
-        }
-    }
 }
 
 #[derive(Default)]
@@ -111,17 +58,31 @@ impl Inner {
         let subscriber_map = self.subscriber_map.read().unwrap();
         let subscriber = subscriber_map.get(&path_hash);
 
-        let ev = match &raw_ev { InputEvent::Raw(ev) => ev };
+        let ev = match &raw_ev {
+            InputEvent::Raw(ev) => ev,
+        };
 
         match ev {
-            EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_BACKSPACE), value: 1, .. } => {
+            EvdevInputEvent {
+                event_code: EventCode::EV_KEY(KEY_BACKSPACE),
+                value: 1,
+                ..
+            } => {
                 state.window.pop();
             }
-            EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_DELETE), value: 1, .. } => {
+            EvdevInputEvent {
+                event_code: EventCode::EV_KEY(KEY_DELETE),
+                value: 1,
+                ..
+            } => {
                 state.window.remove(0);
             }
             // key event
-            EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+            EvdevInputEvent {
+                event_code: EventCode::EV_KEY(key),
+                value,
+                ..
+            } => {
                 let mut from_modifiers = KeyModifierFlags::new();
                 from_modifiers.ctrl = state.modifiers.is_ctrl();
                 from_modifiers.alt = state.modifiers.is_alt();
@@ -152,16 +113,20 @@ impl Inner {
                             state.window.clear();
                             let (path_hash, subscriber) = match subscriber {
                                 Some(x) => x,
-                                None => { return; }
+                                None => {
+                                    return;
+                                }
                             };
 
                             for _ in 1..from_len {
-                                let _ = subscriber.send((*path_hash, InputEvent::Raw(
-                                    Key::from(KEY_BACKSPACE).to_input_ev(1),
-                                )));
-                                let _ = subscriber.send((*path_hash, InputEvent::Raw(
-                                    Key::from(KEY_BACKSPACE).to_input_ev(0),
-                                )));
+                                let _ = subscriber.send((
+                                    *path_hash,
+                                    InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)),
+                                ));
+                                let _ = subscriber.send((
+                                    *path_hash,
+                                    InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)),
+                                ));
                             }
 
                             for action in to {
@@ -170,13 +135,21 @@ impl Inner {
                                         let ev = key_action.to_input_ev();
                                         let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                     }
-                                    RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                                    RuntimeKeyAction::ReleaseRestoreModifiers(
+                                        from_flags,
+                                        to_flags,
+                                        to_type,
+                                    ) => {
                                         let new_events = release_restore_modifiers(
-                                            &state.modifiers, &from_flags, &to_flags, &to_type,
+                                            &state.modifiers,
+                                            &from_flags,
+                                            &to_flags,
+                                            &to_type,
                                         );
                                         // events.append(&mut new_events);
                                         for ev in new_events {
-                                            let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
+                                            let _ =
+                                                subscriber.send((*path_hash, InputEvent::Raw(ev)));
                                         }
                                     }
                                 }
@@ -186,7 +159,10 @@ impl Inner {
                     }
                 }
 
-                event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
+                event_handlers::update_modifiers(
+                    &mut state.modifiers,
+                    &KeyAction::from_input_ev(&ev),
+                );
             }
             _ => {}
         }
@@ -196,7 +172,6 @@ impl Inner {
         }
     }
 }
-
 
 #[pyclass]
 pub struct TextMapper {
@@ -214,7 +189,7 @@ impl TextMapper {
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),
-            None => HashMap::new()
+            None => HashMap::new(),
         };
 
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());
@@ -222,7 +197,12 @@ impl TextMapper {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
         let transformer = XKB_TRANSFORMER_REGISTRY
-            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
+            .get(&TransformerParams::new(
+                kbd_model,
+                kbd_layout,
+                kbd_variant,
+                kbd_options,
+            ))
             .map_err(err_to_py)?;
 
         let subscriber_map: Arc<RwLock<SubscriberMap>> = Arc::new(RwLock::new(HashMap::new()));
@@ -259,29 +239,33 @@ impl TextMapper {
 
     pub fn map(&mut self, from: String, to: String) -> PyResult<()> {
         if from.len() > 32 {
-            return Err(PyRuntimeError::new_err("'from' side cannot be longer than 32 character"));
+            return Err(PyRuntimeError::new_err(
+                "'from' side cannot be longer than 32 character",
+            ));
         }
 
-        let from_seq: Vec<KeyClickActionWithMods> = parse_key_sequence(&from, Some(&self.transformer))
-            .map_err(|err| PyRuntimeError::new_err(format!(
-                "mapping error on the 'from' side:\n{}",
-                ApplicationError::KeyParse(err.to_string()),
-            )))?
-            .into_iter()
-            .map(|x| {
-                match x {
+        let from_seq: Vec<KeyClickActionWithMods> =
+            parse_key_sequence(&from, Some(&self.transformer))
+                .map_err(|err| {
+                    PyRuntimeError::new_err(format!(
+                        "mapping error on the 'from' side:\n{}",
+                        ApplicationError::KeyParse(err.to_string()),
+                    ))
+                })?
+                .into_iter()
+                .map(|x| match x {
                     ParsedKeyAction::KeyClickAction(x) => Some(x),
                     _ => None,
-                }
-            })
-            .collect::<Option<Vec<_>>>()
-            .ok_or_else(|| PyRuntimeError::new_err("invalid key sequence"))?;
+                })
+                .collect::<Option<Vec<_>>>()
+                .ok_or_else(|| PyRuntimeError::new_err("invalid key sequence"))?;
 
-        let to = parse_key_sequence(&to, Some(&self.transformer))
-            .map_err(|err| PyRuntimeError::new_err(format!(
+        let to = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
+            PyRuntimeError::new_err(format!(
                 "mapping error on the 'to' side:\n{}",
                 ApplicationError::KeySequenceParse(err.to_string()),
-            )))?;
+            ))
+        })?;
 
         let to = _map(from_seq.last().unwrap(), to);
 
@@ -290,7 +274,10 @@ impl TextMapper {
         Ok(())
     }
 
-    pub fn snapshot(&self, existing: Option<&TextMapperSnapshot>) -> PyResult<Option<TextMapperSnapshot>> {
+    pub fn snapshot(
+        &self,
+        existing: Option<&TextMapperSnapshot>,
+    ) -> PyResult<Option<TextMapperSnapshot>> {
         if let Some(existing) = existing {
             *self.inner.mappings.write().unwrap() = existing.mappings.clone();
             return Ok(None);
@@ -308,7 +295,9 @@ impl TextMapper {
 
         let target = match add_event_subscription(target) {
             Some(target) => target,
-            None => { return Err(ApplicationError::InvalidLinkTarget.into()); }
+            None => {
+                return Err(ApplicationError::InvalidLinkTarget.into());
+            }
         };
 
         let mut h = DefaultHasher::new();
@@ -320,7 +309,10 @@ impl TextMapper {
         path.hash(&mut h);
         let next_path_hash = h.finish();
 
-        self.subscriber_map.write().unwrap().insert(path_hash, (next_path_hash, target));
+        self.subscriber_map
+            .write()
+            .unwrap()
+            .insert(path_hash, (next_path_hash, target));
         Ok(())
     }
 
