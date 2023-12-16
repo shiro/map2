@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use crate::xkb::XKBTransformer;
 use crate::*;
-
+use std::collections::HashMap;
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct TransformerParams {
@@ -23,16 +22,25 @@ impl TransformerParams {
         let layout = layout.unwrap_or(default.layout.clone());
         let variant = variant.or(default.variant.clone());
         let options = options.or(default.options.clone());
-        Self { model, layout, variant, options }
+        Self {
+            model,
+            layout,
+            variant,
+            options,
+        }
     }
 }
 
 impl Default for TransformerParams {
     fn default() -> Self {
-        Self { model: "pc105".to_string(), layout: "us".to_string(), variant: None, options: None }
+        Self {
+            model: "pc105".to_string(),
+            layout: "us".to_string(),
+            variant: None,
+            options: None,
+        }
     }
 }
-
 
 pub struct XKBTransformerRegistry {
     registry: Mutex<HashMap<TransformerParams, Weak<XKBTransformer>>>,
@@ -40,32 +48,29 @@ pub struct XKBTransformerRegistry {
 
 impl XKBTransformerRegistry {
     pub fn new() -> Self {
-        Self { registry: Mutex::new(HashMap::new()) }
+        Self {
+            registry: Mutex::new(HashMap::new()),
+        }
     }
 
-    pub fn get(
-        &self,
-        params: &TransformerParams,
-    ) -> Result<Arc<XKBTransformer>> {
+    pub fn get(&self, params: &TransformerParams) -> Result<Arc<XKBTransformer>> {
         let mut registry = self.registry.lock().unwrap();
         let res = registry.get(&params);
 
         match res {
-            Some(f) => {
-                match f.upgrade() {
-                    Some(transformer) => Ok(transformer),
-                    None => {
-                        let transformer = Arc::new(XKBTransformer::new(
-                            &params.model,
-                            &params.layout,
-                            params.variant.as_deref(),
-                            params.options.clone(),
-                        )?);
-                        registry.insert(params.clone(), Arc::downgrade(&transformer));
-                        Ok(transformer)
-                    }
+            Some(f) => match f.upgrade() {
+                Some(transformer) => Ok(transformer),
+                None => {
+                    let transformer = Arc::new(XKBTransformer::new(
+                        &params.model,
+                        &params.layout,
+                        params.variant.as_deref(),
+                        params.options.clone(),
+                    )?);
+                    registry.insert(params.clone(), Arc::downgrade(&transformer));
+                    Ok(transformer)
                 }
-            }
+            },
             None => {
                 let transformer = Arc::new(XKBTransformer::new(
                     &params.model,
@@ -83,3 +88,4 @@ impl XKBTransformerRegistry {
 lazy_static! {
     pub static ref XKB_TRANSFORMER_REGISTRY: XKBTransformerRegistry = XKBTransformerRegistry::new();
 }
+

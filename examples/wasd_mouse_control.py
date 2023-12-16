@@ -6,15 +6,17 @@ import map2
 import time
 import threading
 
-map2.default(layout = "us")
+map2.default(layout="us")
 
 # an easy to use interval utility that allows us to run a function on a timer
+
+
 class setInterval:
     def __init__(self, interval, action):
         self.interval = interval / 1000
         self.action = action
         self.stopEvent = threading.Event()
-        thread = threading.Thread(target = self.__setInterval)
+        thread = threading.Thread(target=self.__setInterval)
         thread.start()
 
     def __setInterval(self):
@@ -26,6 +28,7 @@ class setInterval:
     def cancel(self):
         self.stopEvent.set()
 
+
 # read from keyboard
 reader_kbd = map2.Reader(patterns=["/dev/input/by-id/example-keyboard"])
 
@@ -33,8 +36,8 @@ reader_kbd = map2.Reader(patterns=["/dev/input/by-id/example-keyboard"])
 reader_mouse = map2.Reader()
 
 # add new virtual output devices
-writer_kbd = map2.Writer(clone_from = "/dev/input/by-id/example-keyboard")
-writer_mouse = map2.Writer(capabilities = {"rel": True, "buttons": True})
+writer_kbd = map2.Writer(clone_from="/dev/input/by-id/example-keyboard")
+writer_mouse = map2.Writer(capabilities={"rel": True, "buttons": True})
 
 # add mapper
 mapper_kbd = map2.Mapper()
@@ -46,6 +49,7 @@ map2.link([reader_mouse, writer_mouse])
 
 # we keep a map of intervals that maps each key to the associated interval
 intervals = {}
+
 
 def mouse_ctrl(key, state, axis, multiplier):
     def inner_fn():
