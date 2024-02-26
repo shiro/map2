@@ -32,13 +32,17 @@ tokio = { version = "1.13.0", features = ["full"] }
 unicode-xid = "0.2.4"
 walkdir = "2.4.0"
 x11rb = "0.7.0"
-hyprland = "0.3.12"
+hyprland = "0.3.9"
 xdg = "2.2.0"
 atty = "0.2"
 indoc = "1.0"
 futures-intrusive = "0.4.0"
 pyo3 = { version = "0.20.0" }
-pyo3-asyncio = { version = "0.20.0", features = ["attributes", "tokio-runtime", "testing"] }
+pyo3-asyncio = { version = "0.20.0", features = [
+  "attributes",
+  "tokio-runtime",
+  "testing",
+] }
 oneshot = "0.1.2"
 signal-hook = "0.3.17"
 uuid = { version = "1.5.0", features = ["v4"] }
@@ -53,7 +57,11 @@ pythonize = { version = "0.20.0" }
 
 # wayland
 wayland-client = "0.31.1"
-wayland-protocols-misc = { version = "0.2.0", features = ["client", "wayland-server", "wayland-client"] }
+wayland-protocols-misc = { version = "0.2.0", features = [
+  "client",
+  "wayland-server",
+  "wayland-client",
+] }
 xkeysym = "0.2.0"
 unicode-segmentation = "1.10.1"
 xkbcommon = { version = "0.7.0", features = ["wayland"] }
