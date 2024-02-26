@@ -3,7 +3,7 @@
 set -e
 
 
-yum install -y libxkbcommon-devel
+yum install -y libxkbcommon-devel libatomic
 
 cd /tmp
 git clone https://github.com/pkgconf/pkgconf
