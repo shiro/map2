@@ -6,7 +6,6 @@ pub enum Platform {
     Unknown,
 }
 
-
 pub fn get_platform() -> Platform {
     if platform_is_hyprland() {
         return Platform::Hyprland;
@@ -29,7 +28,10 @@ fn platform_is_x11() -> bool {
     Command::new("printenv")
         .arg("XDG_SESSION_TYPE")
         .output()
-        .map(|info| info.status.success() && String::from_utf8_lossy(&info.stdout) == "x11")
+        .map(|info| {
+            info.status.success()
+                && String::from_utf8_lossy(&info.stdout).replace("\n", "") == "x11"
+        })
         .unwrap_or(false)
 }
 
@@ -46,3 +48,4 @@ fn platform_is_x11() -> bool {
 
 // for gnome
 // https://github.com/ActivityWatch/aw-watcher-window/pull/46/files
+
