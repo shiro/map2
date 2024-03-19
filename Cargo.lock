@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "map2"
-version = "2.0.11"
+version = "2.0.13"
 dependencies = [
  "anyhow",
  "arc-swap",
