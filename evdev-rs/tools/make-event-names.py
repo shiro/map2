@@ -90,7 +90,7 @@ def print_enums(bits, prefix):
 
     print("#[allow(non_camel_case_types)]")
     print('#[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]')
-    print("#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]")
+    print("#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]")
     print("pub enum %s {" % enum_name)
     for val, names in list(getattr(bits, prefix).items()):
         # Note(ndesh): We use EV_MAX as proxy to write the UNKnown event
@@ -174,7 +174,7 @@ def print_event_code(bits, prefix):
 
     print("#[allow(non_camel_case_types)]")
     print('#[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]')
-    print("#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]")
+    print("#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]")
     print("pub enum EventCode {")
     for val, [name] in list(getattr(bits, prefix).items()):
         if name[3:]+"_" in event_names:

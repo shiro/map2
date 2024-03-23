@@ -268,7 +268,6 @@ impl TextMapper {
         })?;
 
         let to = _map(from_seq.last().unwrap(), to);
-
         self.inner.mappings.write().unwrap().insert(from, to);
 
         Ok(())

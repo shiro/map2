@@ -2,4 +2,4 @@
 
 set -e
 
-cargo test --no-default-features --features integration
+cargo test --no-default-features --features integration $@

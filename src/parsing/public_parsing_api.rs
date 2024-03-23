@@ -49,6 +49,20 @@ pub fn parse_key_sequence(raw: &str, transformer: Option<&XKBTransformer>) -> Re
     Ok(res)
 }
 
+pub fn parse_key(raw: &str, transformer: Option<&XKBTransformer>) -> Result<Key> {
+    let (rest, ((key, flags))) = key_utf(transformer)(raw)
+        .map_err(|err| format_err(err, raw, 0))?;
+
+    // if !rest.is_empty() {
+    //     return Err(
+    //         format_err(NomErr::Error(last_err), raw, raw.len() - rest.len())
+    //     );
+    // }
+    // TODO errr handling
+
+    Ok(key)
+}
+
 pub fn parse_abs_tag(input: &str) -> Result<EV_ABS> {
     all_consuming(abs_tag)(input)
         .map(|(_, x)| x)

@@ -70,6 +70,10 @@ fn link(py: Python, chain: Vec<PyObject>) -> PyResult<()> {
                 source.link(path.clone(), target.as_ref(py))?;
                 path.push(source.id.clone());
             }
+            if let Ok(mut source) = source.extract::<PyRefMut<ChordMapper>>(py) {
+                source.link(path.clone(), target.as_ref(py))?;
+                path.push(source.id.clone());
+            }
         }
         prev = Some(target);
     }
@@ -125,6 +129,7 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Mapper>()?;
     m.add_class::<KeyMapperSnapshot>()?;
     m.add_class::<TextMapper>()?;
+    m.add_class::<ChordMapper>()?;
     m.add_class::<Writer>()?;
     m.add_class::<VirtualWriter>()?;
     m.add_class::<Window>()?;

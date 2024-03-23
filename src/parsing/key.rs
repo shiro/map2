@@ -123,13 +123,19 @@ mod tests {
     #[test]
     fn test_utf_key() {
         let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
+        let key_utf = key_utf(Some(&t));
 
-        assert_eq!(key_utf(Some(&t))(":"), nom_ok((
+        assert_eq!(key_utf("A"), nom_ok((
+            Key::from_str("KEY_A").unwrap(),
+            KeyModifierFlags::new().tap_mut(|x| x.shift())
+        )));
+
+        assert_eq!(key_utf(":"), nom_ok((
             Key::from_str("semicolon").unwrap(),
             KeyModifierFlags::new().tap_mut(|x| x.shift())
         )));
 
-        assert_eq!(key_utf(Some(&t))("^"), nom_ok((
+        assert_eq!(key_utf("^"), nom_ok((
             Key::from_str("6").unwrap(),
             KeyModifierFlags::new().tap_mut(|x| x.shift())
         )));

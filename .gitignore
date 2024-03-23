@@ -2,6 +2,7 @@
 
 /local
 /target
+pytests/target
 /pkg
 .env
 *.zst

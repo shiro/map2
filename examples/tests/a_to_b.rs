@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::*;
 
 #[pyo3_asyncio::tokio::test]
-async fn hello_world() -> PyResult<()> {
+async fn a_to_b() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
         let m = pytests::include_python!();
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EventType {
     EV_SYN = 0,
     EV_KEY = 1,
@@ -67,7 +67,7 @@ impl std::str::FromStr for EventType {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EventCode {
     EV_SYN(EV_SYN),
     EV_KEY(EV_KEY),
@@ -87,7 +87,7 @@ pub enum EventCode {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_REL {
     REL_X = 0,
     REL_Y = 1,
@@ -99,9 +99,6 @@ pub enum EV_REL {
     REL_DIAL = 7,
     REL_WHEEL = 8,
     REL_MISC = 9,
-    REL_RESERVED = 10,
-    REL_WHEEL_HI_RES = 11,
-    REL_HWHEEL_HI_RES = 12,
     REL_MAX = 15,
 }
 
@@ -117,9 +114,6 @@ pub fn int_to_ev_rel(code: u32) -> Option<EV_REL> {
         7 => Some(EV_REL::REL_DIAL),
         8 => Some(EV_REL::REL_WHEEL),
         9 => Some(EV_REL::REL_MISC),
-        10 => Some(EV_REL::REL_RESERVED),
-        11 => Some(EV_REL::REL_WHEEL_HI_RES),
-        12 => Some(EV_REL::REL_HWHEEL_HI_RES),
         15 => Some(EV_REL::REL_MAX),
         _ => None,
     }
@@ -139,9 +133,6 @@ impl std::str::FromStr for EV_REL {
             "REL_DIAL" => Ok(EV_REL::REL_DIAL),
             "REL_WHEEL" => Ok(EV_REL::REL_WHEEL),
             "REL_MISC" => Ok(EV_REL::REL_MISC),
-            "REL_RESERVED" => Ok(EV_REL::REL_RESERVED),
-            "REL_WHEEL_HI_RES" => Ok(EV_REL::REL_WHEEL_HI_RES),
-            "REL_HWHEEL_HI_RES" => Ok(EV_REL::REL_HWHEEL_HI_RES),
             "REL_MAX" => Ok(EV_REL::REL_MAX),
             _ => Err(()),
         }
@@ -150,7 +141,7 @@ impl std::str::FromStr for EV_REL {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_ABS {
     ABS_X = 0,
     ABS_Y = 1,
@@ -178,7 +169,6 @@ pub enum EV_ABS {
     ABS_TOOL_WIDTH = 28,
     ABS_VOLUME = 32,
     ABS_MISC = 40,
-    ABS_RESERVED = 46,
     ABS_MT_SLOT = 47,
     ABS_MT_TOUCH_MAJOR = 48,
     ABS_MT_TOUCH_MINOR = 49,
@@ -225,7 +215,6 @@ pub fn int_to_ev_abs(code: u32) -> Option<EV_ABS> {
         28 => Some(EV_ABS::ABS_TOOL_WIDTH),
         32 => Some(EV_ABS::ABS_VOLUME),
         40 => Some(EV_ABS::ABS_MISC),
-        46 => Some(EV_ABS::ABS_RESERVED),
         47 => Some(EV_ABS::ABS_MT_SLOT),
         48 => Some(EV_ABS::ABS_MT_TOUCH_MAJOR),
         49 => Some(EV_ABS::ABS_MT_TOUCH_MINOR),
@@ -276,7 +265,6 @@ impl std::str::FromStr for EV_ABS {
             "ABS_TOOL_WIDTH" => Ok(EV_ABS::ABS_TOOL_WIDTH),
             "ABS_VOLUME" => Ok(EV_ABS::ABS_VOLUME),
             "ABS_MISC" => Ok(EV_ABS::ABS_MISC),
-            "ABS_RESERVED" => Ok(EV_ABS::ABS_RESERVED),
             "ABS_MT_SLOT" => Ok(EV_ABS::ABS_MT_SLOT),
             "ABS_MT_TOUCH_MAJOR" => Ok(EV_ABS::ABS_MT_TOUCH_MAJOR),
             "ABS_MT_TOUCH_MINOR" => Ok(EV_ABS::ABS_MT_TOUCH_MINOR),
@@ -300,7 +288,7 @@ impl std::str::FromStr for EV_ABS {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_KEY {
     KEY_RESERVED = 0,
     KEY_ESC = 1,
@@ -565,10 +553,10 @@ pub enum EV_KEY {
     KEY_TITLE = 369,
     KEY_SUBTITLE = 370,
     KEY_ANGLE = 371,
-    KEY_FULL_SCREEN = 372,
+    KEY_ZOOM = 372,
     KEY_MODE = 373,
     KEY_KEYBOARD = 374,
-    KEY_ASPECT_RATIO = 375,
+    KEY_SCREEN = 375,
     KEY_PC = 376,
     KEY_TV = 377,
     KEY_TV2 = 378,
@@ -636,9 +624,6 @@ pub enum EV_KEY {
     KEY_10CHANNELSUP = 440,
     KEY_10CHANNELSDOWN = 441,
     KEY_IMAGES = 442,
-    KEY_NOTIFICATION_CENTER = 444,
-    KEY_PICKUP_PHONE = 445,
-    KEY_HANGUP_PHONE = 446,
     KEY_DEL_EOL = 448,
     KEY_DEL_EOS = 449,
     KEY_INS_LINE = 450,
@@ -664,7 +649,6 @@ pub enum EV_KEY {
     KEY_FN_F = 482,
     KEY_FN_S = 483,
     KEY_FN_B = 484,
-    KEY_FN_RIGHT_SHIFT = 485,
     KEY_BRL_DOT1 = 497,
     KEY_BRL_DOT2 = 498,
     KEY_BRL_DOT3 = 499,
@@ -707,7 +691,6 @@ pub enum EV_KEY {
     KEY_ATTENDANT_TOGGLE = 541,
     KEY_LIGHTS_TOGGLE = 542,
     KEY_ALS_TOGGLE = 560,
-    KEY_ROTATE_LOCK_TOGGLE = 561,
     KEY_BUTTONCONFIG = 576,
     KEY_TASKMANAGER = 577,
     KEY_JOURNAL = 578,
@@ -715,8 +698,6 @@ pub enum EV_KEY {
     KEY_APPSELECT = 580,
     KEY_SCREENSAVER = 581,
     KEY_VOICECOMMAND = 582,
-    KEY_ASSISTANT = 583,
-    KEY_KBD_LAYOUT_NEXT = 584,
     KEY_BRIGHTNESS_MIN = 592,
     KEY_BRIGHTNESS_MAX = 593,
     KEY_KBDINPUTASSIST_PREV = 608,
@@ -743,50 +724,6 @@ pub enum EV_KEY {
     KEY_FASTREVERSE = 629,
     KEY_SLOWREVERSE = 630,
     KEY_DATA = 631,
-    KEY_ONSCREEN_KEYBOARD = 632,
-    KEY_PRIVACY_SCREEN_TOGGLE = 633,
-    KEY_SELECTIVE_SCREENSHOT = 634,
-    KEY_MACRO1 = 656,
-    KEY_MACRO2 = 657,
-    KEY_MACRO3 = 658,
-    KEY_MACRO4 = 659,
-    KEY_MACRO5 = 660,
-    KEY_MACRO6 = 661,
-    KEY_MACRO7 = 662,
-    KEY_MACRO8 = 663,
-    KEY_MACRO9 = 664,
-    KEY_MACRO10 = 665,
-    KEY_MACRO11 = 666,
-    KEY_MACRO12 = 667,
-    KEY_MACRO13 = 668,
-    KEY_MACRO14 = 669,
-    KEY_MACRO15 = 670,
-    KEY_MACRO16 = 671,
-    KEY_MACRO17 = 672,
-    KEY_MACRO18 = 673,
-    KEY_MACRO19 = 674,
-    KEY_MACRO20 = 675,
-    KEY_MACRO21 = 676,
-    KEY_MACRO22 = 677,
-    KEY_MACRO23 = 678,
-    KEY_MACRO24 = 679,
-    KEY_MACRO25 = 680,
-    KEY_MACRO26 = 681,
-    KEY_MACRO27 = 682,
-    KEY_MACRO28 = 683,
-    KEY_MACRO29 = 684,
-    KEY_MACRO30 = 685,
-    KEY_MACRO_RECORD_START = 688,
-    KEY_MACRO_RECORD_STOP = 689,
-    KEY_MACRO_PRESET_CYCLE = 690,
-    KEY_MACRO_PRESET1 = 691,
-    KEY_MACRO_PRESET2 = 692,
-    KEY_MACRO_PRESET3 = 693,
-    KEY_KBD_LCD_MENU1 = 696,
-    KEY_KBD_LCD_MENU2 = 697,
-    KEY_KBD_LCD_MENU3 = 698,
-    KEY_KBD_LCD_MENU4 = 699,
-    KEY_KBD_LCD_MENU5 = 700,
     KEY_MAX = 767,
     BTN_0 = 256,
     BTN_1 = 257,
@@ -843,7 +780,6 @@ pub enum EV_KEY {
     BTN_TOOL_MOUSE = 326,
     BTN_TOOL_LENS = 327,
     BTN_TOOL_QUINTTAP = 328,
-    BTN_STYLUS3 = 329,
     BTN_TOUCH = 330,
     BTN_STYLUS = 331,
     BTN_STYLUS2 = 332,
@@ -1163,10 +1099,10 @@ pub fn int_to_ev_key(code: u32) -> Option<EV_KEY> {
         369 => Some(EV_KEY::KEY_TITLE),
         370 => Some(EV_KEY::KEY_SUBTITLE),
         371 => Some(EV_KEY::KEY_ANGLE),
-        372 => Some(EV_KEY::KEY_FULL_SCREEN),
+        372 => Some(EV_KEY::KEY_ZOOM),
         373 => Some(EV_KEY::KEY_MODE),
         374 => Some(EV_KEY::KEY_KEYBOARD),
-        375 => Some(EV_KEY::KEY_ASPECT_RATIO),
+        375 => Some(EV_KEY::KEY_SCREEN),
         376 => Some(EV_KEY::KEY_PC),
         377 => Some(EV_KEY::KEY_TV),
         378 => Some(EV_KEY::KEY_TV2),
@@ -1234,9 +1170,6 @@ pub fn int_to_ev_key(code: u32) -> Option<EV_KEY> {
         440 => Some(EV_KEY::KEY_10CHANNELSUP),
         441 => Some(EV_KEY::KEY_10CHANNELSDOWN),
         442 => Some(EV_KEY::KEY_IMAGES),
-        444 => Some(EV_KEY::KEY_NOTIFICATION_CENTER),
-        445 => Some(EV_KEY::KEY_PICKUP_PHONE),
-        446 => Some(EV_KEY::KEY_HANGUP_PHONE),
         448 => Some(EV_KEY::KEY_DEL_EOL),
         449 => Some(EV_KEY::KEY_DEL_EOS),
         450 => Some(EV_KEY::KEY_INS_LINE),
@@ -1262,7 +1195,6 @@ pub fn int_to_ev_key(code: u32) -> Option<EV_KEY> {
         482 => Some(EV_KEY::KEY_FN_F),
         483 => Some(EV_KEY::KEY_FN_S),
         484 => Some(EV_KEY::KEY_FN_B),
-        485 => Some(EV_KEY::KEY_FN_RIGHT_SHIFT),
         497 => Some(EV_KEY::KEY_BRL_DOT1),
         498 => Some(EV_KEY::KEY_BRL_DOT2),
         499 => Some(EV_KEY::KEY_BRL_DOT3),
@@ -1305,7 +1237,6 @@ pub fn int_to_ev_key(code: u32) -> Option<EV_KEY> {
         541 => Some(EV_KEY::KEY_ATTENDANT_TOGGLE),
         542 => Some(EV_KEY::KEY_LIGHTS_TOGGLE),
         560 => Some(EV_KEY::KEY_ALS_TOGGLE),
-        561 => Some(EV_KEY::KEY_ROTATE_LOCK_TOGGLE),
         576 => Some(EV_KEY::KEY_BUTTONCONFIG),
         577 => Some(EV_KEY::KEY_TASKMANAGER),
         578 => Some(EV_KEY::KEY_JOURNAL),
@@ -1313,8 +1244,6 @@ pub fn int_to_ev_key(code: u32) -> Option<EV_KEY> {
         580 => Some(EV_KEY::KEY_APPSELECT),
         581 => Some(EV_KEY::KEY_SCREENSAVER),
         582 => Some(EV_KEY::KEY_VOICECOMMAND),
-        583 => Some(EV_KEY::KEY_ASSISTANT),
-        584 => Some(EV_KEY::KEY_KBD_LAYOUT_NEXT),
         592 => Some(EV_KEY::KEY_BRIGHTNESS_MIN),
         593 => Some(EV_KEY::KEY_BRIGHTNESS_MAX),
         608 => Some(EV_KEY::KEY_KBDINPUTASSIST_PREV),
@@ -1341,50 +1270,6 @@ pub fn int_to_ev_key(code: u32) -> Option<EV_KEY> {
         629 => Some(EV_KEY::KEY_FASTREVERSE),
         630 => Some(EV_KEY::KEY_SLOWREVERSE),
         631 => Some(EV_KEY::KEY_DATA),
-        632 => Some(EV_KEY::KEY_ONSCREEN_KEYBOARD),
-        633 => Some(EV_KEY::KEY_PRIVACY_SCREEN_TOGGLE),
-        634 => Some(EV_KEY::KEY_SELECTIVE_SCREENSHOT),
-        656 => Some(EV_KEY::KEY_MACRO1),
-        657 => Some(EV_KEY::KEY_MACRO2),
-        658 => Some(EV_KEY::KEY_MACRO3),
-        659 => Some(EV_KEY::KEY_MACRO4),
-        660 => Some(EV_KEY::KEY_MACRO5),
-        661 => Some(EV_KEY::KEY_MACRO6),
-        662 => Some(EV_KEY::KEY_MACRO7),
-        663 => Some(EV_KEY::KEY_MACRO8),
-        664 => Some(EV_KEY::KEY_MACRO9),
-        665 => Some(EV_KEY::KEY_MACRO10),
-        666 => Some(EV_KEY::KEY_MACRO11),
-        667 => Some(EV_KEY::KEY_MACRO12),
-        668 => Some(EV_KEY::KEY_MACRO13),
-        669 => Some(EV_KEY::KEY_MACRO14),
-        670 => Some(EV_KEY::KEY_MACRO15),
-        671 => Some(EV_KEY::KEY_MACRO16),
-        672 => Some(EV_KEY::KEY_MACRO17),
-        673 => Some(EV_KEY::KEY_MACRO18),
-        674 => Some(EV_KEY::KEY_MACRO19),
-        675 => Some(EV_KEY::KEY_MACRO20),
-        676 => Some(EV_KEY::KEY_MACRO21),
-        677 => Some(EV_KEY::KEY_MACRO22),
-        678 => Some(EV_KEY::KEY_MACRO23),
-        679 => Some(EV_KEY::KEY_MACRO24),
-        680 => Some(EV_KEY::KEY_MACRO25),
-        681 => Some(EV_KEY::KEY_MACRO26),
-        682 => Some(EV_KEY::KEY_MACRO27),
-        683 => Some(EV_KEY::KEY_MACRO28),
-        684 => Some(EV_KEY::KEY_MACRO29),
-        685 => Some(EV_KEY::KEY_MACRO30),
-        688 => Some(EV_KEY::KEY_MACRO_RECORD_START),
-        689 => Some(EV_KEY::KEY_MACRO_RECORD_STOP),
-        690 => Some(EV_KEY::KEY_MACRO_PRESET_CYCLE),
-        691 => Some(EV_KEY::KEY_MACRO_PRESET1),
-        692 => Some(EV_KEY::KEY_MACRO_PRESET2),
-        693 => Some(EV_KEY::KEY_MACRO_PRESET3),
-        696 => Some(EV_KEY::KEY_KBD_LCD_MENU1),
-        697 => Some(EV_KEY::KEY_KBD_LCD_MENU2),
-        698 => Some(EV_KEY::KEY_KBD_LCD_MENU3),
-        699 => Some(EV_KEY::KEY_KBD_LCD_MENU4),
-        700 => Some(EV_KEY::KEY_KBD_LCD_MENU5),
         767 => Some(EV_KEY::KEY_MAX),
         256 => Some(EV_KEY::BTN_0),
         257 => Some(EV_KEY::BTN_1),
@@ -1441,7 +1326,6 @@ pub fn int_to_ev_key(code: u32) -> Option<EV_KEY> {
         326 => Some(EV_KEY::BTN_TOOL_MOUSE),
         327 => Some(EV_KEY::BTN_TOOL_LENS),
         328 => Some(EV_KEY::BTN_TOOL_QUINTTAP),
-        329 => Some(EV_KEY::BTN_STYLUS3),
         330 => Some(EV_KEY::BTN_TOUCH),
         331 => Some(EV_KEY::BTN_STYLUS),
         332 => Some(EV_KEY::BTN_STYLUS2),
@@ -1765,10 +1649,10 @@ impl std::str::FromStr for EV_KEY {
             "KEY_TITLE" => Ok(EV_KEY::KEY_TITLE),
             "KEY_SUBTITLE" => Ok(EV_KEY::KEY_SUBTITLE),
             "KEY_ANGLE" => Ok(EV_KEY::KEY_ANGLE),
-            "KEY_FULL_SCREEN" => Ok(EV_KEY::KEY_FULL_SCREEN),
+            "KEY_ZOOM" => Ok(EV_KEY::KEY_ZOOM),
             "KEY_MODE" => Ok(EV_KEY::KEY_MODE),
             "KEY_KEYBOARD" => Ok(EV_KEY::KEY_KEYBOARD),
-            "KEY_ASPECT_RATIO" => Ok(EV_KEY::KEY_ASPECT_RATIO),
+            "KEY_SCREEN" => Ok(EV_KEY::KEY_SCREEN),
             "KEY_PC" => Ok(EV_KEY::KEY_PC),
             "KEY_TV" => Ok(EV_KEY::KEY_TV),
             "KEY_TV2" => Ok(EV_KEY::KEY_TV2),
@@ -1836,9 +1720,6 @@ impl std::str::FromStr for EV_KEY {
             "KEY_10CHANNELSUP" => Ok(EV_KEY::KEY_10CHANNELSUP),
             "KEY_10CHANNELSDOWN" => Ok(EV_KEY::KEY_10CHANNELSDOWN),
             "KEY_IMAGES" => Ok(EV_KEY::KEY_IMAGES),
-            "KEY_NOTIFICATION_CENTER" => Ok(EV_KEY::KEY_NOTIFICATION_CENTER),
-            "KEY_PICKUP_PHONE" => Ok(EV_KEY::KEY_PICKUP_PHONE),
-            "KEY_HANGUP_PHONE" => Ok(EV_KEY::KEY_HANGUP_PHONE),
             "KEY_DEL_EOL" => Ok(EV_KEY::KEY_DEL_EOL),
             "KEY_DEL_EOS" => Ok(EV_KEY::KEY_DEL_EOS),
             "KEY_INS_LINE" => Ok(EV_KEY::KEY_INS_LINE),
@@ -1864,7 +1745,6 @@ impl std::str::FromStr for EV_KEY {
             "KEY_FN_F" => Ok(EV_KEY::KEY_FN_F),
             "KEY_FN_S" => Ok(EV_KEY::KEY_FN_S),
             "KEY_FN_B" => Ok(EV_KEY::KEY_FN_B),
-            "KEY_FN_RIGHT_SHIFT" => Ok(EV_KEY::KEY_FN_RIGHT_SHIFT),
             "KEY_BRL_DOT1" => Ok(EV_KEY::KEY_BRL_DOT1),
             "KEY_BRL_DOT2" => Ok(EV_KEY::KEY_BRL_DOT2),
             "KEY_BRL_DOT3" => Ok(EV_KEY::KEY_BRL_DOT3),
@@ -1907,7 +1787,6 @@ impl std::str::FromStr for EV_KEY {
             "KEY_ATTENDANT_TOGGLE" => Ok(EV_KEY::KEY_ATTENDANT_TOGGLE),
             "KEY_LIGHTS_TOGGLE" => Ok(EV_KEY::KEY_LIGHTS_TOGGLE),
             "KEY_ALS_TOGGLE" => Ok(EV_KEY::KEY_ALS_TOGGLE),
-            "KEY_ROTATE_LOCK_TOGGLE" => Ok(EV_KEY::KEY_ROTATE_LOCK_TOGGLE),
             "KEY_BUTTONCONFIG" => Ok(EV_KEY::KEY_BUTTONCONFIG),
             "KEY_TASKMANAGER" => Ok(EV_KEY::KEY_TASKMANAGER),
             "KEY_JOURNAL" => Ok(EV_KEY::KEY_JOURNAL),
@@ -1915,8 +1794,6 @@ impl std::str::FromStr for EV_KEY {
             "KEY_APPSELECT" => Ok(EV_KEY::KEY_APPSELECT),
             "KEY_SCREENSAVER" => Ok(EV_KEY::KEY_SCREENSAVER),
             "KEY_VOICECOMMAND" => Ok(EV_KEY::KEY_VOICECOMMAND),
-            "KEY_ASSISTANT" => Ok(EV_KEY::KEY_ASSISTANT),
-            "KEY_KBD_LAYOUT_NEXT" => Ok(EV_KEY::KEY_KBD_LAYOUT_NEXT),
             "KEY_BRIGHTNESS_MIN" => Ok(EV_KEY::KEY_BRIGHTNESS_MIN),
             "KEY_BRIGHTNESS_MAX" => Ok(EV_KEY::KEY_BRIGHTNESS_MAX),
             "KEY_KBDINPUTASSIST_PREV" => Ok(EV_KEY::KEY_KBDINPUTASSIST_PREV),
@@ -1943,50 +1820,6 @@ impl std::str::FromStr for EV_KEY {
             "KEY_FASTREVERSE" => Ok(EV_KEY::KEY_FASTREVERSE),
             "KEY_SLOWREVERSE" => Ok(EV_KEY::KEY_SLOWREVERSE),
             "KEY_DATA" => Ok(EV_KEY::KEY_DATA),
-            "KEY_ONSCREEN_KEYBOARD" => Ok(EV_KEY::KEY_ONSCREEN_KEYBOARD),
-            "KEY_PRIVACY_SCREEN_TOGGLE" => Ok(EV_KEY::KEY_PRIVACY_SCREEN_TOGGLE),
-            "KEY_SELECTIVE_SCREENSHOT" => Ok(EV_KEY::KEY_SELECTIVE_SCREENSHOT),
-            "KEY_MACRO1" => Ok(EV_KEY::KEY_MACRO1),
-            "KEY_MACRO2" => Ok(EV_KEY::KEY_MACRO2),
-            "KEY_MACRO3" => Ok(EV_KEY::KEY_MACRO3),
-            "KEY_MACRO4" => Ok(EV_KEY::KEY_MACRO4),
-            "KEY_MACRO5" => Ok(EV_KEY::KEY_MACRO5),
-            "KEY_MACRO6" => Ok(EV_KEY::KEY_MACRO6),
-            "KEY_MACRO7" => Ok(EV_KEY::KEY_MACRO7),
-            "KEY_MACRO8" => Ok(EV_KEY::KEY_MACRO8),
-            "KEY_MACRO9" => Ok(EV_KEY::KEY_MACRO9),
-            "KEY_MACRO10" => Ok(EV_KEY::KEY_MACRO10),
-            "KEY_MACRO11" => Ok(EV_KEY::KEY_MACRO11),
-            "KEY_MACRO12" => Ok(EV_KEY::KEY_MACRO12),
-            "KEY_MACRO13" => Ok(EV_KEY::KEY_MACRO13),
-            "KEY_MACRO14" => Ok(EV_KEY::KEY_MACRO14),
-            "KEY_MACRO15" => Ok(EV_KEY::KEY_MACRO15),
-            "KEY_MACRO16" => Ok(EV_KEY::KEY_MACRO16),
-            "KEY_MACRO17" => Ok(EV_KEY::KEY_MACRO17),
-            "KEY_MACRO18" => Ok(EV_KEY::KEY_MACRO18),
-            "KEY_MACRO19" => Ok(EV_KEY::KEY_MACRO19),
-            "KEY_MACRO20" => Ok(EV_KEY::KEY_MACRO20),
-            "KEY_MACRO21" => Ok(EV_KEY::KEY_MACRO21),
-            "KEY_MACRO22" => Ok(EV_KEY::KEY_MACRO22),
-            "KEY_MACRO23" => Ok(EV_KEY::KEY_MACRO23),
-            "KEY_MACRO24" => Ok(EV_KEY::KEY_MACRO24),
-            "KEY_MACRO25" => Ok(EV_KEY::KEY_MACRO25),
-            "KEY_MACRO26" => Ok(EV_KEY::KEY_MACRO26),
-            "KEY_MACRO27" => Ok(EV_KEY::KEY_MACRO27),
-            "KEY_MACRO28" => Ok(EV_KEY::KEY_MACRO28),
-            "KEY_MACRO29" => Ok(EV_KEY::KEY_MACRO29),
-            "KEY_MACRO30" => Ok(EV_KEY::KEY_MACRO30),
-            "KEY_MACRO_RECORD_START" => Ok(EV_KEY::KEY_MACRO_RECORD_START),
-            "KEY_MACRO_RECORD_STOP" => Ok(EV_KEY::KEY_MACRO_RECORD_STOP),
-            "KEY_MACRO_PRESET_CYCLE" => Ok(EV_KEY::KEY_MACRO_PRESET_CYCLE),
-            "KEY_MACRO_PRESET1" => Ok(EV_KEY::KEY_MACRO_PRESET1),
-            "KEY_MACRO_PRESET2" => Ok(EV_KEY::KEY_MACRO_PRESET2),
-            "KEY_MACRO_PRESET3" => Ok(EV_KEY::KEY_MACRO_PRESET3),
-            "KEY_KBD_LCD_MENU1" => Ok(EV_KEY::KEY_KBD_LCD_MENU1),
-            "KEY_KBD_LCD_MENU2" => Ok(EV_KEY::KEY_KBD_LCD_MENU2),
-            "KEY_KBD_LCD_MENU3" => Ok(EV_KEY::KEY_KBD_LCD_MENU3),
-            "KEY_KBD_LCD_MENU4" => Ok(EV_KEY::KEY_KBD_LCD_MENU4),
-            "KEY_KBD_LCD_MENU5" => Ok(EV_KEY::KEY_KBD_LCD_MENU5),
             "KEY_MAX" => Ok(EV_KEY::KEY_MAX),
             _ => Err(()),
         }
@@ -1995,7 +1828,7 @@ impl std::str::FromStr for EV_KEY {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_LED {
     LED_NUML = 0,
     LED_CAPSL = 1,
@@ -2052,7 +1885,7 @@ impl std::str::FromStr for EV_LED {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_SND {
     SND_CLICK = 0,
     SND_BELL = 1,
@@ -2085,7 +1918,7 @@ impl std::str::FromStr for EV_SND {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_MSC {
     MSC_SERIAL = 0,
     MSC_PULSELED = 1,
@@ -2127,7 +1960,7 @@ impl std::str::FromStr for EV_MSC {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_SW {
     SW_LID = 0,
     SW_TABLET_MODE = 1,
@@ -2145,11 +1978,10 @@ pub enum EV_SW {
     SW_LINEIN_INSERT = 13,
     SW_MUTE_DEVICE = 14,
     SW_PEN_INSERTED = 15,
-    SW_MACHINE_COVER = 16,
 }
 
 impl EV_SW {
-    pub const SW_MAX: EV_SW = EV_SW::SW_MACHINE_COVER;
+    pub const SW_MAX: EV_SW = EV_SW::SW_PEN_INSERTED;
 }
 
 pub fn int_to_ev_sw(code: u32) -> Option<EV_SW> {
@@ -2170,7 +2002,6 @@ pub fn int_to_ev_sw(code: u32) -> Option<EV_SW> {
         13 => Some(EV_SW::SW_LINEIN_INSERT),
         14 => Some(EV_SW::SW_MUTE_DEVICE),
         15 => Some(EV_SW::SW_PEN_INSERTED),
-        16 => Some(EV_SW::SW_MACHINE_COVER),
         _ => None,
     }
 }
@@ -2195,7 +2026,6 @@ impl std::str::FromStr for EV_SW {
             "SW_LINEIN_INSERT" => Ok(EV_SW::SW_LINEIN_INSERT),
             "SW_MUTE_DEVICE" => Ok(EV_SW::SW_MUTE_DEVICE),
             "SW_PEN_INSERTED" => Ok(EV_SW::SW_PEN_INSERTED),
-            "SW_MACHINE_COVER" => Ok(EV_SW::SW_MACHINE_COVER),
             _ => Err(()),
         }
     }
@@ -2203,7 +2033,7 @@ impl std::str::FromStr for EV_SW {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_SYN {
     SYN_REPORT = 0,
     SYN_CONFIG = 1,
@@ -2239,7 +2069,7 @@ impl std::str::FromStr for EV_SYN {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_REP {
     REP_DELAY = 0,
     REP_PERIOD = 1,
@@ -2270,7 +2100,7 @@ impl std::str::FromStr for EV_REP {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum InputProp {
     INPUT_PROP_POINTER = 0,
     INPUT_PROP_DIRECT = 1,
@@ -2315,7 +2145,7 @@ impl std::str::FromStr for InputProp {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum EV_FF {
     FF_STATUS_STOPPED = 0,
     FF_STATUS_PLAYING = 1,
@@ -2397,7 +2227,7 @@ impl std::str::FromStr for EV_FF {
 
 #[allow(non_camel_case_types)]
 #[cfg_attr(feature = "serde", derive(Serialize), derive(Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum BusType {
     BUS_PCI = 1,
     BUS_ISAPNP = 2,

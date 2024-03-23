@@ -6,7 +6,6 @@ use crate::*;
 pub type SubscribeEvent = (u64, InputEvent);
 pub type Subscriber = tokio::sync::mpsc::UnboundedSender<SubscribeEvent>;
 
-
 pub fn add_event_subscription(target: &PyAny) -> Option<Subscriber> {
     if let Ok(target) = target.extract::<PyRefMut<Mapper>>() {
         return Some(target.subscribe());
@@ -14,8 +13,11 @@ pub fn add_event_subscription(target: &PyAny) -> Option<Subscriber> {
     if let Ok(target) = target.extract::<PyRefMut<TextMapper>>() {
         return Some(target.subscribe());
     }
+    if let Ok(target) = target.extract::<PyRefMut<ChordMapper>>() {
+        return Some(target.subscribe());
+    }
     if let Ok(target) = target.extract::<PyRefMut<Writer>>() {
-        return Some(target.subscribe())
+        return Some(target.subscribe());
     }
     None
 }
@@ -33,7 +35,9 @@ macro_rules! linkable {
 
             let target = match add_event_subscription(target) {
                 Some(target) => target,
-                None => { return Err(PyRuntimeError::new_err("unsupported link target")); }
+                None => {
+                    return Err(PyRuntimeError::new_err("unsupported link target"));
+                }
             };
             self.subscriber.store(Some(Arc::new(target)));
             Ok(())
