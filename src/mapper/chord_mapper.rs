@@ -94,11 +94,11 @@ impl Inner {
                             } else {
                                 let msg_tx = self.msg_tx.clone();
 
-                                let task = tokio::spawn(async move {
+                                state.interval = Some(tokio::spawn(async move {
                                     tokio::time::sleep(tokio::time::Duration::from_millis(50))
                                         .await;
                                     msg_tx.send(Msg::Callback(path_hash, raw_ev));
-                                });
+                                }));
                             }
                         } else {
                             let subscriber_map = self.subscriber_map.read().unwrap();
@@ -142,19 +142,29 @@ impl Inner {
                             task.abort();
                         };
 
-                        for k in state.stack.iter() {
-                            let _ = subscriber
-                                .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_DOWN))));
-                            let _ = subscriber
-                                .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_UP))));
-                        }
+                        if let Some(pos) = state.stack.iter().position(|x| x == &_key) {
+                            state.stack.remove(pos);
 
-                        let should_handle =
-                            !state.ignored_keys.remove(&_key) && !state.stack.contains(&_key);
-                        state.stack.clear();
+                            if !state.ignored_keys.remove(&_key) {
+                                let _ = subscriber.send((
+                                    *path_hash,
+                                    InputEvent::Raw(_key.to_input_ev(TYPE_DOWN)),
+                                ));
+                                let _ = subscriber.send((*path_hash, raw_ev));
+                            }
+                        } else {
+                            for k in state.stack.iter() {
+                                let _ = subscriber
+                                    .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_DOWN))));
+                                let _ = subscriber
+                                    .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_UP))));
+                            }
 
-                        if should_handle {
-                            let _ = subscriber.send((*path_hash, raw_ev));
+                            state.stack.clear();
+
+                            if !state.ignored_keys.remove(&_key) {
+                                let _ = subscriber.send((*path_hash, raw_ev));
+                            }
                         }
                     }
                     TYPE_REPEAT => {
@@ -162,10 +172,6 @@ impl Inner {
                             return;
                         }
                         if state.stack.is_empty() {
-                            // if let Some(task) = state.interval.take() {
-                            //     task.abort();
-                            // };
-
                             let subscriber_map = self.subscriber_map.read().unwrap();
                             let subscriber = subscriber_map.get(&path_hash);
                             let (path_hash, subscriber) = match subscriber {
@@ -174,14 +180,6 @@ impl Inner {
                                     return;
                                 }
                             };
-
-                            // for k in state.stack.iter() {
-                            //     let _ = subscriber
-                            //         .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_DOWN))));
-                            //     let _ = subscriber
-                            //         .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_UP))));
-                            // }
-                            // state.stack.clear();
 
                             let _ = subscriber.send((*path_hash, raw_ev));
                         };
@@ -217,7 +215,7 @@ impl Inner {
         };
 
         if let Some(output) = mappings.get(&state.stack) {
-            for k in state.stack.drain(0..state.stack.len()) {
+            for k in state.stack.iter().cloned() {
                 state.ignored_keys.insert(k);
             }
 
@@ -251,9 +249,8 @@ impl Inner {
                     let _ = subscriber.send((*path_hash, InputEvent::Raw(k.to_input_ev(0))));
                 }
             }
+            state.stack.clear();
         }
-
-        state.stack.clear();
     }
 }
 

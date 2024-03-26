@@ -66,6 +66,22 @@ async fn simple_chord() -> PyResult<()> {
         reader_send_all(py, m, "reader", &keys("{a down}{b down}{a up}{b up}"));
         sleep(py, 55);
         assert_eq!(writer_read_all(py, m, "writer"), keys("c"),);
+        sleep(py, 55);
+        assert_empty!(py, m, WRITER);
+
+        Ok(())
+    })?;
+    Ok(())
+}
+
+#[pyo3_asyncio::tokio::test]
+async fn multi_chord() -> PyResult<()> {
+    Python::with_gil(|py| -> PyResult<()> {
+        let m = pytests::include_python!();
+
+        reader_send_all(py, m, "reader", &keys("{a down}{b down}{b up}{b down}{a up}{b up}"));
+        sleep(py, 55);
+        assert_eq!(writer_read_all(py, m, "writer"), keys("cc"),);
 
         Ok(())
     })?;
