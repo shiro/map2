@@ -21,8 +21,8 @@ def calculate_sha256(filename):
 print("Generating PKGBUILD for map2...")
 makedirs("./dist/aur", exist_ok=True)
 with open("./dist/aur/PKGBUILD", "w") as out:
-    checksum_x86_64 = calculate_sha256(f"./wheels/map2-{release_tag}-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl")
-    checksum_i686   = calculate_sha256(f"./wheels/map2-{release_tag}-cp311-cp311-manylinux_2_17_i686.manylinux2014_i686.whl"    )
+    checksum_x86_64 = calculate_sha256(f"./wheels/map2-{release_tag}-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl")
+    checksum_i686   = calculate_sha256(f"./wheels/map2-{release_tag}-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl"    )
 
     content = open("./ci/templates/PKGBUILD").read()\
         .replace("pkgver=", f"pkgver={release_tag}")\
