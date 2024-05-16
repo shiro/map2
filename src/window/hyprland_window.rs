@@ -2,7 +2,7 @@ use crate::python::*;
 use crate::window::window_base::{ActiveWindowInfo, WindowControlMessage, WindowHandler};
 use crate::*;
 use hyprland::data::Client;
-use hyprland::event_listener::EventListenerMutable as EventListener;
+use hyprland::event_listener::EventListener;
 use hyprland::shared::{HyprData, HyprDataActiveOptional};
 use std::panic::catch_unwind;
 
@@ -26,7 +26,7 @@ pub fn hyprland_window_handler() -> WindowHandler {
 
             std::panic::set_hook(prev_hook);
 
-            event_listener.add_active_window_change_handler(move |info, _| {
+            event_listener.add_active_window_change_handler(move |info| {
                 if exit_rx.try_recv().is_ok() {
                     return;
                 }
