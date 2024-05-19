@@ -10,6 +10,7 @@ use pyo3::{pyclass, pymethods, PyResult};
 use tempfile::tempfile;
 use unicode_segmentation::UnicodeSegmentation;
 use wayland_client::globals::{registry_queue_init, GlobalListContents};
+use wayland_client::protocol::wl_keyboard::KeymapFormat::XkbV1;
 use wayland_client::protocol::wl_seat;
 use wayland_client::{protocol::wl_registry, Dispatch, QueueHandle};
 use wayland_client::{Connection, EventQueue, Proxy};
@@ -19,6 +20,7 @@ use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboar
 use wayland_protocols_misc::zwp_virtual_keyboard_v1::client::zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1;
 use wl_seat::WlSeat;
 use xkeysym::Keysym;
+use zwp_virtual_keyboard_manager_v1::Event as KeyboardManagerEvent;
 
 use crate::encoding;
 
@@ -73,11 +75,11 @@ impl Dispatch<WlSeat, ()> for AppData {
     }
 }
 
-impl Dispatch<zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1, ()> for AppData {
+impl Dispatch<ZwpVirtualKeyboardManagerV1, ()> for AppData {
     fn event(
         state: &mut AppData,
-        proxy: &zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1,
-        event: zwp_virtual_keyboard_manager_v1::Event,
+        proxy: &ZwpVirtualKeyboardManagerV1,
+        event: KeyboardManagerEvent,
         data: &(),
         conn: &Connection,
         qhandle: &QueueHandle<AppData>,
@@ -138,7 +140,7 @@ impl VirtualKeyboard {
             keymap.entry(out).or_insert(idx);
         }
 
-        init_virtual_keyboard_v2(&self.keyboard, &keymap).unwrap();
+        init_virtual_keyboard(&self.keyboard, &keymap).unwrap();
 
         for x in input.graphemes(true) {
             let encoded = x.chars().next().unwrap() as u32;
@@ -159,7 +161,7 @@ struct KeymapEntry {
     keysym: Keysym,
 }
 
-fn init_virtual_keyboard_v2(
+fn init_virtual_keyboard(
     keyboard: &ZwpVirtualKeyboardV1,
     keymap: &HashMap<Keysym, u32>,
 ) -> Result<()> {
@@ -204,11 +206,7 @@ fn init_virtual_keyboard_v2(
     let keymap_fd = keymap_file.as_fd();
     let keymap_size: u32 = keymap_file.metadata().unwrap().len().try_into()?;
 
-    keyboard.keymap(
-        wayland_client::protocol::wl_keyboard::KeymapFormat::XkbV1 as u32,
-        keymap_fd,
-        keymap_size,
-    );
+    keyboard.keymap(XkbV1 as u32, keymap_fd, keymap_size);
 
     Ok(())
 }
