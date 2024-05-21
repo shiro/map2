@@ -29,9 +29,7 @@ impl Key {
 
 impl From<evdev_rs::enums::EV_KEY> for Key {
     fn from(value: evdev_rs::enums::EV_KEY) -> Self {
-        Self {
-            event_code: EventCode::EV_KEY(value),
-        }
+        Self { event_code: EventCode::EV_KEY(value) }
     }
 }
 
@@ -65,13 +63,7 @@ pub struct KeyModifierFlags {
 
 impl KeyModifierFlags {
     pub fn new() -> Self {
-        KeyModifierFlags {
-            ctrl: false,
-            shift: false,
-            alt: false,
-            right_alt: false,
-            meta: false,
-        }
+        KeyModifierFlags { ctrl: false, shift: false, alt: false, right_alt: false, meta: false }
     }
     pub fn ctrl(&mut self) {
         self.ctrl = true;
@@ -160,26 +152,13 @@ impl KeyAction {
         KeyAction { key, value }
     }
     pub fn from_input_ev(ev: &EvdevInputEvent) -> Self {
-        KeyAction {
-            key: Key {
-                event_code: ev.event_code,
-            },
-            value: ev.value,
-        }
+        KeyAction { key: Key { event_code: ev.event_code }, value: ev.value }
     }
     pub fn to_input_ev(&self) -> EvdevInputEvent {
-        EvdevInputEvent {
-            event_code: self.key.event_code,
-            value: self.value,
-            time: INPUT_EV_DUMMY_TIME,
-        }
+        EvdevInputEvent { event_code: self.key.event_code, value: self.value, time: INPUT_EV_DUMMY_TIME }
     }
     pub fn to_key_action_with_mods(self, modifiers: KeyModifierFlags) -> KeyActionWithMods {
-        KeyActionWithMods {
-            key: self.key,
-            value: self.value,
-            modifiers,
-        }
+        KeyActionWithMods { key: self.key, value: self.value, modifiers }
     }
 }
 
@@ -192,11 +171,7 @@ pub struct KeyActionWithMods {
 
 impl KeyActionWithMods {
     pub fn new(key: Key, value: i32, modifiers: KeyModifierFlags) -> Self {
-        KeyActionWithMods {
-            key,
-            value,
-            modifiers,
-        }
+        KeyActionWithMods { key, value, modifiers }
     }
 }
 
@@ -208,10 +183,7 @@ pub struct KeyClickActionWithMods {
 
 impl KeyClickActionWithMods {
     pub fn new(key: Key) -> Self {
-        KeyClickActionWithMods {
-            key,
-            modifiers: KeyModifierFlags::new(),
-        }
+        KeyClickActionWithMods { key, modifiers: KeyModifierFlags::new() }
     }
     pub fn new_with_mods(key: Key, modifiers: KeyModifierFlags) -> Self {
         KeyClickActionWithMods { key, modifiers }

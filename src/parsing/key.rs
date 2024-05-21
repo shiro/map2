@@ -9,13 +9,37 @@ pub fn key_flags(input: &str) -> ParseResult<&str, KeyModifierFlags> {
         let mut flags = KeyModifierFlags::new();
         for v in val {
             match v {
-                '!' => { if !flags.alt { flags.alt(); } else { return Err(make_generic_nom_err_new(input)); } }
-                '^' => { if !flags.ctrl { flags.ctrl(); } else { return Err(make_generic_nom_err_new(input)); } }
-                '+' => { if !flags.shift { flags.shift(); } else { return Err(make_generic_nom_err_new(input)); } }
-                '#' => { if !flags.meta { flags.meta(); } else { return Err(make_generic_nom_err_new(input)); } }
-                _ => unreachable!()
+                '!' => {
+                    if !flags.alt {
+                        flags.alt();
+                    } else {
+                        return Err(make_generic_nom_err_new(input));
+                    }
+                }
+                '^' => {
+                    if !flags.ctrl {
+                        flags.ctrl();
+                    } else {
+                        return Err(make_generic_nom_err_new(input));
+                    }
+                }
+                '+' => {
+                    if !flags.shift {
+                        flags.shift();
+                    } else {
+                        return Err(make_generic_nom_err_new(input));
+                    }
+                }
+                '#' => {
+                    if !flags.meta {
+                        flags.meta();
+                    } else {
+                        return Err(make_generic_nom_err_new(input));
+                    }
+                }
+                _ => unreachable!(),
             }
-        };
+        }
         Ok((next, flags))
     })
 }
@@ -25,16 +49,15 @@ pub fn key(input: &str) -> ParseResult<&str, (Key, KeyModifierFlags)> {
 }
 
 pub fn key_utf<'a>(
-    transformer: Option<&'a XKBTransformer>
+    transformer: Option<&'a XKBTransformer>,
 ) -> impl Fn(&'a str) -> ParseResult<&str, (Key, KeyModifierFlags)> {
     move |input: &str| {
         map_res(
             alt((
                 // multiple ASCII chars
                 ident,
-
                 // one arbitrary char
-                map(take(1usize), |v: &str| v.to_string())
+                map(take(1usize), |v: &str| v.to_string()),
             )),
             |key_name| {
                 let (key, flags) = match KEY_ALIAS_TABLE.get(&*key_name.to_uppercase()) {
@@ -48,10 +71,9 @@ pub fn key_utf<'a>(
                         }
 
                         // fall back to libevdev resolution
-                        let key = Key::from_str(&key_name)
-                            .map_err(|_| make_generic_nom_err_new(input))?;
+                        let key = Key::from_str(&key_name).map_err(|_| make_generic_nom_err_new(input))?;
 
-                        return Ok((key, KeyModifierFlags::new()))
+                        return Ok((key, KeyModifierFlags::new()));
                     }
                 };
 
@@ -72,17 +94,26 @@ fn resolve_key_utf8(key: &str, transformer: &XKBTransformer) -> Result<(Key, Key
     // the rest are modifiers we have to collect
     for ev in seq.iter() {
         match ev {
-            Key { event_code: EventCode::EV_KEY(KEY_LEFTALT) } => { flags.alt(); }
-            Key { event_code: EventCode::EV_KEY(KEY_RIGHTALT) } => { flags.right_alt(); }
-            Key { event_code: EventCode::EV_KEY(KEY_LEFTSHIFT) } => { flags.shift(); }
-            Key { event_code: EventCode::EV_KEY(KEY_RIGHTSHIFT) } => { flags.shift(); }
-            _ => { unreachable!("unhandled modifier") }
+            Key { event_code: EventCode::EV_KEY(KEY_LEFTALT) } => {
+                flags.alt();
+            }
+            Key { event_code: EventCode::EV_KEY(KEY_RIGHTALT) } => {
+                flags.right_alt();
+            }
+            Key { event_code: EventCode::EV_KEY(KEY_LEFTSHIFT) } => {
+                flags.shift();
+            }
+            Key { event_code: EventCode::EV_KEY(KEY_RIGHTSHIFT) } => {
+                flags.shift();
+            }
+            _ => {
+                unreachable!("unhandled modifier")
+            }
         }
     }
 
     Ok((key, flags))
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -90,15 +121,9 @@ mod tests {
 
     #[test]
     fn test_key() {
-        assert_eq!(key("d"), nom_ok((
-            Key::from_str("KEY_D").unwrap(),
-            KeyModifierFlags::new()
-        )));
+        assert_eq!(key("d"), nom_ok((Key::from_str("KEY_D").unwrap(), KeyModifierFlags::new())));
 
-        assert_eq!(key("btn_forward"), nom_ok((
-            Key::from_str("BTN_FORWARD").unwrap(),
-            KeyModifierFlags::new()))
-        );
+        assert_eq!(key("btn_forward"), nom_ok((Key::from_str("BTN_FORWARD").unwrap(), KeyModifierFlags::new())));
     }
 
     #[test]
@@ -108,15 +133,20 @@ mod tests {
         assert_eq!(key_flags("+"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.shift())));
         assert_eq!(key_flags("#"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.meta())));
 
-        assert_eq!(key_flags("!#"), nom_ok(KeyModifierFlags::new().tap_mut(|v| {
-            v.alt();
-            v.meta()
-        })));
-        assert_eq!(key_flags("#!"), nom_ok(KeyModifierFlags::new()
-            .tap_mut(|v| {
+        assert_eq!(
+            key_flags("!#"),
+            nom_ok(KeyModifierFlags::new().tap_mut(|v| {
+                v.alt();
+                v.meta()
+            }))
+        );
+        assert_eq!(
+            key_flags("#!"),
+            nom_ok(KeyModifierFlags::new().tap_mut(|v| {
                 v.alt();
                 v.meta();
-            })));
+            }))
+        );
         assert_eq!(key_flags("#a!"), nom_ok_rest("a!", KeyModifierFlags::new().tap_mut(|v| v.meta())));
     }
 
@@ -125,20 +155,17 @@ mod tests {
         let t = XKBTransformer::new("pc105", "us", None, None).unwrap();
         let key_utf = key_utf(Some(&t));
 
-        assert_eq!(key_utf("A"), nom_ok((
-            Key::from_str("KEY_A").unwrap(),
-            KeyModifierFlags::new().tap_mut(|x| x.shift())
-        )));
+        assert_eq!(
+            key_utf("A"),
+            nom_ok((Key::from_str("KEY_A").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.shift())))
+        );
 
-        assert_eq!(key_utf(":"), nom_ok((
-            Key::from_str("semicolon").unwrap(),
-            KeyModifierFlags::new().tap_mut(|x| x.shift())
-        )));
+        assert_eq!(
+            key_utf(":"),
+            nom_ok((Key::from_str("semicolon").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.shift())))
+        );
 
-        assert_eq!(key_utf("^"), nom_ok((
-            Key::from_str("6").unwrap(),
-            KeyModifierFlags::new().tap_mut(|x| x.shift())
-        )));
+        assert_eq!(key_utf("^"), nom_ok((Key::from_str("6").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.shift()))));
     }
 
     #[test]

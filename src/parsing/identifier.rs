@@ -3,8 +3,7 @@ use unicode_xid::UnicodeXID;
 use super::*;
 
 pub fn ident(input: &str) -> ParseResult<&str, String> {
-    word(input)
-        .map_err(|err| make_generic_nom_err_options(input, vec!["identifier".to_string()]))
+    word(input).map_err(|err| make_generic_nom_err_options(input, vec!["identifier".to_string()]))
 }
 
 pub(super) fn word(input: &str) -> ParseResult<&str, String> {

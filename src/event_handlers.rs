@@ -32,6 +32,6 @@ pub(crate) fn update_modifiers(modifiers: &mut Arc<KeyModifierState>, action: &K
         } else if action.value == TYPE_REPEAT {
             return true;
         }
-    };
+    }
     false
 }

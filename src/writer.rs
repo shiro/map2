@@ -36,18 +36,16 @@ impl Writer {
         };
 
         let device_name = match options.get("name") {
-            Some(option) => option
-                .extract::<String>()
-                .map_err(|_| PyRuntimeError::new_err("'name' must be a string"))?,
+            Some(option) => {
+                option.extract::<String>().map_err(|_| PyRuntimeError::new_err("'name' must be a string"))?
+            }
             None => "Virtual map2 output".to_string(),
         };
 
         let mut capabilities = DeviceCapabilities::new();
         if let Some(_capabilities) = options.get("capabilities") {
-            let _capabilities: capabilities::Capabilities =
-                depythonize(_capabilities).map_err(|_| {
-                    PyRuntimeError::new_err("object 'capabilities' did not match the schema")
-                })?;
+            let _capabilities: capabilities::Capabilities = depythonize(_capabilities)
+                .map_err(|_| PyRuntimeError::new_err("object 'capabilities' did not match the schema"))?;
 
             if _capabilities.keys {
                 capabilities.enable_all_keyboard();
@@ -62,8 +60,7 @@ impl Writer {
                 capabilities::Abs::Bool(x) if x => capabilities.enable_all_abs(),
                 capabilities::Abs::Specification(x) => {
                     for (key, value) in x.iter() {
-                        let tag = parse_abs_tag(key)
-                            .map_err(|_| PyRuntimeError::new_err("invalid key '{key}'"))?;
+                        let tag = parse_abs_tag(key).map_err(|_| PyRuntimeError::new_err("invalid key '{key}'"))?;
 
                         if let Some(abs_info) = match value {
                             &capabilities::AbsSpec::Bool(x) if x => Some(capabilities::AbsInfo {
@@ -91,14 +88,12 @@ impl Writer {
 
         let device_init_policy = match options.get("clone_from") {
             Some(_existing_dev_fd) => {
-                let existing_dev_fd = _existing_dev_fd.extract::<String>().map_err(|_| {
-                    PyRuntimeError::new_err("the 'clone_from' option must be a string")
-                })?;
+                let existing_dev_fd = _existing_dev_fd
+                    .extract::<String>()
+                    .map_err(|_| PyRuntimeError::new_err("the 'clone_from' option must be a string"))?;
 
                 if options.get("capabilities").is_some() {
-                    return Err(PyRuntimeError::new_err(
-                        "expected only one of: 'clone_from', 'capabilities'",
-                    ));
+                    return Err(PyRuntimeError::new_err("expected only one of: 'clone_from', 'capabilities'"));
                 }
 
                 virtual_output_device::DeviceInitPolicy::CloneExistingDevice(existing_dev_fd)
@@ -111,12 +106,7 @@ impl Writer {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
         let transformer = XKB_TRANSFORMER_REGISTRY
-            .get(&TransformerParams::new(
-                kbd_model,
-                kbd_layout,
-                kbd_variant,
-                kbd_options,
-            ))
+            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
             .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<InputEvent>();
@@ -125,9 +115,8 @@ impl Writer {
         #[cfg(not(feature = "integration"))]
         {
             // grab udev device
-            let mut output_device =
-                virtual_output_device::init_virtual_output_device(&device_init_policy)
-                    .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+            let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
+                .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
             get_runtime().spawn(async move {
                 loop {
                     loop {

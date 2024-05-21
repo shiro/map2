@@ -13,9 +13,7 @@ pub fn print_event_debug(ev: &InputEvent) {
             "Event: time {}.{}, type {} , code {} , value {}",
             ev.time.tv_sec,
             ev.time.tv_usec,
-            ev.event_type()
-                .map(|ev_type| format!("{}", ev_type))
-                .unwrap_or("None".to_owned()),
+            ev.event_type().map(|ev_type| format!("{}", ev_type)).unwrap_or("None".to_owned()),
             ev.event_code,
             ev.value
         ),

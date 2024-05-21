@@ -1,7 +1,7 @@
 use std::thread;
 
-use pyo3::{IntoPy, Py, PyAny, Python};
 use pyo3::types::PyTuple;
+use pyo3::{IntoPy, Py, PyAny, Python};
 
 use crate::*;
 
@@ -14,21 +14,18 @@ pub enum PythonArgument {
 type Args = Vec<PythonArgument>;
 
 pub fn args_to_py(py: Python<'_>, args: Args) -> &PyTuple {
-    PyTuple::new(py, args.into_iter().map(|x| {
-        match x {
-            PythonArgument::String(x) => { x.into_py(py) }
-            PythonArgument::Number(x) => { x.into_py(py) }
-        }
-    }))
+    PyTuple::new(
+        py,
+        args.into_iter().map(|x| match x {
+            PythonArgument::String(x) => x.into_py(py),
+            PythonArgument::Number(x) => x.into_py(py),
+        }),
+    )
 }
-
 
 pub struct EventLoop {
     thread_handle: Option<thread::JoinHandle<()>>,
-    callback_tx: tokio::sync::mpsc::Sender<(
-        Py<PyAny>,
-        Option<Args>
-    )>,
+    callback_tx: tokio::sync::mpsc::Sender<(Py<PyAny>, Option<Args>)>,
 }
 
 impl EventLoop {
@@ -42,28 +39,31 @@ impl EventLoop {
                 Python::with_gil(|py| {
                     pyo3_asyncio::tokio::run::<_, ()>(py, async move {
                         loop {
-                            let (callback_object, args): (Py<PyAny>, Option<Args>) = callback_rx.recv().await
-                                .expect("python runtime error: event loop channel is closed");
+                            let (callback_object, args): (Py<PyAny>, Option<Args>) =
+                                callback_rx.recv().await.expect("python runtime error: event loop channel is closed");
 
                             Python::with_gil(|py| {
                                 let args = args_to_py(py, args.unwrap_or_default());
 
-                                let asyncio = py.import("asyncio")
+                                let asyncio = py
+                                    .import("asyncio")
                                     .expect("python runtime error: failed to import 'asyncio', is it installed?");
 
                                 let is_async_callback: bool = asyncio
-                                    .call_method1("iscoroutinefunction", (callback_object.as_ref(py), ))
+                                    .call_method1("iscoroutinefunction", (callback_object.as_ref(py),))
                                     .expect("python runtime error: 'iscoroutinefunction' lookup failed")
                                     .extract()
                                     .expect("python runtime error: 'iscoroutinefunction' call failed");
 
                                 if is_async_callback {
-                                    let coroutine = callback_object.call(py, args, None)
+                                    let coroutine = callback_object
+                                        .call(py, args, None)
                                         .expect("python runtime error: failed to call async callback");
 
                                     let event_loop = pyo3_asyncio::tokio::get_current_loop(py)
                                         .expect("python runtime error: failed to get the event loop");
-                                    let coroutine = event_loop.call_method1("create_task", (coroutine, ))
+                                    let coroutine = event_loop
+                                        .call_method1("create_task", (coroutine,))
                                         .expect("python runtime error: failed to create task");
 
                                     // tasks only actually get run if we convert the coroutine to a rust future, even though we don't use it...
@@ -79,23 +79,17 @@ impl EventLoop {
                                 }
                             });
                         }
-                    }).expect("python runtime error: failed to start the event loop");
+                    })
+                    .expect("python runtime error: failed to start the event loop");
                 });
                 // let elapsed = now.elapsed();
             });
         });
 
-        EventLoop {
-            thread_handle: Some(thread_handle),
-            callback_tx,
-        }
+        EventLoop { thread_handle: Some(thread_handle), callback_tx }
     }
     pub fn execute(&self, callback_object: Py<PyAny>, args: Option<Args>) {
-        futures::executor::block_on(
-            self.callback_tx.send(
-                (callback_object, args)
-            )
-        ).unwrap();
+        futures::executor::block_on(self.callback_tx.send((callback_object, args))).unwrap();
     }
 }
 

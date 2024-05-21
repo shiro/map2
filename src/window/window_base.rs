@@ -1,9 +1,8 @@
-use crate::*;
 use crate::platform::{get_platform, Platform};
 use crate::python::*;
 use crate::window::hyprland_window::hyprland_window_handler;
 use crate::window::x11_window::x11_window_handler;
-
+use crate::*;
 
 #[derive(Debug, Clone)]
 pub struct ActiveWindowInfo {
@@ -12,10 +11,8 @@ pub struct ActiveWindowInfo {
     pub name: String,
 }
 
-pub type WindowHandler = Box<dyn Fn(
-    oneshot::Receiver<()>,
-    mpsc::Receiver<WindowControlMessage>,
-) -> Result<()> + Send + Sync>;
+pub type WindowHandler =
+    Box<dyn Fn(oneshot::Receiver<()>, mpsc::Receiver<WindowControlMessage>) -> Result<()> + Send + Sync>;
 
 #[pyclass]
 pub struct Window {
@@ -30,12 +27,8 @@ impl Window {
     #[new]
     pub fn new() -> Self {
         let handler = match get_platform() {
-            Platform::Hyprland => {
-                hyprland_window_handler()
-            }
-            Platform::X11 => {
-                x11_window_handler()
-            }
+            Platform::Hyprland => hyprland_window_handler(),
+            Platform::X11 => x11_window_handler(),
             Platform::Unknown => {
                 eprintln!("{}", ApplicationError::UnsupportedPlatform);
                 std::process::exit(1);
@@ -70,7 +63,6 @@ impl Drop for Window {
     }
 }
 
-
 #[pyclass]
 struct WindowOnWindowChangeSubscription {
     id: u32,
@@ -82,7 +74,7 @@ pub enum WindowControlMessage {
 }
 
 pub fn spawn_listener_thread(
-    handler: WindowHandler
+    handler: WindowHandler,
 ) -> (mpsc::Sender<WindowControlMessage>, thread::JoinHandle<()>, oneshot::Sender<()>) {
     let (subscription_tx, subscription_rx) = mpsc::channel();
     let (exit_tx, exit_rx) = oneshot::channel();

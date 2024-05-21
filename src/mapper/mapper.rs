@@ -9,36 +9,19 @@ use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTR
 use crate::*;
 
 #[derive(Default)]
-pub struct MapperState {
+struct MapperState {
     pub modifiers: Arc<KeyModifierState>,
 }
 
 impl MapperState {
-    pub fn new() -> Self {
-        MapperState {
-            modifiers: Arc::new(KeyModifierState::new()),
-        }
-    }
-}
-
-impl MapperState {
-    fn handle(
-        &mut self,
-        raw_ev: InputEvent,
-        next: Option<&SubscriberNew>,
-        shared_state: &SharedState,
-    ) {
+    fn handle(&mut self, raw_ev: InputEvent, next: Option<&SubscriberNew>, shared_state: &SharedState) {
         let ev = match &raw_ev {
             InputEvent::Raw(ev) => ev,
         };
 
         match ev {
             // key event
-            EvdevInputEvent {
-                event_code: EventCode::EV_KEY(key),
-                value,
-                ..
-            } => {
+            EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
                 let mut from_modifiers = KeyModifierFlags::new();
                 from_modifiers.ctrl = self.modifiers.is_ctrl();
                 from_modifiers.alt = self.modifiers.is_alt();
@@ -47,9 +30,7 @@ impl MapperState {
                 from_modifiers.meta = self.modifiers.is_meta();
 
                 let from_key_action = KeyActionWithMods {
-                    key: Key {
-                        event_code: ev.event_code,
-                    },
+                    key: Key { event_code: ev.event_code },
                     value: ev.value,
                     modifiers: from_modifiers,
                 };
@@ -67,22 +48,15 @@ impl MapperState {
                             for action in seq {
                                 match action {
                                     RuntimeKeyAction::KeyAction(key_action) => {
-                                        let ev = key_action.to_input_ev();
-
-                                        let _ = next.send(InputEvent::Raw(ev));
+                                        let _ = next.send(InputEvent::Raw(key_action.to_input_ev()));
                                     }
-                                    RuntimeKeyAction::ReleaseRestoreModifiers(
-                                        from_flags,
-                                        to_flags,
-                                        to_type,
-                                    ) => {
+                                    RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
                                         let new_events = release_restore_modifiers(
                                             &self.modifiers,
                                             &from_flags,
                                             &to_flags,
                                             &to_type,
                                         );
-                                        // events.append(&mut new_events);
                                         for ev in new_events {
                                             let _ = next.send(InputEvent::Raw(ev));
                                         }
@@ -103,7 +77,6 @@ impl MapperState {
                                     let _ = next.send(InputEvent::Raw(ev));
                                 }
                             }
-
                             run_python_handler(&handler, None, ev, &shared_state.transformer, next);
                         }
                         RuntimeAction::NOP => {}
@@ -112,23 +85,17 @@ impl MapperState {
                     return;
                 }
 
-                event_handlers::update_modifiers(
-                    &mut self.modifiers,
-                    &KeyAction::from_input_ev(&ev),
-                );
+                event_handlers::update_modifiers(&mut self.modifiers, &KeyAction::from_input_ev(&ev));
 
                 if let Some(handler) = shared_state.fallback_handler.as_ref() {
                     let name = match key {
                         KEY_SPACE => "space".to_string(),
                         KEY_TAB => "tab".to_string(),
                         KEY_ENTER => "enter".to_string(),
-                        _ => shared_state
-                            .transformer
-                            .raw_to_utf(key, &*self.modifiers)
-                            .unwrap_or_else(|| {
-                                let name = format!("{key:?}").to_string();
-                                name[4..name.len()].to_lowercase()
-                            }),
+                        _ => shared_state.transformer.raw_to_utf(key, &*self.modifiers).unwrap_or_else(|| {
+                            let name = format!("{key:?}").to_string();
+                            name[4..name.len()].to_lowercase()
+                        }),
                     };
 
                     let value = match *value {
@@ -147,20 +114,12 @@ impl MapperState {
                 }
             }
             // rel/abs event
-            EvdevInputEvent {
-                event_code, value, ..
-            } if matches!(event_code, EventCode::EV_REL(..))
-                || matches!(event_code, EventCode::EV_ABS(..)) =>
+            EvdevInputEvent { event_code, value, .. }
+                if matches!(event_code, EventCode::EV_REL(..)) || matches!(event_code, EventCode::EV_ABS(..)) =>
             {
                 let (key, handler) = match event_code {
-                    EventCode::EV_REL(key) => (
-                        format!("{key:?}").to_string(),
-                        &shared_state.relative_handler,
-                    ),
-                    EventCode::EV_ABS(key) => (
-                        format!("{key:?}").to_string(),
-                        &shared_state.absolute_handler,
-                    ),
+                    EventCode::EV_REL(key) => (format!("{key:?}").to_string(), &shared_state.relative_handler),
+                    EventCode::EV_ABS(key) => (format!("{key:?}").to_string(), &shared_state.absolute_handler),
                     _ => unreachable!(),
                 };
                 if let Some(handler) = handler.as_ref() {
@@ -189,10 +148,8 @@ pub enum ControlMessage {
 #[derive(Default)]
 struct SharedState {
     id: Arc<Uuid>,
-    // subscriber_map: Arc<RwLock<SubscriberMap>>,
     transformer: Arc<XKBTransformer>,
     mappings: Mappings,
-    // subscriber_map: HashMap<u64, SubscriberNew>,
     fallback_handler: Option<PyObject>,
     relative_handler: Option<PyObject>,
     absolute_handler: Option<PyObject>,
@@ -203,7 +160,6 @@ impl SharedState {}
 #[pyclass]
 pub struct Mapper {
     pub id: Arc<Uuid>,
-    // ev_tx: Subscriber,
     shared_state: Arc<RwLock<SharedState>>,
     transformer: Arc<XKBTransformer>,
     tmp_next: Mutex<Option<SubscriberNew>>,
@@ -224,28 +180,14 @@ impl Mapper {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
         let transformer = XKB_TRANSFORMER_REGISTRY
-            .get(&TransformerParams::new(
-                kbd_model,
-                kbd_layout,
-                kbd_variant,
-                kbd_options,
-            ))
+            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
             .map_err(err_to_py)?;
 
         let id = Arc::new(Uuid::new_v4());
 
-        let shared_state = Arc::new(RwLock::new(SharedState {
-            id: id.clone(),
-            // mappings: RwLock::new(Mappings::new()),
-            ..Default::default()
-        }));
+        let shared_state = Arc::new(RwLock::new(SharedState { id: id.clone(), ..Default::default() }));
 
-        Ok(Self {
-            id,
-            shared_state,
-            transformer,
-            tmp_next: Default::default(),
-        })
+        Ok(Self { id, shared_state, transformer, tmp_next: Default::default() })
     }
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
@@ -331,20 +273,12 @@ impl Mapper {
 
         match from {
             ParsedKeyAction::KeyAction(from) => {
-                self.shared_state
-                    .write()
-                    .unwrap()
-                    .mappings
-                    .insert(from, RuntimeAction::NOP);
+                self.shared_state.write().unwrap().mappings.insert(from, RuntimeAction::NOP);
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 for value in 0..=2 {
                     let from = KeyActionWithMods::new(from.key, value, from.modifiers);
-                    self.shared_state
-                        .write()
-                        .unwrap()
-                        .mappings
-                        .insert(from, RuntimeAction::NOP);
+                    self.shared_state.write().unwrap().mappings.insert(from, RuntimeAction::NOP);
                 }
             }
             ParsedKeyAction::Action(_) => {
@@ -355,10 +289,7 @@ impl Mapper {
         Ok(())
     }
 
-    pub fn snapshot(
-        &self,
-        existing: Option<&KeyMapperSnapshot>,
-    ) -> PyResult<Option<KeyMapperSnapshot>> {
+    pub fn snapshot(&self, existing: Option<&KeyMapperSnapshot>) -> PyResult<Option<KeyMapperSnapshot>> {
         if let Some(existing) = existing {
             let mut shared_state = self.shared_state.write().unwrap();
             shared_state.mappings = existing.mappings.clone();
@@ -381,12 +312,9 @@ impl Mapper {
     pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
         use crate::subscriber::*;
 
-        match target {
-            Some(target) => {
-                *self.tmp_next.lock().unwrap() = Some(target);
-            }
-            None => {}
-        };
+        if let Some(target) = target {
+            *self.tmp_next.lock().unwrap() = Some(target);
+        }
         Ok(())
     }
 
@@ -417,20 +345,13 @@ impl Mapper {
                     .insert(from, RuntimeAction::PythonCallback(from.modifiers, to));
             }
             ParsedKeyAction::KeyClickAction(from) => {
-                self.shared_state.write().unwrap().mappings.insert(
-                    from.to_key_action(1),
-                    RuntimeAction::PythonCallback(from.modifiers, to),
-                );
                 self.shared_state
                     .write()
                     .unwrap()
                     .mappings
-                    .insert(from.to_key_action(0), RuntimeAction::NOP);
-                self.shared_state
-                    .write()
-                    .unwrap()
-                    .mappings
-                    .insert(from.to_key_action(2), RuntimeAction::NOP);
+                    .insert(from.to_key_action(1), RuntimeAction::PythonCallback(from.modifiers, to));
+                self.shared_state.write().unwrap().mappings.insert(from.to_key_action(0), RuntimeAction::NOP);
+                self.shared_state.write().unwrap().mappings.insert(from.to_key_action(2), RuntimeAction::NOP);
             }
             ParsedKeyAction::Action(_) => {
                 return Err(ApplicationError::NonButton.into());
@@ -449,32 +370,17 @@ impl Mapper {
                         // key action to click
                         ParsedKeyAction::KeyClickAction(to) => {
                             let mapping = map_action_to_click(&from, &to);
-                            self.shared_state
-                                .write()
-                                .unwrap()
-                                .mappings
-                                .insert(mapping.0, mapping.1);
+                            self.shared_state.write().unwrap().mappings.insert(mapping.0, mapping.1);
                         }
                         // key action to key action
                         ParsedKeyAction::KeyAction(to) => {
                             let mapping = map_action_to_action(&from, &to);
-                            self.shared_state
-                                .write()
-                                .unwrap()
-                                .mappings
-                                .insert(mapping.0, mapping.1);
+                            self.shared_state.write().unwrap().mappings.insert(mapping.0, mapping.1);
                         }
                         // key action to action
                         ParsedKeyAction::Action(to) => {
-                            let mapping = map_action_to_action(
-                                &from,
-                                &to.to_key_action_with_mods(Default::default()),
-                            );
-                            self.shared_state
-                                .write()
-                                .unwrap()
-                                .mappings
-                                .insert(mapping.0, mapping.1);
+                            let mapping = map_action_to_action(&from, &to.to_key_action_with_mods(Default::default()));
+                            self.shared_state.write().unwrap().mappings.insert(mapping.0, mapping.1);
                         }
                     }
                     return Ok(());
@@ -482,11 +388,7 @@ impl Mapper {
 
                 // action to seq
                 let mapping = map_action_to_seq(from, to);
-                self.shared_state
-                    .write()
-                    .unwrap()
-                    .mappings
-                    .insert(mapping.0, mapping.1);
+                self.shared_state.write().unwrap().mappings.insert(mapping.0, mapping.1);
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 if to.len() == 1 {

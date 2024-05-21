@@ -31,4 +31,3 @@ impl ApplicationError {
         self.into()
     }
 }
-

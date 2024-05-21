@@ -114,19 +114,12 @@ impl VirtualKeyboard {
         event_queue.roundtrip(&mut AppData).unwrap();
 
         let seat: WlSeat = globals.bind(&event_queue.handle(), 7..=8, ()).unwrap();
-        let keybaord_manager: ZwpVirtualKeyboardManagerV1 =
-            globals.bind(&event_queue.handle(), 1..=1, ()).unwrap();
-        let mut keyboard =
-            keybaord_manager.create_virtual_keyboard(&seat, &event_queue.handle(), ());
+        let keybaord_manager: ZwpVirtualKeyboardManagerV1 = globals.bind(&event_queue.handle(), 1..=1, ()).unwrap();
+        let mut keyboard = keybaord_manager.create_virtual_keyboard(&seat, &event_queue.handle(), ());
 
         event_queue.roundtrip(&mut AppData).unwrap();
 
-        Ok(Self {
-            con,
-            keyboard,
-            keybaord_manager,
-            event_queue,
-        })
+        Ok(Self { con, keyboard, keybaord_manager, event_queue })
     }
 
     pub fn send(&mut self, input: &str) {
@@ -161,10 +154,7 @@ struct KeymapEntry {
     keysym: Keysym,
 }
 
-fn init_virtual_keyboard(
-    keyboard: &ZwpVirtualKeyboardV1,
-    keymap: &HashMap<Keysym, u32>,
-) -> Result<()> {
+fn init_virtual_keyboard(keyboard: &ZwpVirtualKeyboardV1, keymap: &HashMap<Keysym, u32>) -> Result<()> {
     let mut keymap_file = tempfile().map_err(|_| anyhow!("unable to create temporary file"))?;
 
     keymap_file.write_all("xkb_keymap {\n".as_bytes())?;
@@ -179,8 +169,7 @@ fn init_virtual_keyboard(
     keymap_file.write_all("};\n".as_bytes())?;
 
     keymap_file.write_all("xkb_types \"(unnamed)\" { include \"complete\" };\n".as_bytes())?;
-    keymap_file
-        .write_all("xkb_compatibility \"(unnamed)\" { include \"complete\" };\n".as_bytes())?;
+    keymap_file.write_all("xkb_compatibility \"(unnamed)\" { include \"complete\" };\n".as_bytes())?;
 
     keymap_file.write_all("xkb_symbols \"(unnamed)\" {\n".as_bytes())?;
 

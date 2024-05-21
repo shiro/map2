@@ -4,4 +4,3 @@ use crate::*;
 pub enum InputEvent {
     Raw(EvdevInputEvent),
 }
-

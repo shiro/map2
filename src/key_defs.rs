@@ -3,16 +3,10 @@ use evdev_rs::TimeVal;
 
 use crate::*;
 
-pub const INPUT_EV_DUMMY_TIME: TimeVal = TimeVal {
-    tv_sec: 0,
-    tv_usec: 0,
-};
+pub const INPUT_EV_DUMMY_TIME: TimeVal = TimeVal { tv_sec: 0, tv_usec: 0 };
 
-pub static SYN_REPORT: EvdevInputEvent = EvdevInputEvent {
-    event_code: EventCode::EV_SYN(EV_SYN::SYN_REPORT),
-    value: 0,
-    time: INPUT_EV_DUMMY_TIME,
-};
+pub static SYN_REPORT: EvdevInputEvent =
+    EvdevInputEvent { event_code: EventCode::EV_SYN(EV_SYN::SYN_REPORT), value: 0, time: INPUT_EV_DUMMY_TIME };
 
 pub static ALL_KEYS: &'static [evdev_rs::enums::EV_KEY] = &[
     KEY_RESERVED,
@@ -562,8 +556,7 @@ pub static ALL_BUTTONS: &'static [evdev_rs::enums::EV_KEY] = &[
 ];
 
 pub static ALL_REL: &'static [evdev_rs::enums::EV_REL] = &[
-    REL_X, REL_Y, REL_Z, REL_RX, REL_RY, REL_RZ, REL_HWHEEL, REL_DIAL, REL_WHEEL,
-    REL_MISC,
+    REL_X, REL_Y, REL_Z, REL_RX, REL_RY, REL_RZ, REL_HWHEEL, REL_DIAL, REL_WHEEL, REL_MISC,
     // REL_MAX,
 ];
 
@@ -632,30 +625,15 @@ lazy_static! {
         m.insert("KEYPAD_9", (KEY_KP9.into(), KeyModifierFlags::new()));
         m.insert("LEFT_ALT", (KEY_LEFTALT.into(), KeyModifierFlags::new()));
         m.insert("LEFT_CTRL", (KEY_RIGHTCTRL.into(), KeyModifierFlags::new()));
-        m.insert(
-            "LEFT_SHIFT",
-            (KEY_LEFTSHIFT.into(), KeyModifierFlags::new()),
-        );
+        m.insert("LEFT_SHIFT", (KEY_LEFTSHIFT.into(), KeyModifierFlags::new()));
         m.insert("META", (KEY_LEFTMETA.into(), KeyModifierFlags::new()));
         m.insert("PAGE_DOWN", (KEY_PAGEDOWN.into(), KeyModifierFlags::new()));
         m.insert("PAGE_UP", (KEY_PAGEUP.into(), KeyModifierFlags::new()));
         m.insert("RIGHT_ALT", (KEY_RIGHTALT.into(), KeyModifierFlags::new()));
-        m.insert(
-            "RIGHT_BRACE",
-            (KEY_RIGHTBRACE.into(), KeyModifierFlags::new()),
-        );
-        m.insert(
-            "LEFT_BRACE",
-            (KEY_LEFTBRACE.into(), KeyModifierFlags::new()),
-        );
-        m.insert(
-            "RIGHT_CTRL",
-            (KEY_RIGHTCTRL.into(), KeyModifierFlags::new()),
-        );
-        m.insert(
-            "RIGHT_SHIFT",
-            (KEY_RIGHTSHIFT.into(), KeyModifierFlags::new()),
-        );
+        m.insert("RIGHT_BRACE", (KEY_RIGHTBRACE.into(), KeyModifierFlags::new()));
+        m.insert("LEFT_BRACE", (KEY_LEFTBRACE.into(), KeyModifierFlags::new()));
+        m.insert("RIGHT_CTRL", (KEY_RIGHTCTRL.into(), KeyModifierFlags::new()));
+        m.insert("RIGHT_SHIFT", (KEY_RIGHTSHIFT.into(), KeyModifierFlags::new()));
         m.insert("SHIFT", (KEY_LEFTSHIFT.into(), KeyModifierFlags::new()));
         m
     };

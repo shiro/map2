@@ -28,9 +28,7 @@ pub fn run_python_handler(
     next: Option<&SubscriberNew>,
 ) {
     let ret = Python::with_gil(|py| -> Result<()> {
-        let asyncio = py
-            .import("asyncio")
-            .expect("python runtime error: failed to import 'asyncio', is it installed?");
+        let asyncio = py.import("asyncio").expect("python runtime error: failed to import 'asyncio', is it installed?");
 
         let is_async_callback: bool = asyncio
             .call_method1("iscoroutinefunction", (handler.as_ref(py),))
@@ -43,23 +41,20 @@ pub fn run_python_handler(
             Ok(())
         } else {
             let args = args_to_py(py, args.unwrap_or(vec![]));
-            let ret = handler
-                .call(py, args, None)
-                .map_err(|err| anyhow!("{}", err))
-                .and_then(|ret| {
-                    if ret.is_none(py) {
-                        return Ok(None);
-                    }
+            let ret = handler.call(py, args, None).map_err(|err| anyhow!("{}", err)).and_then(|ret| {
+                if ret.is_none(py) {
+                    return Ok(None);
+                }
 
-                    if let Ok(ret) = ret.extract::<String>(py) {
-                        return Ok(Some(PythonReturn::String(ret)));
-                    }
-                    if let Ok(ret) = ret.extract::<bool>(py) {
-                        return Ok(Some(PythonReturn::Bool(ret)));
-                    }
+                if let Ok(ret) = ret.extract::<String>(py) {
+                    return Ok(Some(PythonReturn::String(ret)));
+                }
+                if let Ok(ret) = ret.extract::<bool>(py) {
+                    return Ok(Some(PythonReturn::Bool(ret)));
+                }
 
-                    Err(anyhow!("unsupported python return value"))
-                })?;
+                Err(anyhow!("unsupported python return value"))
+            })?;
 
             match ret {
                 Some(PythonReturn::String(ret)) => {

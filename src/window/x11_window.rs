@@ -1,27 +1,33 @@
-use crate::*;
 use crate::python::*;
 use crate::window::window_base::{ActiveWindowInfo, WindowControlMessage, WindowHandler};
+use crate::*;
 
 use anyhow::Result;
 use x11rb::connection::Connection;
+use x11rb::protocol::xproto::{
+    intern_atom, Atom, AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply, Screen, Window,
+};
 use x11rb::protocol::Event::PropertyNotify;
-use x11rb::protocol::xproto::{Atom, AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply, intern_atom, Screen, Window};
 use x11rb::x11_utils::TryParse;
 
-
 pub fn x11_window_handler() -> WindowHandler {
-    Box::new(|exit_rx: oneshot::Receiver<()>,
-        subscription_rx: mpsc::Receiver<WindowControlMessage>| -> Result<()> {
+    Box::new(|exit_rx: oneshot::Receiver<()>, subscription_rx: mpsc::Receiver<WindowControlMessage>| -> Result<()> {
         let x11_state = Arc::new(x11_initialize().unwrap());
         let subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
         loop {
-            if exit_rx.try_recv().is_ok() { break; }
+            if exit_rx.try_recv().is_ok() {
+                break;
+            }
 
             while let Ok(msg) = subscription_rx.try_recv() {
                 match msg {
-                    WindowControlMessage::Subscribe(id, callback) => { subscriptions.lock().unwrap().insert(id, callback); }
-                    WindowControlMessage::Unsubscribe(id) => { subscriptions.lock().unwrap().remove(&id); }
+                    WindowControlMessage::Subscribe(id, callback) => {
+                        subscriptions.lock().unwrap().insert(id, callback);
+                    }
+                    WindowControlMessage::Unsubscribe(id) => {
+                        subscriptions.lock().unwrap().remove(&id);
+                    }
                 }
             }
 
@@ -31,9 +37,11 @@ pub fn x11_window_handler() -> WindowHandler {
                 Python::with_gil(|py| {
                     for callback in subscriptions.lock().unwrap().values() {
                         let is_callable = callback.as_ref(py).is_callable();
-                        if !is_callable { continue; }
+                        if !is_callable {
+                            continue;
+                        }
 
-                        let ret = callback.call(py, (val.class.clone(), ), None);
+                        let ret = callback.call(py, (val.class.clone(),), None);
 
                         if let Err(err) = ret {
                             eprintln!("{err}");
@@ -61,16 +69,15 @@ pub fn x11_initialize() -> Result<X11State<impl Connection + Send + Sync>> {
     let screen: &Screen = &con.setup().roots[screen_id];
     let root: Window = screen.root;
 
-    con.change_window_attributes(root, &ChangeWindowAttributesAux::new()
-        .event_mask(Some(EventMask::SubstructureNotify | EventMask::PropertyChange)))?;
+    con.change_window_attributes(
+        root,
+        &ChangeWindowAttributesAux::new().event_mask(Some(EventMask::SubstructureNotify | EventMask::PropertyChange)),
+    )?;
 
     #[allow(non_snake_case)]
-        let NET_ACTIVE_WINDOW: Atom = intern_atom(&con, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
+    let NET_ACTIVE_WINDOW: Atom = intern_atom(&con, false, b"_NET_ACTIVE_WINDOW").unwrap().reply()?.atom;
 
-    Ok(X11State {
-        con,
-        NET_ACTIVE_WINDOW,
-    })
+    Ok(X11State { con, NET_ACTIVE_WINDOW })
 }
 
 pub fn get_window_info_x11<S: Connection + Send + Sync>(state: &X11State<S>) -> Result<Option<ActiveWindowInfo>> {
@@ -98,10 +105,7 @@ pub(crate) fn x11_get_active_window() -> Result<ActiveWindowInfo> {
 
     // Collect the replies to the atoms
     let (net_wm_name, utf8_string) = (net_wm_name, utf8_string);
-    let (wm_class, string): (u32, u32) = (
-        AtomEnum::WM_CLASS.into(),
-        AtomEnum::STRING.into(),
-    );
+    let (wm_class, string): (u32, u32) = (AtomEnum::WM_CLASS.into(), AtomEnum::STRING.into());
 
     // Get the property from the window that we need
     let name = conn.get_property(false, focus, net_wm_name, utf8_string, 0, u32::max_value())?;
@@ -111,11 +115,7 @@ pub(crate) fn x11_get_active_window() -> Result<ActiveWindowInfo> {
 
     let name = parse_string_property(&_name);
 
-    Ok(ActiveWindowInfo {
-        class: class.to_string(),
-        instance: instance.to_string(),
-        name: name.to_string(),
-    })
+    Ok(ActiveWindowInfo { class: class.to_string(), instance: instance.to_string(), name: name.to_string() })
 }
 
 fn find_active_window(conn: &impl Connection, root: Window, net_active_window: Atom) -> Result<Window> {

@@ -1,21 +1,14 @@
 use super::*;
 
 pub fn action_state(input: &str) -> ParseResult<&str, i32> {
-    map(
-        alt((
-            tag_custom_no_case("down"),
-            tag_custom_no_case("up"),
-            tag_custom_no_case("repeat"),
-        )),
-        |input: &str| {
-            match &*input.to_lowercase() {
-                "up" => 0,
-                "down" => 1,
-                "repeat" => 2,
-                _ => unreachable!()
-            }
-        },
-    )(input)
+    map(alt((tag_custom_no_case("down"), tag_custom_no_case("up"), tag_custom_no_case("repeat"))), |input: &str| {
+        match &*input.to_lowercase() {
+            "up" => 0,
+            "down" => 1,
+            "repeat" => 2,
+            _ => unreachable!(),
+        }
+    })(input)
 }
 
 #[cfg(test)]

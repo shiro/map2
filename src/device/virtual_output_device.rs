@@ -1,7 +1,7 @@
 use evdev_rs::{UInputDevice, UninitDevice};
 
-use crate::*;
 use crate::device::virt_device::DeviceCapabilities;
+use crate::*;
 
 use super::*;
 
@@ -11,8 +11,7 @@ pub struct VirtualOutputDevice {
 
 impl VirtualOutputDevice {
     pub fn send(&mut self, ev: &EvdevInputEvent) -> Result<()> {
-        self.output_device.write_event(&ev)
-            .map_err(|err| anyhow!("failed to write event into uinput device: {}", err))
+        self.output_device.write_event(&ev).map_err(|err| anyhow!("failed to write event into uinput device: {}", err))
     }
 }
 
@@ -47,7 +46,5 @@ pub fn init_virtual_output_device(init_policy: &DeviceInitPolicy) -> Result<Virt
 
     let output_device = input_device.map_err(|err| anyhow!("failed to initialize uinput device: {}", err))?;
 
-    Ok(VirtualOutputDevice {
-        output_device,
-    })
+    Ok(VirtualOutputDevice { output_device })
 }

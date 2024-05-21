@@ -1,19 +1,18 @@
 use std::fmt::Display;
 
-use nom::{Compare, CompareResult, Err, InputLength, InputTake, Parser};
-use nom::IResult;
 use nom::sequence::Tuple;
+use nom::IResult;
+use nom::{Compare, CompareResult, Err, InputLength, InputTake, Parser};
 
 use crate::parsing::error::FromTagError;
 
 use super::*;
 
-
-pub fn many1_with_last_err<I, O,E,  F>(mut f: F) -> impl FnMut(I) -> IResult<I, (Vec<O>, E), E>
-    where
-        I: Clone + InputLength,
-        F: Parser<I, O, E>,
-        E: nom::error::ParseError<I>,
+pub fn many1_with_last_err<I, O, E, F>(mut f: F) -> impl FnMut(I) -> IResult<I, (Vec<O>, E), E>
+where
+    I: Clone + InputLength,
+    F: Parser<I, O, E>,
+    E: nom::error::ParseError<I>,
 {
     move |mut i: I| match f.parse(i.clone()) {
         Err(Err::Error(err)) => Err(Err::Error(E::append(i, nom::error::ErrorKind::Many1, err))),
@@ -43,9 +42,7 @@ pub fn many1_with_last_err<I, O,E,  F>(mut f: F) -> impl FnMut(I) -> IResult<I, 
     }
 }
 
-pub fn tuple<I: Clone, O, List: Tuple<I, O, CustomError<I>>>(
-    mut l: List,
-) -> impl FnMut(I) -> ParseResult<I, O> {
+pub fn tuple<I: Clone, O, List: Tuple<I, O, CustomError<I>>>(mut l: List) -> impl FnMut(I) -> ParseResult<I, O> {
     move |i: I| {
         let res = l.parse(i.clone());
         if res.is_err() {
@@ -55,13 +52,10 @@ pub fn tuple<I: Clone, O, List: Tuple<I, O, CustomError<I>>>(
     }
 }
 
-
-pub fn tag_custom<T, Input, Error: FromTagError<Input>>(
-    tag: T,
-) -> impl Fn(Input) -> IResult<Input, Input, Error>
-    where
-        Input: InputTake + Compare<T>,
-        T: InputLength + Clone + Display,
+pub fn tag_custom<T, Input, Error: FromTagError<Input>>(tag: T) -> impl Fn(Input) -> IResult<Input, Input, Error>
+where
+    Input: InputTake + Compare<T>,
+    T: InputLength + Clone + Display,
 {
     // let tag = tag.to_string();
     move |input: Input| {
@@ -70,7 +64,7 @@ pub fn tag_custom<T, Input, Error: FromTagError<Input>>(
 
         let res: IResult<_, _, Error> = match input.compare(t) {
             CompareResult::Ok => Ok(input.take_split(tag_len)),
-            _ => { Err(Err::Error(Error::from_tag(input, tag.to_string()))) }
+            _ => Err(Err::Error(Error::from_tag(input, tag.to_string()))),
         };
         res
     }
@@ -79,9 +73,9 @@ pub fn tag_custom<T, Input, Error: FromTagError<Input>>(
 pub fn tag_custom_no_case<T, Input, Error: FromTagError<Input>>(
     tag: T,
 ) -> impl Fn(Input) -> IResult<Input, Input, Error>
-    where
-        Input: InputTake + Compare<T>,
-        T: InputLength + Clone + Display,
+where
+    Input: InputTake + Compare<T>,
+    T: InputLength + Clone + Display,
 {
     // let tag = tag.to_string();
     move |input: Input| {
@@ -90,12 +84,11 @@ pub fn tag_custom_no_case<T, Input, Error: FromTagError<Input>>(
 
         let res: IResult<_, _, Error> = match input.compare_no_case(t) {
             CompareResult::Ok => Ok(input.take_split(tag_len)),
-            _ => { Err(Err::Error(Error::from_tag(input, tag.to_string()))) }
+            _ => Err(Err::Error(Error::from_tag(input, tag.to_string()))),
         };
         res
     }
 }
-
 
 pub fn surrounded_group<'a, Output>(
     from_token: &'a str,
@@ -104,13 +97,12 @@ pub fn surrounded_group<'a, Output>(
 ) -> Box<dyn FnMut(&'a str) -> ParseResult<&'a str, Output> + 'a> {
     Box::new(move |input| {
         map_res(
-            tuple((
-                tag_custom(from_token),
-                terminated(take_until(to_token), tag_custom(to_token))
-            )),
+            tuple((tag_custom(from_token), terminated(take_until(to_token), tag_custom(to_token)))),
             |(_, input)| {
                 let (input, res) = parser(input)?;
-                if !input.is_empty() { return Err(make_generic_nom_err_new(input)); }
+                if !input.is_empty() {
+                    return Err(make_generic_nom_err_new(input));
+                }
                 Ok(res)
             },
         )(input)

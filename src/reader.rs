@@ -30,9 +30,9 @@ impl Reader {
         };
 
         let patterns: Vec<&str> = match options.get("patterns") {
-            Some(patterns) => patterns
-                .extract()
-                .map_err(|_| PyRuntimeError::new_err("'patterns' must be of type 'string[]?'"))?,
+            Some(patterns) => {
+                patterns.extract().map_err(|_| PyRuntimeError::new_err("'patterns' must be of type 'string[]?'"))?
+            }
             None => {
                 vec![]
             }
@@ -43,12 +43,7 @@ impl Reader {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
         let transformer = XKB_TRANSFORMER_REGISTRY
-            .get(&TransformerParams::new(
-                kbd_model,
-                kbd_layout,
-                kbd_variant,
-                kbd_options,
-            ))
+            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
             .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
         #[cfg(not(feature = "integration"))]

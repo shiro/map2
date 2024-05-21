@@ -2,7 +2,6 @@ use serde::*;
 
 use crate::*;
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AbsInfo {
     #[serde(default)]
@@ -49,7 +48,9 @@ pub enum Abs {
 }
 
 impl Default for Abs {
-    fn default() -> Self { Self::Bool(false) }
+    fn default() -> Self {
+        Self::Bool(false)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

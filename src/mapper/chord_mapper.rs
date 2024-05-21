@@ -31,37 +31,16 @@ struct SharedState {
 }
 
 impl State {
-    fn handle(
-        &mut self,
-        raw_ev: InputEvent,
-        next: Option<&SubscriberNew>,
-        shared_state: &SharedState,
-    ) {
+    fn handle(&mut self, raw_ev: InputEvent, next: Option<&SubscriberNew>, shared_state: &SharedState) {
         let ev = match &raw_ev {
             InputEvent::Raw(ev) => ev,
         };
 
-        let _key = Key {
-            event_code: ev.event_code,
-        };
+        let _key = Key { event_code: ev.event_code };
 
         match ev {
-            EvdevInputEvent {
-                event_code: EventCode::EV_KEY(key),
-                value,
-                ..
-            } => {
-                let mut from_modifiers = KeyModifierFlags::new();
-                from_modifiers.ctrl = self.modifiers.is_ctrl();
-                from_modifiers.alt = self.modifiers.is_alt();
-                from_modifiers.right_alt = self.modifiers.is_right_alt();
-                from_modifiers.shift = self.modifiers.is_shift();
-                from_modifiers.meta = self.modifiers.is_meta();
-
-                event_handlers::update_modifiers(
-                    &mut self.modifiers,
-                    &KeyAction::from_input_ev(&ev),
-                );
+            EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+                event_handlers::update_modifiers(&mut self.modifiers, &KeyAction::from_input_ev(&ev));
 
                 match ev.value {
                     TYPE_DOWN => {
@@ -78,18 +57,12 @@ impl State {
                             } else {
                                 let msg_tx = self.msg_tx.clone();
                                 self.interval = Some(tokio::spawn(async move {
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(50))
-                                        .await;
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                                     msg_tx.send(Msg::Callback(raw_ev));
                                 }));
                             }
                         } else {
-                            let next = match next {
-                                Some(x) => x,
-                                None => {
-                                    return;
-                                }
-                            };
+                            let Some(next) = next else { return };
 
                             if let Some(task) = self.interval.take() {
                                 task.abort();
@@ -107,13 +80,7 @@ impl State {
                     }
                     TYPE_UP => {
                         self.pressed_keys.remove(&_key);
-
-                        let next = match next {
-                            Some(x) => x,
-                            None => {
-                                return;
-                            }
-                        };
+                        let Some(next) = next else { return };
 
                         if let Some(task) = self.interval.take() {
                             task.abort();
@@ -144,15 +111,7 @@ impl State {
                             return;
                         }
                         if self.stack.is_empty() {
-                            // let subscriber_map = self.subscriber_map.read().unwrap();
-                            // let subscriber = subscriber_map.get(&path_hash);
-                            let next = match next {
-                                Some(x) => x,
-                                None => {
-                                    return;
-                                }
-                            };
-
+                            let Some(next) = next else { return };
                             let _ = next.send(raw_ev);
                         };
                     }
@@ -164,13 +123,7 @@ impl State {
     }
 
     // fired after the chord timeout has passed, submits the keys held on the stack
-    fn handle_cb(
-        &mut self,
-        raw_ev: InputEvent,
-        next: Option<&SubscriberNew>,
-        shared_state: &SharedState,
-    ) {
-        // let mut inner = _inner.write().unwrap();
+    fn handle_cb(&mut self, raw_ev: InputEvent, next: Option<&SubscriberNew>, shared_state: &SharedState) {
         let ev = match &raw_ev {
             InputEvent::Raw(ev) => ev,
         };
@@ -184,28 +137,18 @@ impl State {
                 self.ignored_keys.insert(k);
             }
 
-            // for action in output {
             match action {
                 RuntimeAction::ActionSequence(seq) => {
                     for action in seq {
                         match action {
                             RuntimeKeyAction::KeyAction(key_action) => {
                                 if let Some(next) = next {
-                                    let ev = key_action.to_input_ev();
-                                    let _ = next.send(InputEvent::Raw(ev));
+                                    let _ = next.send(InputEvent::Raw(key_action.to_input_ev()));
                                 }
                             }
-                            RuntimeKeyAction::ReleaseRestoreModifiers(
-                                from_flags,
-                                to_flags,
-                                to_type,
-                            ) => {
-                                let new_events = release_restore_modifiers(
-                                    &self.modifiers,
-                                    &from_flags,
-                                    &to_flags,
-                                    &to_type,
-                                );
+                            RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                                let new_events =
+                                    release_restore_modifiers(&self.modifiers, &from_flags, &to_flags, &to_type);
                                 if let Some(next) = next {
                                     for ev in new_events {
                                         let _ = next.send(InputEvent::Raw(ev));
@@ -233,14 +176,8 @@ impl State {
                 }
                 RuntimeAction::NOP => {}
             }
-            // }
         } else {
-            let next = match next {
-                Some(x) => x,
-                None => {
-                    return;
-                }
-            };
+            let Some(next) = next else { return };
 
             // only one key on the stack
             if self.stack.len() == 1 && self.stack[0].event_code == ev.event_code {
@@ -280,12 +217,7 @@ impl ChordMapper {
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
         let kbd_options = options.get("options").and_then(|x| x.extract().ok());
         let transformer = XKB_TRANSFORMER_REGISTRY
-            .get(&TransformerParams::new(
-                kbd_model,
-                kbd_layout,
-                kbd_variant,
-                kbd_options,
-            ))
+            .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
             .map_err(err_to_py)?;
 
         let id = Uuid::new_v4();
@@ -296,12 +228,7 @@ impl ChordMapper {
             mappings: Default::default(),
         }));
 
-        Ok(Self {
-            id,
-            shared_state,
-            transformer,
-            tmp_next: Default::default(),
-        })
+        Ok(Self { id, shared_state, transformer, tmp_next: Default::default() })
     }
 
     pub fn map(&mut self, py: Python, from: Vec<String>, to: PyObject) -> PyResult<()> {
@@ -311,116 +238,64 @@ impl ChordMapper {
         //     ));
         // }
 
-        let mut from_parsed = from
-            .into_iter()
-            .map(|x| parse_key(&x, Some(&self.transformer)))
-            .collect::<Result<Vec<_>>>()
-            .map_err(|err| {
-                PyRuntimeError::new_err(format!(
-                    "mapping error on the 'from' side:\n{}",
-                    ApplicationError::KeyParse(err.to_string()),
-                ))
-            })?;
-
-        // let from_seq: Vec<KeyClickActionWithMods> =
-        //     parse_key_sequence(&from, Some(&self.transformer))
-        //         .map_err(|err| {
-        //             PyRuntimeError::new_err(format!(
-        //                 "mapping error on the 'from' side:\n{}",
-        //                 ApplicationError::KeyParse(err.to_string()),
-        //             ))
-        //         })?
-        //         .into_iter()
-        //         .map(|x| match x {
-        //             ParsedKeyAction::KeyClickAction(x) => Some(x),
-        //             _ => None,
-        //         })
-        //         .collect::<Option<Vec<_>>>()
-        //         .ok_or_else(|| PyRuntimeError::new_err("invalid key sequence"))?;
-        //
+        let mut from_parsed =
+            from.into_iter().map(|x| parse_key(&x, Some(&self.transformer))).collect::<Result<Vec<_>>>().map_err(
+                |err| {
+                    PyRuntimeError::new_err(format!(
+                        "mapping error on the 'from' side:\n{}",
+                        ApplicationError::KeyParse(err.to_string()),
+                    ))
+                },
+            )?;
 
         let mut shared_state = self.shared_state.write().unwrap();
 
-        // TODO fix code duplication
-        if to.as_ref(py).is_callable() {
-            // self._map_callback(from, to)?;
-            let to = RuntimeAction::PythonCallback(Default::default(), to);
+        let to = if to.as_ref(py).is_callable() {
+            RuntimeAction::PythonCallback(Default::default(), to)
+        } else {
+            let to = to.extract::<String>(py).map_err(|err| {
+                PyRuntimeError::new_err(format!(
+                    "mapping error on the 'to' side:\n{}",
+                    ApplicationError::InvalidInputType { type_: "String".to_string() }
+                ))
+            })?;
+            let to = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
+                PyRuntimeError::new_err(format!(
+                    "mapping error on the 'to' side:\n{}",
+                    ApplicationError::KeySequenceParse(err.to_string()),
+                ))
+            })?;
 
-            // mark chorded keys
-            shared_state
-                .chorded_keys
-                .extend(from_parsed.iter().cloned());
-
-            // insert all combinations
-            shared_state
-                .mappings
-                .insert(from_parsed.clone(), to.clone());
-            from_parsed.reverse();
-            shared_state.mappings.insert(from_parsed, to);
-            return Ok(());
-        }
-
-        let to = to.extract::<String>(py).map_err(|err| {
-            PyRuntimeError::new_err(format!(
-                "mapping error on the 'to' side:\n{}",
-                ApplicationError::InvalidInputType {
-                    type_: "String".to_string(),
-                }
-            ))
-        })?;
-        let to_parsed = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
-            PyRuntimeError::new_err(format!(
-                "mapping error on the 'to' side:\n{}",
-                ApplicationError::KeySequenceParse(err.to_string()),
-            ))
-        })?;
-
-        let mut to: Vec<RuntimeKeyAction> = to_parsed
-            .to_key_actions()
-            .into_iter()
-            .map(|action| RuntimeKeyAction::KeyAction(action))
-            .collect();
+            let mut to: Vec<RuntimeKeyAction> =
+                to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
+            RuntimeAction::ActionSequence(to)
+        };
 
         // mark chorded keys
-        shared_state
-            .chorded_keys
-            .extend(from_parsed.iter().cloned());
-
-        let to = RuntimeAction::ActionSequence(to);
+        shared_state.chorded_keys.extend(from_parsed.iter().cloned());
 
         // insert all combinations
-        shared_state
-            .mappings
-            .insert(from_parsed.clone(), to.clone());
+        shared_state.mappings.insert(from_parsed.clone(), to.clone());
         from_parsed.reverse();
         shared_state.mappings.insert(from_parsed, to);
 
         Ok(())
     }
 
-    pub fn snapshot(
-        &self,
-        existing: Option<&ChordMapperSnapshot>,
-    ) -> PyResult<Option<ChordMapperSnapshot>> {
+    pub fn snapshot(&self, existing: Option<&ChordMapperSnapshot>) -> PyResult<Option<ChordMapperSnapshot>> {
         if let Some(existing) = existing {
             let mut shared_state = self.shared_state.write().unwrap();
             shared_state.mappings = existing.mappings.clone();
-            shared_state.chorded_keys =
-                shared_state
-                    .mappings
-                    .keys()
-                    .fold(HashSet::new(), |mut acc, e| {
-                        acc.extend(e.iter().cloned());
-                        acc
-                    });
+            shared_state.chorded_keys = shared_state.mappings.keys().fold(HashSet::new(), |mut acc, e| {
+                acc.extend(e.iter().cloned());
+                acc
+            });
             return Ok(None);
         }
 
         let mut shared_state = self.shared_state.read().unwrap();
 
-        Ok(Some(ChordMapperSnapshot {
-            mappings: shared_state.mappings.clone(),
-        }))
+        Ok(Some(ChordMapperSnapshot { mappings: shared_state.mappings.clone() }))
     }
 }
 
@@ -428,11 +303,8 @@ impl ChordMapper {
     pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
         use crate::subscriber::*;
 
-        match target {
-            Some(target) => {
-                *self.tmp_next.lock().unwrap() = Some(target);
-            }
-            None => {}
+        if let Some(target) = target {
+            *self.tmp_next.lock().unwrap() = Some(target);
         };
         Ok(())
     }

@@ -7,8 +7,6 @@ pub struct MapperState {
 
 impl MapperState {
     pub fn new() -> Self {
-        MapperState {
-            modifiers: Arc::new(KeyModifierState::new()),
-        }
+        MapperState { modifiers: Arc::new(KeyModifierState::new()) }
     }
 }

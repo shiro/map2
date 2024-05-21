@@ -18,12 +18,7 @@ pub struct XKBTransformer {
 }
 
 impl XKBTransformer {
-    pub fn new(
-        model: &str,
-        layout: &str,
-        variant: Option<&str>,
-        options: Option<String>,
-    ) -> Result<Self> {
+    pub fn new(model: &str, layout: &str, variant: Option<&str>, options: Option<String>) -> Result<Self> {
         let context = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
         let keymap = xkb::Keymap::new_from_names(
             &context,
@@ -121,10 +116,7 @@ impl XKBTransformer {
             }
         });
 
-        Ok(Self {
-            utf_to_raw_map,
-            raw_to_utf_map,
-        })
+        Ok(Self { utf_to_raw_map, raw_to_utf_map })
     }
 
     pub fn utf_to_raw(&self, key: String) -> Result<Vec<Key>> {
@@ -142,42 +134,27 @@ impl XKBTransformer {
             .and_then(|keysyms| {
                 keysyms
                     .iter()
-                    .map(|&x| {
-                        int_to_ev_key(x - 8).and_then(|x| {
-                            Some(Key {
-                                event_code: EventCode::EV_KEY(x),
-                            })
-                        })
-                    })
+                    .map(|&x| int_to_ev_key(x - 8).and_then(|x| Some(Key { event_code: EventCode::EV_KEY(x) })))
                     .collect::<Option<Vec<Key>>>()
             })
             .ok_or_else(|| anyhow!("failed to convert utf to raw"))
     }
 
     pub fn raw_to_utf(&self, key: &EV_KEY, state: &KeyModifierState) -> Option<String> {
-        self.raw_to_utf_map
-            .get(&(*key, *state))
-            .cloned()
-            .and_then(|x| {
-                if x.chars().next() == Some('\0') {
-                    None
-                } else {
-                    Some(x)
-                }
-            })
+        self.raw_to_utf_map.get(&(*key, *state)).cloned().and_then(|x| {
+            if x.chars().next() == Some('\0') {
+                None
+            } else {
+                Some(x)
+            }
+        })
     }
 }
 
 impl Default for XKBTransformer {
     fn default() -> Self {
         let params = TransformerParams::default();
-        Self::new(
-            &params.model,
-            &params.layout,
-            params.variant.as_deref(),
-            params.options.clone(),
-        )
-        .unwrap()
+        Self::new(&params.model, &params.layout, params.variant.as_deref(), params.options.clone()).unwrap()
     }
 }
 

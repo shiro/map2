@@ -17,21 +17,14 @@ pub fn get_platform() -> Platform {
 }
 
 fn platform_is_hyprland() -> bool {
-    Command::new("printenv")
-        .arg("HYPRLAND_INSTANCE_SIGNATURE")
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
+    Command::new("printenv").arg("HYPRLAND_INSTANCE_SIGNATURE").status().map(|status| status.success()).unwrap_or(false)
 }
 
 fn platform_is_x11() -> bool {
     Command::new("printenv")
         .arg("XDG_SESSION_TYPE")
         .output()
-        .map(|info| {
-            info.status.success()
-                && String::from_utf8_lossy(&info.stdout).replace("\n", "") == "x11"
-        })
+        .map(|info| info.status.success() && String::from_utf8_lossy(&info.stdout).replace("\n", "") == "x11")
         .unwrap_or(false)
 }
 
@@ -48,4 +41,3 @@ fn platform_is_x11() -> bool {
 
 // for gnome
 // https://github.com/ActivityWatch/aw-watcher-window/pull/46/files
-

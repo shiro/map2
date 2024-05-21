@@ -33,8 +33,7 @@ fn default(options: Option<&PyDict>) -> PyResult<()> {
     let kbd_variant: Option<Option<String>> = options.get("variant").and_then(|x| x.extract().ok());
     let kbd_options: Option<Option<String>> = options.get("options").and_then(|x| x.extract().ok());
 
-    if kbd_model.is_some() || kbd_layout.is_some() || kbd_variant.is_some() || kbd_options.is_some()
-    {
+    if kbd_model.is_some() || kbd_layout.is_some() || kbd_variant.is_some() || kbd_options.is_some() {
         let mut default_params = global::DEFAULT_TRANSFORMER_PARAMS.write().unwrap();
 
         if let Some(model) = kbd_model {
@@ -125,12 +124,7 @@ fn exit(exit_code: Option<i32>) {
 #[cfg(feature = "integration")]
 #[pyfunction]
 fn __test() -> PyResult<Vec<String>> {
-    Ok(global::TEST_PIPE
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|x| serde_json::to_string(x).unwrap())
-        .collect())
+    Ok(global::TEST_PIPE.lock().unwrap().iter().map(|x| serde_json::to_string(x).unwrap()).collect())
 }
 
 #[pymodule]

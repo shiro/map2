@@ -20,11 +20,7 @@ pub fn xkb_utf32_to_keysym(utf: u32) -> Keysym {
     }
 
     // Unicode non-symbols and code points outside Unicode planes.
-    if matches!(utf, 0xd800..=0xdfff)
-        || matches!(utf, 0xfdd0..=0xfdef)
-        || utf > 0x10ffff
-        || (utf & 0xfffe == 0xfffe)
-    {
+    if matches!(utf, 0xd800..=0xdfff) || matches!(utf, 0xfdd0..=0xfdef) || utf > 0x10ffff || (utf & 0xfffe == 0xfffe) {
         return Keysym::from(0);
     }
 
@@ -32,9 +28,7 @@ pub fn xkb_utf32_to_keysym(utf: u32) -> Keysym {
     KEYSYMTAB
         .iter()
         .find(|pair| pair.ucs as u32 == utf)
-        .map_or(Keysym::new(utf | 0x01000000), |pair| {
-            Keysym::new(pair.keysym as u32)
-        })
+        .map_or(Keysym::new(utf | 0x01000000), |pair| Keysym::new(pair.keysym as u32))
 }
 
 pub fn xkb_keysym_to_utf32(sym: RawKeysym) -> u32 {
@@ -65,10 +59,7 @@ pub fn xkb_keysym_to_utf32(sym: RawKeysym) -> u32 {
     // }
 
     // Search main table.
-    KEYSYMTAB
-        .iter()
-        .find(|pair| pair.keysym as u32 == sym)
-        .map_or(0, |pair| pair.ucs as u32)
+    KEYSYMTAB.iter().find(|pair| pair.keysym as u32 == sym).map_or(0, |pair| pair.ucs as u32)
 }
 
 struct CodePair {
