@@ -1,11 +1,185 @@
+use super::*;
 use crate::event_loop::{args_to_py, PythonArgument};
 use crate::mapper::mapping_functions::*;
 use crate::mapper::{RuntimeAction, RuntimeKeyAction};
 use crate::python::*;
-use crate::subscriber::{SubscribeEvent, Subscriber};
+use crate::subscriber::SubscriberNew;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
+
+#[derive(Default)]
+pub struct MapperState {
+    pub modifiers: Arc<KeyModifierState>,
+}
+
+impl MapperState {
+    pub fn new() -> Self {
+        MapperState {
+            modifiers: Arc::new(KeyModifierState::new()),
+        }
+    }
+}
+
+impl MapperState {
+    fn handle(
+        &mut self,
+        raw_ev: InputEvent,
+        next: Option<&SubscriberNew>,
+        shared_state: &SharedState,
+    ) {
+        let ev = match &raw_ev {
+            InputEvent::Raw(ev) => ev,
+        };
+
+        match ev {
+            // key event
+            EvdevInputEvent {
+                event_code: EventCode::EV_KEY(key),
+                value,
+                ..
+            } => {
+                let mut from_modifiers = KeyModifierFlags::new();
+                from_modifiers.ctrl = self.modifiers.is_ctrl();
+                from_modifiers.alt = self.modifiers.is_alt();
+                from_modifiers.right_alt = self.modifiers.is_right_alt();
+                from_modifiers.shift = self.modifiers.is_shift();
+                from_modifiers.meta = self.modifiers.is_meta();
+
+                let from_key_action = KeyActionWithMods {
+                    key: Key {
+                        event_code: ev.event_code,
+                    },
+                    value: ev.value,
+                    modifiers: from_modifiers,
+                };
+
+                if let Some(runtime_action) = shared_state.mappings.get(&from_key_action) {
+                    match runtime_action {
+                        RuntimeAction::ActionSequence(seq) => {
+                            let next = match next {
+                                Some(x) => x,
+                                None => {
+                                    return;
+                                }
+                            };
+
+                            for action in seq {
+                                match action {
+                                    RuntimeKeyAction::KeyAction(key_action) => {
+                                        let ev = key_action.to_input_ev();
+
+                                        let _ = next.send(InputEvent::Raw(ev));
+                                    }
+                                    RuntimeKeyAction::ReleaseRestoreModifiers(
+                                        from_flags,
+                                        to_flags,
+                                        to_type,
+                                    ) => {
+                                        let new_events = release_restore_modifiers(
+                                            &self.modifiers,
+                                            &from_flags,
+                                            &to_flags,
+                                            &to_type,
+                                        );
+                                        // events.append(&mut new_events);
+                                        for ev in new_events {
+                                            let _ = next.send(InputEvent::Raw(ev));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        RuntimeAction::PythonCallback(from_modifiers, handler) => {
+                            if let Some(next) = next {
+                                // always release all trigger mods before running the callback
+                                let new_events = release_restore_modifiers(
+                                    &self.modifiers,
+                                    &from_modifiers,
+                                    &KeyModifierFlags::new(),
+                                    &TYPE_UP,
+                                );
+                                for ev in new_events {
+                                    let _ = next.send(InputEvent::Raw(ev));
+                                }
+                            }
+
+                            run_python_handler(&handler, None, ev, &shared_state.transformer, next);
+                        }
+                        RuntimeAction::NOP => {}
+                    }
+
+                    return;
+                }
+
+                event_handlers::update_modifiers(
+                    &mut self.modifiers,
+                    &KeyAction::from_input_ev(&ev),
+                );
+
+                if let Some(handler) = shared_state.fallback_handler.as_ref() {
+                    let name = match key {
+                        KEY_SPACE => "space".to_string(),
+                        KEY_TAB => "tab".to_string(),
+                        KEY_ENTER => "enter".to_string(),
+                        _ => shared_state
+                            .transformer
+                            .raw_to_utf(key, &*self.modifiers)
+                            .unwrap_or_else(|| {
+                                let name = format!("{key:?}").to_string();
+                                name[4..name.len()].to_lowercase()
+                            }),
+                    };
+
+                    let value = match *value {
+                        0 => "up",
+                        1 => "down",
+                        2 => "repeat",
+                        _ => unreachable!(),
+                    }
+                    .to_string();
+
+                    let args = vec![PythonArgument::String(name), PythonArgument::String(value)];
+
+                    run_python_handler(&handler, Some(args), ev, &shared_state.transformer, next);
+
+                    return;
+                }
+            }
+            // rel/abs event
+            EvdevInputEvent {
+                event_code, value, ..
+            } if matches!(event_code, EventCode::EV_REL(..))
+                || matches!(event_code, EventCode::EV_ABS(..)) =>
+            {
+                let (key, handler) = match event_code {
+                    EventCode::EV_REL(key) => (
+                        format!("{key:?}").to_string(),
+                        &shared_state.relative_handler,
+                    ),
+                    EventCode::EV_ABS(key) => (
+                        format!("{key:?}").to_string(),
+                        &shared_state.absolute_handler,
+                    ),
+                    _ => unreachable!(),
+                };
+                if let Some(handler) = handler.as_ref() {
+                    let name = format!("{key:?}");
+                    // remove prefix REL_ / ABS_
+                    let name = name[4..name.len()].to_string();
+                    let args = vec![PythonArgument::String(name), PythonArgument::Number(*value)];
+                    run_python_handler(&handler, Some(args), ev, &shared_state.transformer, next);
+                    return;
+                }
+            }
+            _ => {}
+        }
+
+        if let Some(next) = next {
+            let _ = next.send(raw_ev);
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum ControlMessage {
@@ -23,7 +197,7 @@ fn run_python_handler(
     args: Option<Vec<PythonArgument>>,
     ev: &EvdevInputEvent,
     transformer: &Arc<XKBTransformer>,
-    subscriber: Option<&(u64, Subscriber)>,
+    next: Option<&SubscriberNew>,
 ) {
     let ret = Python::with_gil(|py| -> Result<()> {
         let asyncio = py
@@ -63,16 +237,15 @@ fn run_python_handler(
                 Some(PythonReturn::String(ret)) => {
                     let seq = parse_key_sequence(&ret, Some(transformer))?;
 
-                    if let Some((path_hash, subscriber)) = subscriber {
+                    if let Some(next) = next {
                         for action in seq.to_key_actions() {
-                            let _ = subscriber
-                                .send((*path_hash, InputEvent::Raw(action.to_input_ev())));
+                            let _ = next.send(InputEvent::Raw(action.to_input_ev()));
                         }
                     }
                 }
                 Some(PythonReturn::Bool(ret)) if ret => {
-                    if let Some((path_hash, subscriber)) = subscriber {
-                        let _ = subscriber.send((*path_hash, InputEvent::Raw(ev.clone())));
+                    if let Some(next) = next {
+                        let _ = next.send(InputEvent::Raw(ev.clone()));
                     }
                 }
                 _ => {}
@@ -88,191 +261,32 @@ fn run_python_handler(
 }
 
 #[derive(Default)]
-struct Inner {
+struct SharedState {
     id: Arc<Uuid>,
-    subscriber_map: Arc<RwLock<SubscriberMap>>,
+    // subscriber_map: Arc<RwLock<SubscriberMap>>,
     transformer: Arc<XKBTransformer>,
-    mappings: RwLock<Mappings>,
-
-    fallback_handler: RwLock<Option<PyObject>>,
-    relative_handler: RwLock<Option<PyObject>>,
-    absolute_handler: RwLock<Option<PyObject>>,
+    mappings: Mappings,
+    // subscriber_map: HashMap<u64, SubscriberNew>,
+    fallback_handler: Option<PyObject>,
+    relative_handler: Option<PyObject>,
+    absolute_handler: Option<PyObject>,
 }
 
-impl Inner {
-    fn handle(&self, path_hash: u64, raw_ev: InputEvent, state: &mut MapperState) {
-        let mappings = self.mappings.read().unwrap();
-
-        let subscriber_map = self.subscriber_map.read().unwrap();
-        let subscriber = subscriber_map.get(&path_hash);
-
-        let ev = match &raw_ev {
-            InputEvent::Raw(ev) => ev,
-        };
-
-        match ev {
-            // key event
-            EvdevInputEvent {
-                event_code: EventCode::EV_KEY(key),
-                value,
-                ..
-            } => {
-                let mut from_modifiers = KeyModifierFlags::new();
-                from_modifiers.ctrl = state.modifiers.is_ctrl();
-                from_modifiers.alt = state.modifiers.is_alt();
-                from_modifiers.right_alt = state.modifiers.is_right_alt();
-                from_modifiers.shift = state.modifiers.is_shift();
-                from_modifiers.meta = state.modifiers.is_meta();
-
-                let from_key_action = KeyActionWithMods {
-                    key: Key {
-                        event_code: ev.event_code,
-                    },
-                    value: ev.value,
-                    modifiers: from_modifiers,
-                };
-
-                if let Some(runtime_action) = mappings.get(&from_key_action) {
-                    match runtime_action {
-                        RuntimeAction::ActionSequence(seq) => {
-                            let (path_hash, subscriber) = match subscriber {
-                                Some(x) => x,
-                                None => {
-                                    return;
-                                }
-                            };
-
-                            for action in seq {
-                                match action {
-                                    RuntimeKeyAction::KeyAction(key_action) => {
-                                        let ev = key_action.to_input_ev();
-
-                                        let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
-                                    }
-                                    RuntimeKeyAction::ReleaseRestoreModifiers(
-                                        from_flags,
-                                        to_flags,
-                                        to_type,
-                                    ) => {
-                                        let new_events = release_restore_modifiers(
-                                            &state.modifiers,
-                                            from_flags,
-                                            to_flags,
-                                            to_type,
-                                        );
-                                        // events.append(&mut new_events);
-                                        for ev in new_events {
-                                            let _ =
-                                                subscriber.send((*path_hash, InputEvent::Raw(ev)));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        RuntimeAction::PythonCallback(from_modifiers, handler) => {
-                            if let Some((path_hash, subscriber)) = subscriber {
-                                // always release all trigger mods before running the callback
-                                let new_events = release_restore_modifiers(
-                                    &state.modifiers,
-                                    from_modifiers,
-                                    &KeyModifierFlags::new(),
-                                    &TYPE_UP,
-                                );
-                                for ev in new_events {
-                                    let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
-                                }
-                            }
-
-                            run_python_handler(&handler, None, ev, &self.transformer, subscriber);
-                        }
-                        RuntimeAction::NOP => {}
-                    }
-
-                    return;
-                }
-
-                event_handlers::update_modifiers(
-                    &mut state.modifiers,
-                    &KeyAction::from_input_ev(&ev),
-                );
-
-                if let Some(handler) = self.fallback_handler.read().unwrap().as_ref() {
-                    let name = match key {
-                        KEY_SPACE => "space".to_string(),
-                        KEY_TAB => "tab".to_string(),
-                        KEY_ENTER => "enter".to_string(),
-                        _ => self
-                            .transformer
-                            .raw_to_utf(key, &*state.modifiers)
-                            .unwrap_or_else(|| {
-                                let name = format!("{key:?}").to_string();
-                                name[4..name.len()].to_lowercase()
-                            }),
-                    };
-
-                    let value = match *value {
-                        0 => "up",
-                        1 => "down",
-                        2 => "repeat",
-                        _ => unreachable!(),
-                    }
-                    .to_string();
-
-                    let args = vec![PythonArgument::String(name), PythonArgument::String(value)];
-
-                    run_python_handler(&handler, Some(args), ev, &self.transformer, subscriber);
-
-                    return;
-                }
-            }
-            // rel/abs event
-            EvdevInputEvent {
-                event_code, value, ..
-            } if matches!(event_code, EventCode::EV_REL(..))
-                || matches!(event_code, EventCode::EV_ABS(..)) =>
-            {
-                let (key, handler) = match event_code {
-                    EventCode::EV_REL(key) => (
-                        format!("{key:?}").to_string(),
-                        self.relative_handler.read().unwrap(),
-                    ),
-                    EventCode::EV_ABS(key) => (
-                        format!("{key:?}").to_string(),
-                        self.absolute_handler.read().unwrap(),
-                    ),
-                    _ => unreachable!(),
-                };
-                if let Some(handler) = handler.as_ref() {
-                    let name = format!("{key:?}");
-                    // remove prefix REL_ / ABS_
-                    let name = name[4..name.len()].to_string();
-                    let args = vec![PythonArgument::String(name), PythonArgument::Number(*value)];
-                    run_python_handler(&handler, Some(args), ev, &self.transformer, subscriber);
-                    return;
-                }
-            }
-            _ => {}
-        }
-
-        if let Some((path_hash, subscriber)) = subscriber {
-            let _ = subscriber.send((*path_hash, raw_ev));
-        }
-    }
-}
+impl SharedState {}
 
 #[pyclass]
 pub struct Mapper {
     pub id: Arc<Uuid>,
-    subscriber_map: Arc<RwLock<SubscriberMap>>,
-    ev_tx: Subscriber,
-    inner: Arc<Inner>,
+    // ev_tx: Subscriber,
+    shared_state: Arc<RwLock<SharedState>>,
     transformer: Arc<XKBTransformer>,
+    tmp_next: Mutex<Option<SubscriberNew>>,
 }
 
 #[pymethods]
 impl Mapper {
     #[new]
-    #[pyo3(signature = (* * kwargs))]
+    #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),
@@ -292,35 +306,19 @@ impl Mapper {
             ))
             .map_err(err_to_py)?;
 
-        let subscriber_map: Arc<RwLock<SubscriberMap>> = Arc::new(RwLock::new(HashMap::new()));
         let id = Arc::new(Uuid::new_v4());
 
-        let inner = Arc::new(Inner {
+        let shared_state = Arc::new(RwLock::new(SharedState {
             id: id.clone(),
-            subscriber_map: subscriber_map.clone(),
-            mappings: RwLock::new(Mappings::new()),
+            // mappings: RwLock::new(Mappings::new()),
             ..Default::default()
-        });
-
-        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
-
-        let _inner = inner.clone();
-        get_runtime().spawn(async move {
-            let mut state_map = HashMap::new();
-
-            loop {
-                let (path_hash, ev) = ev_rx.recv().await.unwrap();
-                let state = state_map.entry(path_hash).or_default();
-                _inner.handle(path_hash, ev, state);
-            }
-        });
+        }));
 
         Ok(Self {
             id,
-            subscriber_map,
-            ev_tx,
-            inner,
+            shared_state,
             transformer,
+            tmp_next: Default::default(),
         })
     }
 
@@ -375,7 +373,7 @@ impl Mapper {
 
     pub fn map_fallback(&mut self, py: Python, fallback_handler: PyObject) -> PyResult<()> {
         if fallback_handler.as_ref(py).is_callable() {
-            *self.inner.fallback_handler.write().unwrap() = Some(fallback_handler);
+            self.shared_state.write().unwrap().fallback_handler = Some(fallback_handler);
             return Ok(());
         }
         Err(ApplicationError::NotCallable.into())
@@ -383,7 +381,7 @@ impl Mapper {
 
     pub fn map_relative(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
         if handler.as_ref(py).is_callable() {
-            *self.inner.relative_handler.write().unwrap() = Some(handler);
+            self.shared_state.write().unwrap().relative_handler = Some(handler);
             return Ok(());
         }
         Err(ApplicationError::NotCallable.into())
@@ -391,7 +389,7 @@ impl Mapper {
 
     pub fn map_absolute(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
         if handler.as_ref(py).is_callable() {
-            *self.inner.absolute_handler.write().unwrap() = Some(handler);
+            self.shared_state.write().unwrap().absolute_handler = Some(handler);
             return Ok(());
         }
         Err(ApplicationError::NotCallable.into())
@@ -407,19 +405,19 @@ impl Mapper {
 
         match from {
             ParsedKeyAction::KeyAction(from) => {
-                self.inner
-                    .mappings
+                self.shared_state
                     .write()
                     .unwrap()
+                    .mappings
                     .insert(from, RuntimeAction::NOP);
             }
             ParsedKeyAction::KeyClickAction(from) => {
                 for value in 0..=2 {
                     let from = KeyActionWithMods::new(from.key, value, from.modifiers);
-                    self.inner
-                        .mappings
+                    self.shared_state
                         .write()
                         .unwrap()
+                        .mappings
                         .insert(from, RuntimeAction::NOP);
                 }
             }
@@ -436,76 +434,76 @@ impl Mapper {
         existing: Option<&KeyMapperSnapshot>,
     ) -> PyResult<Option<KeyMapperSnapshot>> {
         if let Some(existing) = existing {
-            *self.inner.mappings.write().unwrap() = existing.mappings.clone();
-            *self.inner.fallback_handler.write().unwrap() = existing.fallback_handler.clone();
-            *self.inner.relative_handler.write().unwrap() = existing.relative_handler.clone();
-            *self.inner.absolute_handler.write().unwrap() = existing.absolute_handler.clone();
+            let mut shared_state = self.shared_state.write().unwrap();
+            shared_state.mappings = existing.mappings.clone();
+            shared_state.fallback_handler = existing.fallback_handler.clone();
+            shared_state.relative_handler = existing.relative_handler.clone();
+            shared_state.absolute_handler = existing.absolute_handler.clone();
             return Ok(None);
         }
 
         Ok(Some(KeyMapperSnapshot {
-            mappings: self.inner.mappings.read().unwrap().clone(),
-            fallback_handler: self.inner.fallback_handler.read().unwrap().clone(),
-            relative_handler: self.inner.relative_handler.read().unwrap().clone(),
-            absolute_handler: self.inner.absolute_handler.read().unwrap().clone(),
+            mappings: self.shared_state.read().unwrap().mappings.clone(),
+            fallback_handler: self.shared_state.read().unwrap().fallback_handler.clone(),
+            relative_handler: self.shared_state.read().unwrap().relative_handler.clone(),
+            absolute_handler: self.shared_state.read().unwrap().absolute_handler.clone(),
         }))
     }
 }
 
 impl Mapper {
-    pub fn link(&mut self, mut path: Vec<Arc<Uuid>>, target: &PyAny) -> PyResult<()> {
+    pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
         use crate::subscriber::*;
 
-        let target = match add_event_subscription(target) {
-            Some(target) => target,
-            None => {
-                return Err(ApplicationError::InvalidLinkTarget.into());
+        match target {
+            Some(target) => {
+                *self.tmp_next.lock().unwrap() = Some(target);
             }
+            None => {}
         };
-
-        let mut h = DefaultHasher::new();
-        path.hash(&mut h);
-        let path_hash = h.finish();
-
-        let mut h = DefaultHasher::new();
-        path.push(self.id.clone());
-        path.hash(&mut h);
-        let next_path_hash = h.finish();
-
-        self.subscriber_map
-            .write()
-            .unwrap()
-            .insert(path_hash, (next_path_hash, target));
         Ok(())
     }
 
-    pub fn subscribe(&self) -> Subscriber {
-        self.ev_tx.clone()
+    pub fn subscribe(&self) -> SubscriberNew {
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<InputEvent>();
+        let next = self.tmp_next.lock().unwrap().take();
+
+        let _shared_state = self.shared_state.clone();
+        get_runtime().spawn(async move {
+            let mut state = MapperState::default();
+            loop {
+                let ev = ev_rx.recv().await.unwrap();
+                let shared_state = _shared_state.read().unwrap();
+                state.handle(ev, next.as_ref(), &shared_state);
+            }
+        });
+
+        ev_tx.clone()
     }
 
     fn _map_callback(&mut self, from: ParsedKeyAction, to: PyObject) -> PyResult<()> {
         match from {
             ParsedKeyAction::KeyAction(from) => {
-                self.inner
-                    .mappings
+                self.shared_state
                     .write()
                     .unwrap()
+                    .mappings
                     .insert(from, RuntimeAction::PythonCallback(from.modifiers, to));
             }
             ParsedKeyAction::KeyClickAction(from) => {
-                self.inner.mappings.write().unwrap().insert(
+                self.shared_state.write().unwrap().mappings.insert(
                     from.to_key_action(1),
                     RuntimeAction::PythonCallback(from.modifiers, to),
                 );
-                self.inner
-                    .mappings
+                self.shared_state
                     .write()
                     .unwrap()
+                    .mappings
                     .insert(from.to_key_action(0), RuntimeAction::NOP);
-                self.inner
-                    .mappings
+                self.shared_state
                     .write()
                     .unwrap()
+                    .mappings
                     .insert(from.to_key_action(2), RuntimeAction::NOP);
             }
             ParsedKeyAction::Action(_) => {
@@ -525,19 +523,19 @@ impl Mapper {
                         // key action to click
                         ParsedKeyAction::KeyClickAction(to) => {
                             let mapping = map_action_to_click(&from, &to);
-                            self.inner
-                                .mappings
+                            self.shared_state
                                 .write()
                                 .unwrap()
+                                .mappings
                                 .insert(mapping.0, mapping.1);
                         }
                         // key action to key action
                         ParsedKeyAction::KeyAction(to) => {
                             let mapping = map_action_to_action(&from, &to);
-                            self.inner
-                                .mappings
+                            self.shared_state
                                 .write()
                                 .unwrap()
+                                .mappings
                                 .insert(mapping.0, mapping.1);
                         }
                         // key action to action
@@ -546,10 +544,10 @@ impl Mapper {
                                 &from,
                                 &to.to_key_action_with_mods(Default::default()),
                             );
-                            self.inner
-                                .mappings
+                            self.shared_state
                                 .write()
                                 .unwrap()
+                                .mappings
                                 .insert(mapping.0, mapping.1);
                         }
                     }
@@ -558,10 +556,10 @@ impl Mapper {
 
                 // action to seq
                 let mapping = map_action_to_seq(from, to);
-                self.inner
-                    .mappings
+                self.shared_state
                     .write()
                     .unwrap()
+                    .mappings
                     .insert(mapping.0, mapping.1);
             }
             ParsedKeyAction::KeyClickAction(from) => {
@@ -572,14 +570,14 @@ impl Mapper {
                             let mappings = map_click_to_click(&from, &to);
 
                             IntoIterator::into_iter(mappings).for_each(|(from, to)| {
-                                self.inner.mappings.write().unwrap().insert(from, to);
+                                self.shared_state.write().unwrap().mappings.insert(from, to);
                             });
                         }
                         // click to key action
                         ParsedKeyAction::KeyAction(to) => {
                             let mappings = map_click_to_action(&from, &to);
                             IntoIterator::into_iter(mappings).for_each(|(from, to)| {
-                                self.inner.mappings.write().unwrap().insert(from, to);
+                                self.shared_state.write().unwrap().mappings.insert(from, to);
                             });
                         }
                         // click to action
@@ -587,7 +585,7 @@ impl Mapper {
                             let to = to.to_key_action_with_mods(Default::default());
                             let mappings = map_click_to_action(&from, &to);
                             IntoIterator::into_iter(mappings).for_each(|(from, to)| {
-                                self.inner.mappings.write().unwrap().insert(from, to);
+                                self.shared_state.write().unwrap().mappings.insert(from, to);
                             });
                         }
                     };
@@ -597,7 +595,7 @@ impl Mapper {
                 // click to seq
                 let mappings = map_click_to_seq(from, to);
                 IntoIterator::into_iter(mappings).for_each(|(from, to)| {
-                    self.inner.mappings.write().unwrap().insert(from, to);
+                    self.shared_state.write().unwrap().mappings.insert(from, to);
                 });
             }
             ParsedKeyAction::Action(_) => {

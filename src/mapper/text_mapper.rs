@@ -1,7 +1,7 @@
+use super::*;
 use crate::mapper::mapping_functions::*;
 use crate::mapper::RuntimeKeyAction;
 use crate::python::*;
-use crate::subscriber::{SubscribeEvent, Subscriber};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
@@ -44,20 +44,18 @@ fn _map(from: &KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> Vec<RuntimeK
 }
 
 #[derive(Default)]
-struct Inner {
-    id: Arc<Uuid>,
-    subscriber_map: Arc<RwLock<SubscriberMap>>,
+struct SharedState {
     transformer: Arc<XKBTransformer>,
-    mappings: RwLock<Mappings>,
+    mappings: Mappings,
 }
 
-impl Inner {
-    fn handle(&self, path_hash: u64, raw_ev: InputEvent, state: &mut State) {
-        let mappings = self.mappings.read().unwrap();
-
-        let subscriber_map = self.subscriber_map.read().unwrap();
-        let subscriber = subscriber_map.get(&path_hash);
-
+impl State {
+    fn handle(
+        &mut self,
+        raw_ev: InputEvent,
+        next: Option<&SubscriberNew>,
+        shared_state: &SharedState,
+    ) {
         let ev = match &raw_ev {
             InputEvent::Raw(ev) => ev,
         };
@@ -68,14 +66,14 @@ impl Inner {
                 value: 1,
                 ..
             } => {
-                state.window.pop();
+                self.window.pop();
             }
             EvdevInputEvent {
                 event_code: EventCode::EV_KEY(KEY_DELETE),
                 value: 1,
                 ..
             } => {
-                state.window.remove(0);
+                self.window.remove(0);
             }
             // key event
             EvdevInputEvent {
@@ -84,34 +82,34 @@ impl Inner {
                 ..
             } => {
                 let mut from_modifiers = KeyModifierFlags::new();
-                from_modifiers.ctrl = state.modifiers.is_ctrl();
-                from_modifiers.alt = state.modifiers.is_alt();
-                from_modifiers.right_alt = state.modifiers.is_right_alt();
-                from_modifiers.shift = state.modifiers.is_shift();
-                from_modifiers.meta = state.modifiers.is_meta();
+                from_modifiers.ctrl = self.modifiers.is_ctrl();
+                from_modifiers.alt = self.modifiers.is_alt();
+                from_modifiers.right_alt = self.modifiers.is_right_alt();
+                from_modifiers.shift = self.modifiers.is_shift();
+                from_modifiers.meta = self.modifiers.is_meta();
 
                 if ev.value == 1 {
-                    let key = self.transformer.raw_to_utf(&key, &state.modifiers);
+                    let key = shared_state.transformer.raw_to_utf(&key, &self.modifiers);
 
                     if let Some(key) = key {
-                        state.window.push(key.chars().next().unwrap());
+                        self.window.push(key.chars().next().unwrap());
                         // TODO set window size dynamically
-                        if state.window.len() > 32 {
-                            state.window.remove(0);
+                        if self.window.len() > 32 {
+                            self.window.remove(0);
                         }
 
                         let mut hit = None;
 
-                        for i in (0..state.window.len()).rev() {
-                            let search: String = state.window.iter().skip(i).collect();
-                            if let Some(x) = mappings.get(&search) {
+                        for i in (0..self.window.len()).rev() {
+                            let search: String = self.window.iter().skip(i).collect();
+                            if let Some(x) = shared_state.mappings.get(&search) {
                                 hit = Some((x, search.len()));
                             }
                         }
 
                         if let Some((to, from_len)) = hit {
-                            state.window.clear();
-                            let (path_hash, subscriber) = match subscriber {
+                            self.window.clear();
+                            let next = match next {
                                 Some(x) => x,
                                 None => {
                                     return;
@@ -119,21 +117,17 @@ impl Inner {
                             };
 
                             for _ in 1..from_len {
-                                let _ = subscriber.send((
-                                    *path_hash,
-                                    InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)),
-                                ));
-                                let _ = subscriber.send((
-                                    *path_hash,
-                                    InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)),
-                                ));
+                                let _ = next
+                                    .send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)));
+                                let _ = next
+                                    .send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)));
                             }
 
                             for action in to {
                                 match action {
                                     RuntimeKeyAction::KeyAction(key_action) => {
                                         let ev = key_action.to_input_ev();
-                                        let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
+                                        let _ = next.send(InputEvent::Raw(ev));
                                     }
                                     RuntimeKeyAction::ReleaseRestoreModifiers(
                                         from_flags,
@@ -141,15 +135,14 @@ impl Inner {
                                         to_type,
                                     ) => {
                                         let new_events = release_restore_modifiers(
-                                            &state.modifiers,
+                                            &self.modifiers,
                                             &from_flags,
                                             &to_flags,
                                             &to_type,
                                         );
                                         // events.append(&mut new_events);
                                         for ev in new_events {
-                                            let _ =
-                                                subscriber.send((*path_hash, InputEvent::Raw(ev)));
+                                            let _ = next.send(InputEvent::Raw(ev));
                                         }
                                     }
                                 }
@@ -160,26 +153,25 @@ impl Inner {
                 }
 
                 event_handlers::update_modifiers(
-                    &mut state.modifiers,
+                    &mut self.modifiers,
                     &KeyAction::from_input_ev(&ev),
                 );
             }
             _ => {}
         }
 
-        if let Some((path_hash, subscriber)) = subscriber {
-            let _ = subscriber.send((*path_hash, raw_ev));
+        if let Some(next) = next {
+            let _ = next.send(raw_ev);
         }
     }
 }
 
 #[pyclass]
 pub struct TextMapper {
-    pub id: Arc<Uuid>,
-    subscriber_map: Arc<RwLock<SubscriberMap>>,
-    ev_tx: Subscriber,
-    inner: Arc<Inner>,
+    pub id: Uuid,
+    shared_state: Arc<RwLock<SharedState>>,
     transformer: Arc<XKBTransformer>,
+    tmp_next: Mutex<Option<SubscriberNew>>,
 }
 
 #[pymethods]
@@ -205,35 +197,15 @@ impl TextMapper {
             ))
             .map_err(err_to_py)?;
 
-        let subscriber_map: Arc<RwLock<SubscriberMap>> = Arc::new(RwLock::new(HashMap::new()));
-        let id = Arc::new(Uuid::new_v4());
+        let id = Uuid::new_v4();
 
-        let inner = Arc::new(Inner {
-            id: id.clone(),
-            subscriber_map: subscriber_map.clone(),
-            mappings: RwLock::new(Mappings::new()),
-            ..Default::default()
-        });
-
-        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
-
-        let _inner = inner.clone();
-        get_runtime().spawn(async move {
-            let mut state_map = HashMap::new();
-
-            loop {
-                let (path_hash, ev) = ev_rx.recv().await.unwrap();
-                let state = state_map.entry(path_hash).or_default();
-                _inner.handle(path_hash, ev, state);
-            }
-        });
+        let shared_state = Arc::new(RwLock::new(SharedState::default()));
 
         Ok(Self {
             id,
-            subscriber_map,
-            ev_tx,
-            inner,
+            shared_state,
             transformer,
+            tmp_next: Default::default(),
         })
     }
 
@@ -268,7 +240,7 @@ impl TextMapper {
         })?;
 
         let to = _map(from_seq.last().unwrap(), to);
-        self.inner.mappings.write().unwrap().insert(from, to);
+        self.shared_state.write().unwrap().mappings.insert(from, to);
 
         Ok(())
     }
@@ -277,46 +249,48 @@ impl TextMapper {
         &self,
         existing: Option<&TextMapperSnapshot>,
     ) -> PyResult<Option<TextMapperSnapshot>> {
+        let mut shared_state = self.shared_state.write().unwrap();
+
         if let Some(existing) = existing {
-            *self.inner.mappings.write().unwrap() = existing.mappings.clone();
+            shared_state.mappings = existing.mappings.clone();
             return Ok(None);
         }
 
         Ok(Some(TextMapperSnapshot {
-            mappings: self.inner.mappings.read().unwrap().clone(),
+            mappings: shared_state.mappings.clone(),
         }))
     }
 }
 
 impl TextMapper {
-    pub fn link(&mut self, mut path: Vec<Arc<Uuid>>, target: &PyAny) -> PyResult<()> {
+    pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
         use crate::subscriber::*;
 
-        let target = match add_event_subscription(target) {
-            Some(target) => target,
-            None => {
-                return Err(ApplicationError::InvalidLinkTarget.into());
+        match target {
+            Some(target) => {
+                *self.tmp_next.lock().unwrap() = Some(target);
             }
+            None => {}
         };
-
-        let mut h = DefaultHasher::new();
-        path.hash(&mut h);
-        let path_hash = h.finish();
-
-        let mut h = DefaultHasher::new();
-        path.push(self.id.clone());
-        path.hash(&mut h);
-        let next_path_hash = h.finish();
-
-        self.subscriber_map
-            .write()
-            .unwrap()
-            .insert(path_hash, (next_path_hash, target));
         Ok(())
     }
 
-    pub fn subscribe(&self) -> Subscriber {
-        self.ev_tx.clone()
+    pub fn subscribe(&self) -> SubscriberNew {
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<InputEvent>();
+        let next = self.tmp_next.lock().unwrap().take();
+
+        let _shared_state = self.shared_state.clone();
+        get_runtime().spawn(async move {
+            let mut state = State::default();
+            loop {
+                let ev = ev_rx.recv().await.unwrap();
+                let shared_state = _shared_state.read().unwrap();
+
+                state.handle(ev, next.as_ref(), &shared_state);
+            }
+        });
+
+        ev_tx.clone()
     }
 }
 

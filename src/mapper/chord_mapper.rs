@@ -1,58 +1,41 @@
 use crate::mapper::mapping_functions::*;
 use crate::mapper::RuntimeKeyAction;
 use crate::python::*;
-use crate::subscriber::{SubscribeEvent, Subscriber};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 use nom::Slice;
 
+use self::subscriber::SubscriberNew;
+
 type Mappings = HashMap<Vec<Key>, Vec<RuntimeKeyAction>>;
 
-#[derive(Default)]
 struct State {
     pub modifiers: Arc<KeyModifierState>,
     stack: Vec<Key>,
     ignored_keys: HashSet<Key>,
     pressed_keys: HashSet<Key>,
     interval: Option<tokio::task::JoinHandle<()>>,
+    msg_tx: tokio::sync::mpsc::UnboundedSender<Msg>,
 }
 
-#[derive(Default)]
+enum Msg {
+    Callback(InputEvent),
+}
+
 struct SharedState {
+    transformer: Arc<XKBTransformer>,
     mappings: Mappings,
     chorded_keys: HashSet<Key>,
 }
 
-enum Msg {
-    Callback(u64, InputEvent),
-}
-
-struct Inner {
-    id: Arc<Uuid>,
-    transformer: Arc<XKBTransformer>,
-    subscriber_map: Arc<RwLock<SubscriberMap>>,
-    msg_tx: tokio::sync::mpsc::UnboundedSender<Msg>,
-    shared_state: RwLock<SharedState>,
-}
-
-impl Inner {
-    fn new(id: Arc<Uuid>, msg_tx: tokio::sync::mpsc::UnboundedSender<Msg>) -> Self {
-        Self {
-            id,
-            transformer: Default::default(),
-            subscriber_map: Default::default(),
-            msg_tx,
-            shared_state: Default::default(),
-        }
-    }
-}
-
-impl Inner {
-    fn handle(&self, path_hash: u64, raw_ev: InputEvent, state: &mut State) {
-        let shared = self.shared_state.read().unwrap();
-        let mappings = &shared.mappings;
-
+impl State {
+    fn handle(
+        &mut self,
+        raw_ev: InputEvent,
+        next: Option<&SubscriberNew>,
+        shared_state: &SharedState,
+    ) {
         let ev = match &raw_ev {
             InputEvent::Raw(ev) => ev,
         };
@@ -68,120 +51,108 @@ impl Inner {
                 ..
             } => {
                 let mut from_modifiers = KeyModifierFlags::new();
-                from_modifiers.ctrl = state.modifiers.is_ctrl();
-                from_modifiers.alt = state.modifiers.is_alt();
-                from_modifiers.right_alt = state.modifiers.is_right_alt();
-                from_modifiers.shift = state.modifiers.is_shift();
-                from_modifiers.meta = state.modifiers.is_meta();
+                from_modifiers.ctrl = self.modifiers.is_ctrl();
+                from_modifiers.alt = self.modifiers.is_alt();
+                from_modifiers.right_alt = self.modifiers.is_right_alt();
+                from_modifiers.shift = self.modifiers.is_shift();
+                from_modifiers.meta = self.modifiers.is_meta();
 
                 event_handlers::update_modifiers(
-                    &mut state.modifiers,
+                    &mut self.modifiers,
                     &KeyAction::from_input_ev(&ev),
                 );
 
                 match ev.value {
                     TYPE_DOWN => {
-                        let should_handle = shared.chorded_keys.contains(&_key)
-                            && state.pressed_keys.iter().all(|x| state.stack.contains(x));
+                        let should_handle = shared_state.chorded_keys.contains(&_key)
+                            && self.pressed_keys.iter().all(|x| self.stack.contains(x));
 
-                        state.pressed_keys.insert(_key.clone());
+                        self.pressed_keys.insert(_key.clone());
 
                         if should_handle {
-                            state.stack.push(_key.clone());
+                            self.stack.push(_key.clone());
 
-                            if state.stack.len() == 2 {
-                                self.handle_cb(path_hash, raw_ev, state);
+                            if self.stack.len() == 2 {
+                                self.handle_cb(raw_ev, next, shared_state);
                             } else {
                                 let msg_tx = self.msg_tx.clone();
-
-                                state.interval = Some(tokio::spawn(async move {
+                                self.interval = Some(tokio::spawn(async move {
                                     tokio::time::sleep(tokio::time::Duration::from_millis(50))
                                         .await;
-                                    msg_tx.send(Msg::Callback(path_hash, raw_ev));
+                                    msg_tx.send(Msg::Callback(raw_ev));
                                 }));
                             }
                         } else {
-                            let subscriber_map = self.subscriber_map.read().unwrap();
-                            let subscriber = subscriber_map.get(&path_hash);
-                            let (path_hash, subscriber) = match subscriber {
+                            let next = match next {
                                 Some(x) => x,
                                 None => {
                                     return;
                                 }
                             };
 
-                            if let Some(task) = state.interval.take() {
+                            if let Some(task) = self.interval.take() {
                                 task.abort();
                             };
 
-                            for k in state.stack.iter() {
-                                let _ = subscriber
-                                    .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_DOWN))));
-                                let _ = subscriber
-                                    .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_UP))));
-                                state.ignored_keys.insert(k.clone());
+                            for k in self.stack.iter() {
+                                let _ = next.send(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
+                                let _ = next.send(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
+                                self.ignored_keys.insert(k.clone());
                             }
-                            state.stack.clear();
+                            self.stack.clear();
 
-                            let _ = subscriber.send((*path_hash, raw_ev));
+                            let _ = next.send(raw_ev);
                         }
                     }
                     TYPE_UP => {
-                        state.pressed_keys.remove(&_key);
+                        self.pressed_keys.remove(&_key);
 
-                        let subscriber_map = self.subscriber_map.read().unwrap();
-                        let subscriber = subscriber_map.get(&path_hash);
-                        let (path_hash, subscriber) = match subscriber {
+                        let next = match next {
                             Some(x) => x,
                             None => {
                                 return;
                             }
                         };
 
-                        if let Some(task) = state.interval.take() {
+                        if let Some(task) = self.interval.take() {
                             task.abort();
                         };
 
-                        if let Some(pos) = state.stack.iter().position(|x| x == &_key) {
-                            state.stack.remove(pos);
+                        if let Some(pos) = self.stack.iter().position(|x| x == &_key) {
+                            self.stack.remove(pos);
 
-                            if !state.ignored_keys.remove(&_key) {
-                                let _ = subscriber.send((
-                                    *path_hash,
-                                    InputEvent::Raw(_key.to_input_ev(TYPE_DOWN)),
-                                ));
-                                let _ = subscriber.send((*path_hash, raw_ev));
+                            if !self.ignored_keys.remove(&_key) {
+                                let _ = next.send(InputEvent::Raw(_key.to_input_ev(TYPE_DOWN)));
+                                let _ = next.send(raw_ev);
                             }
                         } else {
-                            for k in state.stack.iter() {
-                                let _ = subscriber
-                                    .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_DOWN))));
-                                let _ = subscriber
-                                    .send((*path_hash, InputEvent::Raw(k.to_input_ev(TYPE_UP))));
+                            for k in self.stack.iter() {
+                                let _ = next.send(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
+                                let _ = next.send(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
                             }
 
-                            state.stack.clear();
+                            self.stack.clear();
 
-                            if !state.ignored_keys.remove(&_key) {
-                                let _ = subscriber.send((*path_hash, raw_ev));
+                            if !self.ignored_keys.remove(&_key) {
+                                let _ = next.send(raw_ev);
                             }
                         }
                     }
                     TYPE_REPEAT => {
-                        if state.ignored_keys.contains(&_key) {
+                        if self.ignored_keys.contains(&_key) {
                             return;
                         }
-                        if state.stack.is_empty() {
-                            let subscriber_map = self.subscriber_map.read().unwrap();
-                            let subscriber = subscriber_map.get(&path_hash);
-                            let (path_hash, subscriber) = match subscriber {
+                        if self.stack.is_empty() {
+                            // let subscriber_map = self.subscriber_map.read().unwrap();
+                            // let subscriber = subscriber_map.get(&path_hash);
+                            let next = match next {
                                 Some(x) => x,
                                 None => {
                                     return;
                                 }
                             };
 
-                            let _ = subscriber.send((*path_hash, raw_ev));
+                            let _ = next.send(raw_ev);
                         };
                     }
                     _ => unreachable!(),
@@ -192,75 +163,74 @@ impl Inner {
     }
 
     // fired after the chord timeout has passed, submits the keys held on the stack
-    fn handle_cb(&self, path_hash: u64, raw_ev: InputEvent, state: &mut State) {
+    fn handle_cb(
+        &mut self,
+        raw_ev: InputEvent,
+        next: Option<&SubscriberNew>,
+        shared_state: &SharedState,
+    ) {
         // let mut inner = _inner.write().unwrap();
         let ev = match &raw_ev {
             InputEvent::Raw(ev) => ev,
         };
 
-        let shared = self.shared_state.read().unwrap();
-        let mappings = &shared.mappings;
-
-        if let Some(task) = state.interval.take() {
+        if let Some(task) = self.interval.take() {
             task.abort();
         };
 
-        let subscriber_map = self.subscriber_map.read().unwrap();
-        let subscriber = subscriber_map.get(&path_hash);
-        let (path_hash, subscriber) = match subscriber {
+        let next = match next {
             Some(x) => x,
             None => {
                 return;
             }
         };
 
-        if let Some(output) = mappings.get(&state.stack) {
-            for k in state.stack.iter().cloned() {
-                state.ignored_keys.insert(k);
+        if let Some(output) = shared_state.mappings.get(&self.stack) {
+            for k in self.stack.iter().cloned() {
+                self.ignored_keys.insert(k);
             }
 
             for action in output {
                 match action {
                     RuntimeKeyAction::KeyAction(key_action) => {
                         let ev = key_action.to_input_ev();
-                        let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
+                        let _ = next.send(InputEvent::Raw(ev));
                     }
                     RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
                         let new_events = release_restore_modifiers(
-                            &state.modifiers,
+                            &self.modifiers,
                             &from_flags,
                             &to_flags,
                             &to_type,
                         );
                         for ev in new_events {
-                            let _ = subscriber.send((*path_hash, InputEvent::Raw(ev)));
+                            let _ = next.send(InputEvent::Raw(ev));
                         }
                     }
                 }
             }
         } else {
             // only one key on the stack
-            if state.stack.len() == 1 && state.stack[0].event_code == ev.event_code {
-                let _ = subscriber.send((*path_hash, InputEvent::Raw(ev.clone())));
+            if self.stack.len() == 1 && self.stack[0].event_code == ev.event_code {
+                let _ = next.send(InputEvent::Raw(ev.clone()));
             } else {
                 // no match, send all buffered keys from stack
-                for k in state.stack.iter() {
-                    let _ = subscriber.send((*path_hash, InputEvent::Raw(k.to_input_ev(1))));
-                    let _ = subscriber.send((*path_hash, InputEvent::Raw(k.to_input_ev(0))));
+                for k in self.stack.iter() {
+                    let _ = next.send(InputEvent::Raw(k.to_input_ev(1)));
+                    let _ = next.send(InputEvent::Raw(k.to_input_ev(0)));
                 }
             }
-            state.stack.clear();
+            self.stack.clear();
         }
     }
 }
 
 #[pyclass]
 pub struct ChordMapper {
-    pub id: Arc<Uuid>,
-    subscriber_map: Arc<RwLock<SubscriberMap>>,
-    ev_tx: Subscriber,
-    inner: Arc<Inner>,
+    pub id: Uuid,
+    shared_state: Arc<RwLock<SharedState>>,
     transformer: Arc<XKBTransformer>,
+    tmp_next: Mutex<Option<SubscriberNew>>,
 }
 
 #[pymethods]
@@ -286,42 +256,19 @@ impl ChordMapper {
             ))
             .map_err(err_to_py)?;
 
-        let id = Arc::new(Uuid::new_v4());
+        let id = Uuid::new_v4();
 
-        let (msg_tx, mut msg_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
-
-        let inner = Arc::new(Inner::new(id.clone(), msg_tx));
-        let subscriber_map = inner.subscriber_map.clone();
-
-        let _inner = inner.clone();
-        get_runtime().spawn(async move {
-            let mut state_map = HashMap::new();
-
-            loop {
-                tokio::select! {
-                    Some(res) = ev_rx.recv() => {
-                        let (path_hash, ev) = res;
-                        let state = state_map.entry(path_hash).or_default();
-                        _inner.handle(path_hash, ev, state);
-                    }
-                    ev = msg_rx.recv() => {
-                        let (path_hash, ev) = match ev.unwrap() {
-                            Msg::Callback(path_hash, ev) => (path_hash, ev),
-                        };
-                        let state = state_map.entry(path_hash).or_default();
-                        _inner.handle_cb(path_hash, ev, state);
-                    }
-                };
-            }
-        });
+        let shared_state = Arc::new(RwLock::new(SharedState {
+            transformer: transformer.clone(),
+            chorded_keys: Default::default(),
+            mappings: Default::default(),
+        }));
 
         Ok(Self {
             id,
-            subscriber_map,
-            ev_tx,
-            inner,
+            shared_state,
             transformer,
+            tmp_next: Default::default(),
         })
     }
 
@@ -372,7 +319,7 @@ impl ChordMapper {
             .map(|action| RuntimeKeyAction::KeyAction(action))
             .collect();
 
-        let mut shared = self.inner.shared_state.write().unwrap();
+        let mut shared = self.shared_state.write().unwrap();
 
         // mark chorded keys
         shared.chorded_keys.extend(from_parsed.iter().cloned());
@@ -390,52 +337,73 @@ impl ChordMapper {
         existing: Option<&ChordMapperSnapshot>,
     ) -> PyResult<Option<ChordMapperSnapshot>> {
         if let Some(existing) = existing {
-            let mut shared = self.inner.shared_state.write().unwrap();
-            shared.mappings = existing.mappings.clone();
-            shared.chorded_keys = shared.mappings.keys().fold(HashSet::new(), |mut acc, e| {
-                acc.extend(e.iter().cloned());
-                acc
-            });
+            let mut shared_state = self.shared_state.write().unwrap();
+            shared_state.mappings = existing.mappings.clone();
+            shared_state.chorded_keys =
+                shared_state
+                    .mappings
+                    .keys()
+                    .fold(HashSet::new(), |mut acc, e| {
+                        acc.extend(e.iter().cloned());
+                        acc
+                    });
             return Ok(None);
         }
 
-        let mut shared = self.inner.shared_state.read().unwrap();
+        let mut shared_state = self.shared_state.read().unwrap();
 
         Ok(Some(ChordMapperSnapshot {
-            mappings: shared.mappings.clone(),
+            mappings: shared_state.mappings.clone(),
         }))
     }
 }
 
 impl ChordMapper {
-    pub fn link(&mut self, mut path: Vec<Arc<Uuid>>, target: &PyAny) -> PyResult<()> {
+    pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
         use crate::subscriber::*;
 
-        let target = match add_event_subscription(target) {
-            Some(target) => target,
-            None => {
-                return Err(ApplicationError::InvalidLinkTarget.into());
+        match target {
+            Some(target) => {
+                *self.tmp_next.lock().unwrap() = Some(target);
             }
+            None => {}
         };
-
-        let mut h = DefaultHasher::new();
-        path.hash(&mut h);
-        let path_hash = h.finish();
-
-        let mut h = DefaultHasher::new();
-        path.push(self.id.clone());
-        path.hash(&mut h);
-        let next_path_hash = h.finish();
-
-        self.subscriber_map
-            .write()
-            .unwrap()
-            .insert(path_hash, (next_path_hash, target));
         Ok(())
     }
 
-    pub fn subscribe(&self) -> Subscriber {
-        self.ev_tx.clone()
+    pub fn subscribe(&self) -> SubscriberNew {
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<InputEvent>();
+        let next = self.tmp_next.lock().unwrap().take();
+
+        let _shared_state = self.shared_state.clone();
+        get_runtime().spawn(async move {
+            let (msg_tx, mut msg_rx) = tokio::sync::mpsc::unbounded_channel();
+            let mut state = State {
+                modifiers: Default::default(),
+                stack: Default::default(),
+                ignored_keys: Default::default(),
+                pressed_keys: Default::default(),
+                interval: Default::default(),
+                msg_tx,
+            };
+            loop {
+                tokio::select! {
+                    Some(ev) = ev_rx.recv() => {
+                        let shared_state = _shared_state.read().unwrap();
+                        state.handle(ev, next.as_ref(), &shared_state);
+                    }
+                    msg = msg_rx.recv() => {
+                        let ev = match msg.unwrap() {
+                            Msg::Callback(ev) => ev,
+                        };
+                        let shared_state = _shared_state.read().unwrap();
+                        state.handle_cb(ev, next.as_ref(), &shared_state);
+                    }
+                };
+            }
+        });
+
+        ev_tx.clone()
     }
 }
 

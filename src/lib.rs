@@ -8,15 +8,15 @@ extern crate core;
 extern crate lazy_static;
 extern crate regex;
 
+use arc_swap::ArcSwap;
+use arc_swap::ArcSwapOption;
 use std::borrow::BorrowMut;
-use std::{fs, io};
-// #[macro_use]
-// use subscriber::linkable;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::sync::{mpsc, Arc, Mutex, RwLock, Weak};
 use std::thread;
 use std::time::Duration;
+use std::{fs, io};
 
 pub use evdev_rs::enums::EV_ABS::*;
 pub use evdev_rs::enums::EV_KEY::*;
@@ -25,7 +25,6 @@ pub use key_primitives::Key;
 pub use parsing::*;
 
 pub use anyhow::{anyhow, Result};
-use arc_swap::ArcSwapOption;
 use evdev_rs::enums::EventCode;
 pub use evdev_rs::InputEvent as EvdevInputEvent;
 use nom::lib::std::collections::{BTreeSet, HashMap, HashSet};
@@ -36,7 +35,6 @@ use event_loop::EVENT_LOOP;
 pub use mapper::*;
 pub use python::err_to_py;
 use reader::Reader;
-use subscriber_map::SubscriberMap;
 use writer::Writer;
 
 use crate::device::virtual_input_device::grab_udev_inputs;
@@ -61,7 +59,6 @@ pub mod parsing;
 pub mod platform;
 pub mod state;
 pub mod subscriber;
-pub mod subscriber_map;
 pub mod xkb;
 pub mod xkb_transformer_registry;
 

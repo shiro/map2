@@ -3,15 +3,15 @@ use std::hash::{Hash, Hasher};
 
 use crate::event::InputEvent;
 use crate::python::*;
-use crate::subscriber::{add_event_subscription, Subscriber};
+use crate::subscriber::SubscriberNew;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 
 #[pyclass]
 pub struct Reader {
-    pub id: Arc<Uuid>,
-    subscriber: Arc<ArcSwapOption<Subscriber>>,
+    pub id: Uuid,
+    subscriber: Arc<ArcSwapOption<SubscriberNew>>,
     transformer: Arc<XKBTransformer>,
     #[cfg(not(feature = "integration"))]
     reader_exit_tx: Option<oneshot::Sender<()>>,
@@ -54,20 +54,20 @@ impl Reader {
         #[cfg(not(feature = "integration"))]
         let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
 
-        let subscriber: Arc<ArcSwapOption<Subscriber>> = Arc::new(ArcSwapOption::new(None));
+        let subscriber: Arc<ArcSwapOption<SubscriberNew>> = Arc::new(ArcSwapOption::new(None));
         let _subscriber = subscriber.clone();
 
-        let id = Arc::new(Uuid::new_v4());
+        let id = Uuid::new_v4();
 
         #[cfg(not(feature = "integration"))]
         let reader_thread_handle = if !patterns.is_empty() {
-            let mut h = DefaultHasher::new();
-            vec![id.clone()].hash(&mut h);
-            let path_hash = h.finish();
+            // let mut h = DefaultHasher::new();
+            // vec![id.clone()].hash(&mut h);
+            // let path_hash = h.finish();
 
             let handler = Arc::new(move |_: &str, ev: EvdevInputEvent| {
                 if let Some(subscriber) = _subscriber.load().deref() {
-                    let _ = subscriber.send((path_hash, InputEvent::Raw(ev)));
+                    let _ = subscriber.send(InputEvent::Raw(ev));
                 }
             });
 
@@ -92,13 +92,13 @@ impl Reader {
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
 
-        let mut h = DefaultHasher::new();
-        vec![self.id.clone()].hash(&mut h);
-        let path_hash = h.finish();
+        // let mut h = DefaultHasher::new();
+        // vec![self.id.clone()].hash(&mut h);
+        // let path_hash = h.finish();
 
         if let Some(subscriber) = self.subscriber.load().deref() {
             for action in actions {
-                let _ = subscriber.send((path_hash, InputEvent::Raw(action.to_input_ev())));
+                let _ = subscriber.send(InputEvent::Raw(action.to_input_ev()));
             }
         }
         Ok(())
@@ -108,33 +108,30 @@ impl Reader {
     pub fn __test__write_ev(&mut self, ev: String) -> PyResult<()> {
         let ev: EvdevInputEvent = serde_json::from_str(&ev).unwrap();
 
-        let mut h = DefaultHasher::new();
-        vec![self.id.clone()].hash(&mut h);
-        let path_hash = h.finish();
+        // let mut h = DefaultHasher::new();
+        // vec![self.id.clone()].hash(&mut h);
+        // let path_hash = h.finish();
 
         if let Some(subscriber) = self.subscriber.load().deref() {
-            let _ = subscriber.send((path_hash, InputEvent::Raw(ev)));
+            let _ = subscriber.send(InputEvent::Raw(ev));
         };
         Ok(())
     }
 }
 
 impl Reader {
-    pub fn link(&mut self, target: &PyAny) -> PyResult<()> {
+    pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
         use crate::subscriber::*;
 
-        if target.is_none() {
-            self.subscriber.store(None);
-            return Ok(());
-        }
-
-        let target = match add_event_subscription(target) {
-            Some(target) => target,
+        match target {
+            Some(target) => {
+                self.subscriber.store(Some(Arc::new(target)));
+            }
             None => {
-                return Err(PyRuntimeError::new_err("unsupported link target"));
+                self.subscriber.store(None);
+                return Ok(());
             }
         };
-        self.subscriber.store(Some(Arc::new(target)));
         Ok(())
     }
 }

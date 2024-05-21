@@ -10,18 +10,19 @@ use python::*;
 
 use crate::device::virt_device::DeviceCapabilities;
 use crate::device::*;
-use crate::subscriber::{SubscribeEvent, Subscriber};
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 
+use self::subscriber::SubscriberNew;
+
 #[pyclass]
 pub struct Writer {
-    ev_tx: Subscriber,
+    ev_tx: SubscriberNew,
     exit_tx: tokio::sync::mpsc::UnboundedSender<()>,
     transformer: Arc<XKBTransformer>,
     #[cfg(feature = "integration")]
-    ev_rx: tokio::sync::mpsc::UnboundedReceiver<SubscribeEvent>,
+    ev_rx: tokio::sync::mpsc::UnboundedReceiver<InputEvent>,
 }
 
 #[pymethods]
@@ -118,7 +119,7 @@ impl Writer {
             ))
             .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
-        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<SubscribeEvent>();
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<InputEvent>();
         let (exit_tx, mut exit_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
 
         #[cfg(not(feature = "integration"))]
@@ -130,7 +131,7 @@ impl Writer {
             get_runtime().spawn(async move {
                 loop {
                     loop {
-                        let (_, ev) = ev_rx.recv().await.unwrap();
+                        let ev = ev_rx.recv().await.unwrap();
 
                         if let Ok(()) = exit_rx.try_recv() {
                             return;
@@ -175,7 +176,7 @@ impl Writer {
             .to_key_actions();
 
         for action in actions {
-            let _ = self.ev_tx.send((0, InputEvent::Raw(action.to_input_ev())));
+            let _ = self.ev_tx.send(InputEvent::Raw(action.to_input_ev()));
         }
         Ok(())
     }
@@ -183,7 +184,7 @@ impl Writer {
     #[cfg(feature = "integration")]
     pub fn __test__read_ev(&mut self) -> PyResult<Option<String>> {
         match self.ev_rx.try_recv().ok() {
-            Some((_, ev)) => {
+            Some(ev) => {
                 let ev = match ev {
                     InputEvent::Raw(ev) => ev,
                 };
@@ -195,7 +196,7 @@ impl Writer {
 }
 
 impl Writer {
-    pub fn subscribe(&self) -> Subscriber {
+    pub fn subscribe(&self) -> SubscriberNew {
         self.ev_tx.clone()
     }
 }
@@ -203,6 +204,6 @@ impl Writer {
 impl Drop for Writer {
     fn drop(&mut self) {
         let _ = self.exit_tx.send(());
-        let _ = self.ev_tx.send((0, InputEvent::Raw(SYN_REPORT.clone())));
+        let _ = self.ev_tx.send(InputEvent::Raw(SYN_REPORT.clone()));
     }
 }
