@@ -14,9 +14,10 @@ pub enum ApplicationError {
     InvalidLinkTarget,
     #[error("[NOT_CALLABLE] expected a callable object (i.e. a function)")]
     NotCallable,
+    #[error("[INVALID_INPUT_TYPE] expected input to be of type {type_}")]
+    InvalidInputType { type_: String },
     #[error("[UNEXPECTED_NON_BUTTON_INPUT] expected only button inputs")]
     NonButton,
-
 }
 
 impl From<ApplicationError> for PyErr {
@@ -26,5 +27,8 @@ impl From<ApplicationError> for PyErr {
 }
 
 impl ApplicationError {
-    pub fn into_py(self) -> PyErr { self.into() }
+    pub fn into_py(self) -> PyErr {
+        self.into()
+    }
 }
+

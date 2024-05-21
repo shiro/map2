@@ -7,3 +7,10 @@ writer = map2.Writer(clone_from = "/dev/input/by-id/example")
 map2.link([reader, mapper, writer])
 
 mapper.map(["a", "b"], "c")
+
+counter = 0
+
+def increment():
+  global counter
+  counter += 1
+mapper.map(["c", "d"], increment)

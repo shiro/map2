@@ -63,9 +63,9 @@ async fn simple_chord() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
         let m = pytests::include_python!();
 
-        reader_send_all(py, m, "reader", &keys("{a down}{b down}{a up}{b up}"));
+        reader_send_all(py, m, READER, &keys("{a down}{b down}{a up}{b up}"));
         sleep(py, 55);
-        assert_eq!(writer_read_all(py, m, "writer"), keys("c"),);
+        assert_eq!(writer_read_all(py, m, WRITER), keys("c"),);
         sleep(py, 55);
         assert_empty!(py, m, WRITER);
 
@@ -86,7 +86,27 @@ async fn multi_chord() -> PyResult<()> {
             &keys("{a down}{b down}{b up}{b down}{a up}{b up}"),
         );
         sleep(py, 55);
-        assert_eq!(writer_read_all(py, m, "writer"), keys("cc"),);
+        assert_eq!(writer_read_all(py, m, WRITER), keys("cc"),);
+
+        Ok(())
+    })?;
+    Ok(())
+}
+
+#[pyo3_asyncio::tokio::test]
+async fn chord_to_function() -> PyResult<()> {
+    Python::with_gil(|py| -> PyResult<()> {
+        let m = pytests::include_python!();
+
+        let counter = m.getattr("counter").unwrap().extract::<i32>().unwrap();
+        assert_eq!(counter, 0);
+
+        reader_send_all(py, m, READER, &keys("{c down}{d down}{c up}{d up}"));
+        sleep(py, 55);
+        assert_empty!(py, m, WRITER);
+
+        let counter = m.getattr("counter").unwrap().extract::<i32>().unwrap();
+        assert_eq!(counter, 1);
 
         Ok(())
     })?;

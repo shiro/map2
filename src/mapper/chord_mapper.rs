@@ -1,3 +1,4 @@
+use super::*;
 use crate::mapper::mapping_functions::*;
 use crate::mapper::RuntimeKeyAction;
 use crate::python::*;
@@ -8,7 +9,7 @@ use nom::Slice;
 
 use self::subscriber::SubscriberNew;
 
-type Mappings = HashMap<Vec<Key>, Vec<RuntimeKeyAction>>;
+type Mappings = HashMap<Vec<Key>, RuntimeAction>;
 
 struct State {
     pub modifiers: Arc<KeyModifierState>,
@@ -178,38 +179,69 @@ impl State {
             task.abort();
         };
 
-        let next = match next {
-            Some(x) => x,
-            None => {
-                return;
-            }
-        };
-
-        if let Some(output) = shared_state.mappings.get(&self.stack) {
+        if let Some(action) = shared_state.mappings.get(&self.stack) {
             for k in self.stack.iter().cloned() {
                 self.ignored_keys.insert(k);
             }
 
-            for action in output {
-                match action {
-                    RuntimeKeyAction::KeyAction(key_action) => {
-                        let ev = key_action.to_input_ev();
-                        let _ = next.send(InputEvent::Raw(ev));
+            // for action in output {
+            match action {
+                RuntimeAction::ActionSequence(seq) => {
+                    for action in seq {
+                        match action {
+                            RuntimeKeyAction::KeyAction(key_action) => {
+                                if let Some(next) = next {
+                                    let ev = key_action.to_input_ev();
+                                    let _ = next.send(InputEvent::Raw(ev));
+                                }
+                            }
+                            RuntimeKeyAction::ReleaseRestoreModifiers(
+                                from_flags,
+                                to_flags,
+                                to_type,
+                            ) => {
+                                let new_events = release_restore_modifiers(
+                                    &self.modifiers,
+                                    &from_flags,
+                                    &to_flags,
+                                    &to_type,
+                                );
+                                if let Some(next) = next {
+                                    for ev in new_events {
+                                        let _ = next.send(InputEvent::Raw(ev));
+                                    }
+                                }
+                            }
+                        }
                     }
-                    RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                }
+                RuntimeAction::PythonCallback(from_modifiers, handler) => {
+                    if let Some(next) = next {
+                        // always release all trigger mods before running the callback
                         let new_events = release_restore_modifiers(
                             &self.modifiers,
-                            &from_flags,
-                            &to_flags,
-                            &to_type,
+                            &from_modifiers,
+                            &KeyModifierFlags::new(),
+                            &TYPE_UP,
                         );
                         for ev in new_events {
                             let _ = next.send(InputEvent::Raw(ev));
                         }
                     }
+
+                    run_python_handler(&handler, None, ev, &shared_state.transformer, next);
                 }
+                RuntimeAction::NOP => {}
             }
+            // }
         } else {
+            let next = match next {
+                Some(x) => x,
+                None => {
+                    return;
+                }
+            };
+
             // only one key on the stack
             if self.stack.len() == 1 && self.stack[0].event_code == ev.event_code {
                 let _ = next.send(InputEvent::Raw(ev.clone()));
@@ -272,7 +304,7 @@ impl ChordMapper {
         })
     }
 
-    pub fn map(&mut self, from: Vec<String>, to: String) -> PyResult<()> {
+    pub fn map(&mut self, py: Python, from: Vec<String>, to: PyObject) -> PyResult<()> {
         // if from.len() > 32 {
         //     return Err(PyRuntimeError::new_err(
         //         "'from' side cannot be longer than 32 character",
@@ -306,6 +338,36 @@ impl ChordMapper {
         //         .collect::<Option<Vec<_>>>()
         //         .ok_or_else(|| PyRuntimeError::new_err("invalid key sequence"))?;
         //
+
+        let mut shared_state = self.shared_state.write().unwrap();
+
+        // TODO fix code duplication
+        if to.as_ref(py).is_callable() {
+            // self._map_callback(from, to)?;
+            let to = RuntimeAction::PythonCallback(Default::default(), to);
+
+            // mark chorded keys
+            shared_state
+                .chorded_keys
+                .extend(from_parsed.iter().cloned());
+
+            // insert all combinations
+            shared_state
+                .mappings
+                .insert(from_parsed.clone(), to.clone());
+            from_parsed.reverse();
+            shared_state.mappings.insert(from_parsed, to);
+            return Ok(());
+        }
+
+        let to = to.extract::<String>(py).map_err(|err| {
+            PyRuntimeError::new_err(format!(
+                "mapping error on the 'to' side:\n{}",
+                ApplicationError::InvalidInputType {
+                    type_: "String".to_string(),
+                }
+            ))
+        })?;
         let to_parsed = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
             PyRuntimeError::new_err(format!(
                 "mapping error on the 'to' side:\n{}",
@@ -319,15 +381,19 @@ impl ChordMapper {
             .map(|action| RuntimeKeyAction::KeyAction(action))
             .collect();
 
-        let mut shared = self.shared_state.write().unwrap();
-
         // mark chorded keys
-        shared.chorded_keys.extend(from_parsed.iter().cloned());
+        shared_state
+            .chorded_keys
+            .extend(from_parsed.iter().cloned());
+
+        let to = RuntimeAction::ActionSequence(to);
 
         // insert all combinations
-        shared.mappings.insert(from_parsed.clone(), to.clone());
+        shared_state
+            .mappings
+            .insert(from_parsed.clone(), to.clone());
         from_parsed.reverse();
-        shared.mappings.insert(from_parsed, to);
+        shared_state.mappings.insert(from_parsed, to);
 
         Ok(())
     }

@@ -1,3 +1,5 @@
+#![feature(internal_output_capture)]
+
 use std::io::Write;
 use std::thread;
 use std::time::Duration;
