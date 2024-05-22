@@ -9,7 +9,7 @@ use nom::Slice;
 
 use super::suffix_tree::SuffixTree;
 
-type Mappings = SuffixTree<Vec<RuntimeKeyAction>>;
+type Mappings = SuffixTree<RuntimeAction>;
 
 #[derive(Default)]
 struct State {
@@ -76,32 +76,60 @@ impl State {
 
                         if let Some((to, from_len)) = hit {
                             self.window.clear();
-                            let Some(next) = next else {
-                                return;
-                            };
 
-                            for _ in 0..from_len {
-                                let _ = next.send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)));
-                                let _ = next.send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)));
+                            if let Some(next) = next {
+                                for _ in 0..from_len {
+                                    let _ = next.send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)));
+                                    let _ = next.send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)));
+                                }
                             }
 
-                            for action in to {
-                                match action {
-                                    RuntimeKeyAction::KeyAction(key_action) => {
-                                        let _ = next.send(InputEvent::Raw(key_action.to_input_ev()));
+                            match to {
+                                RuntimeAction::ActionSequence(seq) => {
+                                    for action in seq {
+                                        match action {
+                                            RuntimeKeyAction::KeyAction(key_action) => {
+                                                if let Some(next) = next {
+                                                    let _ = next.send(InputEvent::Raw(key_action.to_input_ev()));
+                                                }
+                                            }
+                                            RuntimeKeyAction::ReleaseRestoreModifiers(
+                                                from_flags,
+                                                to_flags,
+                                                to_type,
+                                            ) => {
+                                                let new_events = release_restore_modifiers(
+                                                    &self.modifiers,
+                                                    &from_flags,
+                                                    &to_flags,
+                                                    &to_type,
+                                                );
+                                                if let Some(next) = next {
+                                                    for ev in new_events {
+                                                        let _ = next.send(InputEvent::Raw(ev));
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
-                                    RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                                }
+                                RuntimeAction::PythonCallback(from_modifiers, handler) => {
+                                    if let Some(next) = next {
+                                        // always release all trigger mods before running the callback
                                         let new_events = release_restore_modifiers(
                                             &self.modifiers,
-                                            &from_flags,
-                                            &to_flags,
-                                            &to_type,
+                                            &from_modifiers,
+                                            &KeyModifierFlags::new(),
+                                            &TYPE_UP,
                                         );
                                         for ev in new_events {
                                             let _ = next.send(InputEvent::Raw(ev));
                                         }
                                     }
+
+                                    run_python_handler(&handler, None, ev, &shared_state.transformer, next);
                                 }
+                                RuntimeAction::NOP => {}
                             }
 
                             // return after handled match
@@ -149,7 +177,7 @@ impl TextMapper {
         Ok(Self { id, shared_state, transformer, tmp_next: Default::default() })
     }
 
-    pub fn map(&mut self, from: String, to: String) -> PyResult<()> {
+    pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         if from.len() > 32 {
             return Err(PyRuntimeError::new_err("'from' side cannot be longer than 32 character"));
         }
@@ -169,14 +197,28 @@ impl TextMapper {
             .collect::<Option<Vec<_>>>()
             .ok_or_else(|| PyRuntimeError::new_err("invalid key sequence"))?;
 
-        let to = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
-            PyRuntimeError::new_err(format!(
-                "mapping error on the 'to' side:\n{}",
-                ApplicationError::KeySequenceParse(err.to_string()),
-            ))
-        })?;
+        let to = if to.as_ref(py).is_callable() {
+            RuntimeAction::PythonCallback(Default::default(), to)
+        } else {
+            let to = to.extract::<String>(py).map_err(|err| {
+                PyRuntimeError::new_err(format!(
+                    "mapping error on the 'to' side:\n{}",
+                    ApplicationError::InvalidInputType { type_: "String".to_string() }
+                ))
+            })?;
+            let to = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
+                PyRuntimeError::new_err(format!(
+                    "mapping error on the 'to' side:\n{}",
+                    ApplicationError::KeySequenceParse(err.to_string()),
+                ))
+            })?;
 
-        let to = _map(from_seq.last().unwrap(), to);
+            let mut to: Vec<RuntimeKeyAction> =
+                to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
+
+            RuntimeAction::ActionSequence(to)
+        };
+
         self.shared_state.write().unwrap().mappings.insert(from, to);
 
         Ok(())

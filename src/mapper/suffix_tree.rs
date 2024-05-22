@@ -2,9 +2,14 @@ use nom::Slice;
 
 use crate::*;
 
-#[derive(Default)]
 pub struct SuffixTree<Value> {
     root: HashMap<char, SuffixTreeNode<Value>>,
+}
+
+impl<Value> Default for SuffixTree<Value> {
+    fn default() -> Self {
+        Self { root: HashMap::new() }
+    }
 }
 
 impl<Value> SuffixTree<Value> {

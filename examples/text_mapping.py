@@ -8,9 +8,11 @@ map2.link([reader, mapper, writer])
 
 mapper.map("hello", "bye")
 
-# counter = 0
-#
-# def increment():
-#   global counter
-#   counter += 1
-# mapper.map(["c", "d"], increment)
+mapper.map("LaSeRs", "lAsErS")
+
+counter = 0
+
+def increment():
+  global counter
+  counter += 1
+mapper.map("Something", increment)
