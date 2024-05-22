@@ -42,6 +42,10 @@ impl State {
             InputEvent::Raw(ev) => ev,
         };
 
+        if let Some(next) = next {
+            let _ = next.send(raw_ev.clone());
+        }
+
         match ev {
             EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_BACKSPACE), value: 1, .. } => {
                 self.window.pop();
@@ -51,7 +55,7 @@ impl State {
             }
             // key event
             EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-                if ev.value == 1 {
+                if ev.value == 0 {
                     let key = shared_state.transformer.raw_to_utf(&key, &self.modifiers);
 
                     if let Some(key) = key {
@@ -76,7 +80,7 @@ impl State {
                                 return;
                             };
 
-                            for _ in 1..from_len {
+                            for _ in 0..from_len {
                                 let _ = next.send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)));
                                 let _ = next.send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)));
                             }
@@ -99,6 +103,8 @@ impl State {
                                     }
                                 }
                             }
+
+                            // return after handled match
                             return;
                         }
                     }
@@ -107,10 +113,6 @@ impl State {
                 event_handlers::update_modifiers(&mut self.modifiers, &KeyAction::from_input_ev(&ev));
             }
             _ => {}
-        }
-
-        if let Some(next) = next {
-            let _ = next.send(raw_ev);
         }
     }
 }
