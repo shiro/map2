@@ -80,7 +80,7 @@ jobs:
       - name: Get changelog version
         id: changelog_version
         run: |
-          if [[ "$GITHUB_REF" == "refs/tags/*" ]]; then
+          if [[ "$GITHUB_REF" == "refs/tags/"* ]]; then
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           else
             echo "version=Unreleased" >> $GITHUB_OUTPUT
@@ -92,6 +92,11 @@ jobs:
           validation_level: error
           version: ${{ steps.changelog_version.outputs.version }}
           path: ./CHANGELOG.md
+      - name: Debug actions
+        env:
+          version: ${{ steps.changelog.outputs.changes }}
+        run: |
+          echo "<<<<< ACTIONS VERSION ${version}"
 
   deploy:
     name: Deploy package
