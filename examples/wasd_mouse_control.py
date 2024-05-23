@@ -8,9 +8,7 @@ import threading
 
 map2.default(layout="us")
 
-# an easy to use interval utility that allows us to run a function on a timer
-
-
+# an easy to use interval utility that allows running functions on a timer
 class setInterval:
     def __init__(self, interval, action):
         self.interval = interval / 1000
@@ -53,13 +51,13 @@ intervals = {}
 
 def mouse_ctrl(key, state, axis, multiplier):
     def inner_fn():
-        # if the key was released, remove and cancel the corresponding interval
+        # on key release, remove and cancel the corresponding interval
         if state == 0:
             if key in intervals:
                 intervals.pop(key).cancel()
             return
 
-        # this function will move our mouse using the virtual reader from earlier
+        # this function will move our mouse using the virtual reader
         def send():
             value = 15 * multiplier
             reader_mouse.send("{{relative {} {}}}".format(axis, value))

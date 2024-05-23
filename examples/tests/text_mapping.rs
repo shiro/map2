@@ -57,6 +57,7 @@ async fn map_to_function() -> PyResult<()> {
         }
         assert_keys!(py, m, WRITER, &output);
 
+        sleep(py, 100);
         let counter = m.getattr("counter").unwrap().extract::<i32>().unwrap();
         assert_eq!(counter, 1);
 

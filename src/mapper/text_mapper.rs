@@ -126,8 +126,17 @@ impl State {
                                             let _ = next.send(InputEvent::Raw(ev));
                                         }
                                     }
-
-                                    run_python_handler(&handler, None, ev, &shared_state.transformer, next);
+                                    // delay the callback until the backspace events are processed
+                                    {
+                                        let ev = ev.clone();
+                                        let next = next.map(|x| x.clone());
+                                        let transformer = shared_state.transformer.clone();
+                                        let handler = handler.clone();
+                                        get_runtime().spawn(async move {
+                                            tokio::time::sleep(Duration::from_millis(10 * from_len as u64)).await;
+                                            run_python_handler(&handler, None, &ev, &transformer, next.as_ref());
+                                        });
+                                    }
                                 }
                                 RuntimeAction::NOP => {}
                             }

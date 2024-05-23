@@ -49,12 +49,16 @@ export const SIDEBAR: Sidebar = {
       { text: "map2", link: "en/api/map2" },
       { text: "Reader", link: "en/api/reader" },
       { text: "Mapper", link: "en/api/mapper" },
+      { text: "Text Mapper", link: "en/api/text-mapper" },
+      { text: "Chord Mapper", link: "en/api/chord-mapper" },
       { text: "Writer", link: "en/api/writer" },
-      { text: "VirtualWriter", link: "en/api/virtual-writer" },
+      { text: "Virtual Writer", link: "en/api/virtual-writer" },
       { text: "Window", link: "en/api/window" },
     ],
     "Examples": [
       { text: "Hello world", link: "en/examples/hello-world" },
+      { text: "Chords", link: "en/examples/chords" },
+      { text: "Text mapping", link: "en/examples/text_mapping" },
       { text: "WASD mouse control", link: "en/examples/wasd-mouse-control" },
       { text: "Keyboard to controller", link: "en/examples/keyboard_to_controller" },
     ]
