@@ -58,9 +58,9 @@ export const SIDEBAR: Sidebar = {
     "Examples": [
       { text: "Hello world", link: "en/examples/hello-world" },
       { text: "Chords", link: "en/examples/chords" },
-      { text: "Text mapping", link: "en/examples/text_mapping" },
+      { text: "Text mapping", link: "en/examples/text-mapping" },
       { text: "WASD mouse control", link: "en/examples/wasd-mouse-control" },
-      { text: "Keyboard to controller", link: "en/examples/keyboard_to_controller" },
+      { text: "Keyboard to controller", link: "en/examples/keyboard-to-controller" },
     ]
   }
 }
