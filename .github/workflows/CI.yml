@@ -72,6 +72,26 @@ jobs:
           # root path
           path: docs
           # node-version: 18 # The specific version of Node that should be used to build your site. Defaults to 18. (optional)
+  changelog:
+    name: Changelog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Get changelog version
+        id: changelog_version
+        run: |
+          if [[ "$GITHUB_REF" == "refs/tags/*" ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=Unreleased" >> $GITHUB_OUTPUT
+          fi
+      - name: Get changelog entry
+        id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          validation_level: error
+          version: ${{ steps.changelog_version.outputs.version }}
+          path: ./CHANGELOG.md
 
   deploy:
     name: Deploy package
@@ -92,7 +112,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          # body: "This is my release text"
+          body: ${{ steps.changelog.outputs.changes }}
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
