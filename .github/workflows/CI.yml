@@ -105,7 +105,7 @@ jobs:
     permissions:
       contents: write
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [linux]
+    needs: [linux, changelog]
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -129,7 +129,7 @@ jobs:
 
   deploy-docs:
     name: Deploy docs
-    needs: [linux, build-docs]
+    needs: [linux, build-docs, changelog]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -143,7 +143,7 @@ jobs:
     name: Deploy packge AUR
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [linux]
+    needs: [deploy]
     steps:
       - name: Git checkout
         uses: actions/checkout@v3
