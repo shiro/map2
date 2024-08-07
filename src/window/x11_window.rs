@@ -11,51 +11,55 @@ use x11rb::protocol::Event::PropertyNotify;
 use x11rb::x11_utils::TryParse;
 
 pub fn x11_window_handler() -> WindowHandler {
-    Box::new(|exit_rx: oneshot::Receiver<()>, subscription_rx: mpsc::Receiver<WindowControlMessage>| -> Result<()> {
-        let x11_state = Arc::new(x11_initialize().unwrap());
-        let subscriptions = Arc::new(Mutex::new(HashMap::new()));
+    Box::new(
+        |exit_rx: oneshot::Receiver<()>,
+         mut subscription_rx: tokio::sync::mpsc::Receiver<WindowControlMessage>|
+         -> Result<()> {
+            let x11_state = Arc::new(x11_initialize().unwrap());
+            let subscriptions = Arc::new(Mutex::new(HashMap::new()));
 
-        loop {
-            if exit_rx.try_recv().is_ok() {
-                break;
-            }
+            loop {
+                if exit_rx.try_recv().is_ok() {
+                    break;
+                }
 
-            while let Ok(msg) = subscription_rx.try_recv() {
-                match msg {
-                    WindowControlMessage::Subscribe(id, callback) => {
-                        subscriptions.lock().unwrap().insert(id, callback);
-                    }
-                    WindowControlMessage::Unsubscribe(id) => {
-                        subscriptions.lock().unwrap().remove(&id);
+                while let Ok(msg) = subscription_rx.try_recv() {
+                    match msg {
+                        WindowControlMessage::Subscribe(id, callback) => {
+                            subscriptions.lock().unwrap().insert(id, callback);
+                        }
+                        WindowControlMessage::Unsubscribe(id) => {
+                            subscriptions.lock().unwrap().remove(&id);
+                        }
                     }
                 }
+
+                let info = get_window_info_x11(&x11_state);
+
+                if let Ok(Some(val)) = info {
+                    Python::with_gil(|py| {
+                        for callback in subscriptions.lock().unwrap().values() {
+                            let is_callable = callback.as_ref(py).is_callable();
+                            if !is_callable {
+                                continue;
+                            }
+
+                            let ret = callback.call(py, (val.class.clone(),), None);
+
+                            if let Err(err) = ret {
+                                eprintln!("{err}");
+                                std::process::exit(1);
+                            }
+                        }
+                    });
+                }
+
+                thread::sleep(Duration::from_millis(100));
             }
 
-            let info = get_window_info_x11(&x11_state);
-
-            if let Ok(Some(val)) = info {
-                Python::with_gil(|py| {
-                    for callback in subscriptions.lock().unwrap().values() {
-                        let is_callable = callback.as_ref(py).is_callable();
-                        if !is_callable {
-                            continue;
-                        }
-
-                        let ret = callback.call(py, (val.class.clone(),), None);
-
-                        if let Err(err) = ret {
-                            eprintln!("{err}");
-                            std::process::exit(1);
-                        }
-                    }
-                });
-            }
-
-            thread::sleep(Duration::from_millis(100));
-        }
-
-        Ok(())
-    })
+            Ok(())
+        },
+    )
 }
 
 #[allow(non_snake_case)]

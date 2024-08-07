@@ -12,14 +12,14 @@ pub struct ActiveWindowInfo {
 }
 
 pub type WindowHandler =
-    Box<dyn Fn(oneshot::Receiver<()>, mpsc::Receiver<WindowControlMessage>) -> Result<()> + Send + Sync>;
+    Box<dyn Fn(oneshot::Receiver<()>, tokio::sync::mpsc::Receiver<WindowControlMessage>) -> Result<()> + Send + Sync>;
 
 #[pyclass]
 pub struct Window {
     thread_handle: Option<thread::JoinHandle<()>>,
     thread_exit_tx: Option<oneshot::Sender<()>>,
     subscription_id_cnt: u32,
-    subscriptions_tx: mpsc::Sender<WindowControlMessage>,
+    subscriptions_tx: tokio::sync::mpsc::Sender<WindowControlMessage>,
 }
 
 #[pymethods]
@@ -46,7 +46,9 @@ impl Window {
     }
 
     fn on_window_change(&mut self, callback: PyObject) -> WindowOnWindowChangeSubscription {
-        let _ = self.subscriptions_tx.send(WindowControlMessage::Subscribe(self.subscription_id_cnt, callback));
+        let _ = futures::executor::block_on(
+            self.subscriptions_tx.send(WindowControlMessage::Subscribe(self.subscription_id_cnt, callback)),
+        );
         let subscription = WindowOnWindowChangeSubscription { id: self.subscription_id_cnt };
         self.subscription_id_cnt += 1;
         subscription
@@ -75,8 +77,8 @@ pub enum WindowControlMessage {
 
 pub fn spawn_listener_thread(
     handler: WindowHandler,
-) -> (mpsc::Sender<WindowControlMessage>, thread::JoinHandle<()>, oneshot::Sender<()>) {
-    let (subscription_tx, subscription_rx) = mpsc::channel();
+) -> (tokio::sync::mpsc::Sender<WindowControlMessage>, thread::JoinHandle<()>, oneshot::Sender<()>) {
+    let (subscription_tx, subscription_rx) = tokio::sync::mpsc::channel(255);
     let (exit_tx, exit_rx) = oneshot::channel();
     let handle = thread::spawn(move || {
         if let Err(err) = handler(exit_rx, subscription_rx) {
