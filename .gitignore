@@ -4,7 +4,7 @@
 /target
 pytests/target
 /pkg
-.env
+/venv
 *.zst
 *.tar.gz
 /dist
