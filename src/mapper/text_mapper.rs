@@ -1,3 +1,4 @@
+use super::suffix_tree::SuffixTree;
 use super::*;
 use crate::mapper::mapping_functions::*;
 use crate::mapper::RuntimeKeyAction;
@@ -6,160 +7,29 @@ use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 use nom::Slice;
+use tokio::sync::mpsc::Sender;
 
-use super::suffix_tree::SuffixTree;
+use ApplicationError::TooManyEvents;
 
 type Mappings = SuffixTree<RuntimeAction>;
 
 #[derive(Default)]
 struct State {
-    pub modifiers: Arc<KeyModifierState>,
-    pub window: Vec<char>,
-}
-
-impl State {
-    pub fn new() -> Self {
-        State { modifiers: Arc::new(KeyModifierState::new()), window: vec![] }
-    }
-}
-
-fn _map(from: &KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> Vec<RuntimeKeyAction> {
-    let mut seq: Vec<RuntimeKeyAction> =
-        to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
-    seq.insert(0, RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP));
-    seq
-}
-
-#[derive(Default)]
-struct SharedState {
     transformer: Arc<XKBTransformer>,
+    prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
+    next: HashMap<Uuid, Arc<dyn LinkDst>>,
     mappings: Mappings,
-}
-
-impl State {
-    fn handle(&mut self, raw_ev: InputEvent, next: Option<&SubscriberNew>, shared_state: &SharedState) {
-        let ev = match &raw_ev {
-            InputEvent::Raw(ev) => ev,
-        };
-
-        if let Some(next) = next {
-            let _ = next.send(raw_ev.clone());
-        }
-
-        match ev {
-            EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_BACKSPACE), value: 1, .. } => {
-                self.window.pop();
-            }
-            EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_DELETE), value: 1, .. } => {
-                self.window.remove(0);
-            }
-            // key event
-            EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-                if ev.value == 0 {
-                    let key = shared_state.transformer.raw_to_utf(&key, &self.modifiers);
-
-                    if let Some(key) = key {
-                        self.window.push(key.chars().next().unwrap());
-                        // TODO set window size dynamically
-                        if self.window.len() > 32 {
-                            self.window.remove(0);
-                        }
-
-                        let mut hit = None;
-
-                        for i in (0..self.window.len()).rev() {
-                            let search: String = self.window.iter().skip(i).collect();
-                            if let Some(x) = shared_state.mappings.get(&search) {
-                                hit = Some((x, search.len()));
-                            }
-                        }
-
-                        if let Some((to, from_len)) = hit {
-                            self.window.clear();
-
-                            if let Some(next) = next {
-                                for _ in 0..from_len {
-                                    let _ = next.send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)));
-                                    let _ = next.send(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)));
-                                }
-                            }
-
-                            match to {
-                                RuntimeAction::ActionSequence(seq) => {
-                                    for action in seq {
-                                        match action {
-                                            RuntimeKeyAction::KeyAction(key_action) => {
-                                                if let Some(next) = next {
-                                                    let _ = next.send(InputEvent::Raw(key_action.to_input_ev()));
-                                                }
-                                            }
-                                            RuntimeKeyAction::ReleaseRestoreModifiers(
-                                                from_flags,
-                                                to_flags,
-                                                to_type,
-                                            ) => {
-                                                let new_events = release_restore_modifiers(
-                                                    &self.modifiers,
-                                                    &from_flags,
-                                                    &to_flags,
-                                                    &to_type,
-                                                );
-                                                if let Some(next) = next {
-                                                    for ev in new_events {
-                                                        let _ = next.send(InputEvent::Raw(ev));
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                RuntimeAction::PythonCallback(from_modifiers, handler) => {
-                                    if let Some(next) = next {
-                                        // always release all trigger mods before running the callback
-                                        let new_events = release_restore_modifiers(
-                                            &self.modifiers,
-                                            &from_modifiers,
-                                            &KeyModifierFlags::new(),
-                                            &TYPE_UP,
-                                        );
-                                        for ev in new_events {
-                                            let _ = next.send(InputEvent::Raw(ev));
-                                        }
-                                    }
-                                    // delay the callback until the backspace events are processed
-                                    {
-                                        let ev = ev.clone();
-                                        let next = next.map(|x| x.clone());
-                                        let transformer = shared_state.transformer.clone();
-                                        let handler = handler.clone();
-                                        get_runtime().spawn(async move {
-                                            tokio::time::sleep(Duration::from_millis(10 * from_len as u64)).await;
-                                            run_python_handler(&handler, None, &ev, &transformer, next.as_ref());
-                                        });
-                                    }
-                                }
-                                RuntimeAction::NOP => {}
-                            }
-
-                            // return after handled match
-                            return;
-                        }
-                    }
-                }
-
-                event_handlers::update_modifiers(&mut self.modifiers, &KeyAction::from_input_ev(&ev));
-            }
-            _ => {}
-        }
-    }
+    modifiers: Arc<KeyModifierState>,
+    window: Vec<char>,
 }
 
 #[pyclass]
 pub struct TextMapper {
     pub id: Uuid,
-    shared_state: Arc<RwLock<SharedState>>,
+    pub link: Arc<TextMapperLink>,
+    ev_tx: tokio::sync::mpsc::Sender<InputEvent>,
+    control_tx: ClosureChannel<State>,
     transformer: Arc<XKBTransformer>,
-    tmp_next: Mutex<Option<SubscriberNew>>,
 }
 
 #[pymethods]
@@ -181,9 +51,26 @@ impl TextMapper {
             .map_err(err_to_py)?;
 
         let id = Uuid::new_v4();
-        let shared_state = Arc::new(RwLock::new(SharedState::default()));
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(32);
+        let (control_tx, mut control_rx) = ClosureChannel::<State>::new();
+        let link = Arc::new(TextMapperLink { id, ev_tx: ev_tx.clone(), control_tx: control_tx.clone() });
 
-        Ok(Self { id, shared_state, transformer, tmp_next: Default::default() })
+        let _transformer = transformer.clone();
+        get_runtime().spawn(async move {
+            let mut state = State { transformer: _transformer, ..Default::default() };
+            loop {
+                tokio::select! {
+                    Some(ev) = ev_rx.recv() => {
+                        handle(&mut state, ev).await;
+                    }
+                    Some(cb) = control_rx.recv() => {
+                        cb(&mut state);
+                    }
+                };
+            }
+        });
+
+        Ok(Self { id, link, ev_tx, control_tx, transformer })
     }
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
@@ -228,56 +115,246 @@ impl TextMapper {
             RuntimeAction::ActionSequence(to)
         };
 
-        self.shared_state.write().unwrap().mappings.insert(from, to);
+        let ret = self
+            .control_tx
+            .call(Box::new(move |state| {
+                state.mappings.insert(from, to);
+            }))
+            .map_err(err_to_py)?;
 
         Ok(())
     }
 
     pub fn snapshot(&self, existing: Option<&TextMapperSnapshot>) -> PyResult<Option<TextMapperSnapshot>> {
-        let mut shared_state = self.shared_state.write().unwrap();
-
-        if let Some(existing) = existing {
-            shared_state.mappings = existing.mappings.clone();
-            return Ok(None);
-        }
-
-        Ok(Some(TextMapperSnapshot { mappings: shared_state.mappings.clone() }))
+        let ret = self
+            .control_tx
+            .call(Box::new(move |state| {
+                if let Some(existing) = existing {
+                    state.mappings = existing.mappings.clone();
+                    return None;
+                }
+                Some(TextMapperSnapshot { mappings: state.mappings.clone() })
+            }))
+            .map_err(err_to_py)?;
+        Ok(ret)
     }
-}
 
-impl TextMapper {
-    pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
-        use crate::subscriber::*;
-
-        match target {
-            Some(target) => {
-                *self.tmp_next.lock().unwrap() = Some(target);
-            }
-            None => {}
-        };
+    pub fn link_to(&mut self, target: &PyAny) -> PyResult<()> {
+        let mut target = node_to_link_dst(target).unwrap();
+        target.link_from(self.link.clone());
+        self.link.link_to(target);
         Ok(())
     }
 
-    pub fn subscribe(&self) -> SubscriberNew {
-        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<InputEvent>();
-        let next = self.tmp_next.lock().unwrap().take();
+    pub fn unlink_to(&mut self, py: Python, target: &PyAny) -> PyResult<bool> {
+        let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
+        target.unlink_from(&self.id);
+        let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
+        Ok(ret)
+    }
 
-        let _shared_state = self.shared_state.clone();
-        get_runtime().spawn(async move {
-            let mut state = State::default();
-            loop {
-                let ev = ev_rx.recv().await.unwrap();
-                let shared_state = _shared_state.read().unwrap();
+    pub fn unlink_to_all(&mut self) -> PyResult<()> {
+        let id = &self.id;
+        self.control_tx
+            .call(Box::new(move |state| {
+                for l in state.next.values_mut() {
+                    l.unlink_from(id);
+                }
+                state.next.clear();
+            }))
+            .map_err(err_to_py)?;
+        Ok(())
+    }
 
-                state.handle(ev, next.as_ref(), &shared_state);
-            }
-        });
+    pub fn unlink_from(&mut self, target: &PyAny) -> PyResult<bool> {
+        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
+        target.unlink_to(&self.id);
+        let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;
+        Ok(ret)
+    }
 
-        ev_tx.clone()
+    pub fn unlink_from_all(&mut self) -> PyResult<()> {
+        let id = &self.id;
+        self.control_tx
+            .call(Box::new(move |state| {
+                for l in state.prev.values_mut() {
+                    l.unlink_to(id);
+                }
+                state.prev.clear();
+            }))
+            .map_err(err_to_py)?;
+        Ok(())
+    }
+
+    pub fn send(&mut self, val: String) -> PyResult<()> {
+        let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
+            .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
+            .to_key_actions();
+        for action in actions {
+            self.ev_tx.try_send(InputEvent::Raw(action.to_input_ev())).expect(&TooManyEvents.to_string());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct TextMapperLink {
+    id: Uuid,
+    ev_tx: Sender<InputEvent>,
+    control_tx: ClosureChannel<State>,
+}
+
+impl LinkSrc for TextMapperLink {
+    fn id(&self) -> &Uuid {
+        &self.id
+    }
+    fn link_to(&self, node: Arc<dyn LinkDst>) -> Result<()> {
+        self.control_tx.call(Box::new(move |state| {
+            state.next.insert(*node.id(), node);
+        }))?;
+        Ok(())
+    }
+    fn unlink_to(&self, id: &Uuid) -> Result<bool> {
+        self.control_tx.call(Box::new(move |state| state.next.remove(id).is_some()))
+    }
+}
+
+impl LinkDst for TextMapperLink {
+    fn id(&self) -> &Uuid {
+        &self.id
+    }
+    fn link_from(&self, node: Arc<dyn LinkSrc>) -> Result<()> {
+        self.control_tx
+            .call(Box::new(move |state| {
+                state.prev.insert(*node.id(), node);
+            }))
+            .unwrap();
+
+        Ok(())
+    }
+    fn unlink_from(&self, id: &Uuid) -> Result<bool> {
+        self.control_tx.call(Box::new(move |state| state.prev.remove(id).is_some()))
+    }
+    fn send(&self, ev: InputEvent) {
+        self.ev_tx.try_send(ev).expect(&ApplicationError::TooManyEvents.to_string());
     }
 }
 
 #[pyclass]
 pub struct TextMapperSnapshot {
     mappings: Mappings,
+}
+
+fn _map(from: &KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> Vec<RuntimeKeyAction> {
+    let mut seq: Vec<RuntimeKeyAction> =
+        to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
+    seq.insert(0, RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP));
+    seq
+}
+
+async fn handle(state: &mut State, raw_ev: InputEvent) {
+    if !state.next.is_empty() {
+        state.next.send_all(raw_ev.clone());
+    }
+    let ev = match raw_ev {
+        InputEvent::Raw(ev) => ev,
+    };
+
+    match ev {
+        EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_BACKSPACE), value: 1, .. } => {
+            state.window.pop();
+        }
+        EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_DELETE), value: 1, .. } => {
+            state.window.remove(0);
+        }
+        // key event
+        EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+            if ev.value == 0 {
+                let key = state.transformer.raw_to_utf(&key, &state.modifiers);
+
+                if let Some(key) = key {
+                    state.window.push(key.chars().next().unwrap());
+                    // TODO set window size dynamically
+                    if state.window.len() > 32 {
+                        state.window.remove(0);
+                    }
+
+                    let mut hit = None;
+
+                    for i in (0..state.window.len()).rev() {
+                        let search: String = state.window.iter().skip(i).collect();
+                        if let Some(x) = state.mappings.get(&search) {
+                            hit = Some((x, search.len()));
+                        }
+                    }
+
+                    if let Some((to, from_len)) = hit {
+                        state.window.clear();
+
+                        if !state.next.is_empty() {
+                            for _ in 0..from_len {
+                                state.next.send_all(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)));
+                                state.next.send_all(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)));
+                            }
+                        }
+
+                        match to {
+                            RuntimeAction::ActionSequence(seq) => {
+                                for action in seq {
+                                    match action {
+                                        RuntimeKeyAction::KeyAction(key_action) => {
+                                            state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
+                                        }
+                                        RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                                            if !state.next.is_empty() {
+                                                let new_events = release_restore_modifiers(
+                                                    &state.modifiers,
+                                                    &from_flags,
+                                                    &to_flags,
+                                                    &to_type,
+                                                );
+                                                for ev in new_events {
+                                                    state.next.send_all(InputEvent::Raw(ev));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            RuntimeAction::PythonCallback(from_modifiers, handler) => {
+                                if !state.next.is_empty() {
+                                    // always release all trigger mods before running the callback
+                                    let new_events = release_restore_modifiers(
+                                        &state.modifiers,
+                                        &from_modifiers,
+                                        &KeyModifierFlags::new(),
+                                        &TYPE_UP,
+                                    );
+                                    for ev in new_events {
+                                        state.next.send_all(InputEvent::Raw(ev));
+                                    }
+                                }
+                                // delay the callback until the backspace events are processed
+                                tokio::time::sleep(Duration::from_millis(10 * from_len as u64)).await;
+                                run_python_handler(
+                                    handler.clone(),
+                                    None,
+                                    ev,
+                                    state.transformer.clone(),
+                                    state.next.clone(),
+                                );
+                            }
+                            RuntimeAction::NOP => {}
+                        }
+
+                        // return after handled match
+                        return;
+                    }
+                }
+            }
+
+            event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
+        }
+        _ => {}
+    }
 }

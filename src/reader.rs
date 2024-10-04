@@ -3,15 +3,21 @@ use std::hash::{Hash, Hasher};
 
 use crate::event::InputEvent;
 use crate::python::*;
-use crate::subscriber::SubscriberNew;
+use crate::subscriber::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 
+#[derive(Default)]
+struct State {
+    next: HashMap<Uuid, Arc<dyn LinkDst>>,
+}
+
 #[pyclass]
 pub struct Reader {
     pub id: Uuid,
-    subscriber: Arc<ArcSwapOption<SubscriberNew>>,
+    pub link: Arc<ReaderLink>,
+    state: Arc<Mutex<State>>,
     transformer: Arc<XKBTransformer>,
     #[cfg(not(feature = "integration"))]
     reader_exit_tx: Option<oneshot::Sender<()>>,
@@ -49,21 +55,15 @@ impl Reader {
         #[cfg(not(feature = "integration"))]
         let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
 
-        let subscriber: Arc<ArcSwapOption<SubscriberNew>> = Arc::new(ArcSwapOption::new(None));
-        let _subscriber = subscriber.clone();
-
         let id = Uuid::new_v4();
+        let state = Arc::new(Mutex::new(State::default()));
+        let link = Arc::new(ReaderLink { id, state: state.clone() });
 
         #[cfg(not(feature = "integration"))]
         let reader_thread_handle = if !patterns.is_empty() {
-            // let mut h = DefaultHasher::new();
-            // vec![id.clone()].hash(&mut h);
-            // let path_hash = h.finish();
-
+            let state = state.clone();
             let handler = Arc::new(move |_: &str, ev: EvdevInputEvent| {
-                if let Some(subscriber) = _subscriber.load().deref() {
-                    let _ = subscriber.send(InputEvent::Raw(ev));
-                }
+                state.lock().unwrap().next.send_all(InputEvent::Raw(ev));
             });
 
             Some(grab_udev_inputs(&patterns, handler, reader_exit_rx).map_err(err_to_py)?)
@@ -73,8 +73,9 @@ impl Reader {
 
         Ok(Self {
             id,
-            subscriber,
+            state,
             transformer,
+            link,
             #[cfg(not(feature = "integration"))]
             reader_exit_tx: Some(reader_exit_tx),
             #[cfg(not(feature = "integration"))]
@@ -82,19 +83,36 @@ impl Reader {
         })
     }
 
+    pub fn link_to(&mut self, target: &PyAny) -> PyResult<()> {
+        let mut target = node_to_link_dst(target).unwrap();
+        target.link_from(self.link.clone());
+        self.link.link_to(target);
+        Ok(())
+    }
+
+    pub fn unlink_to(&mut self, py: Python, target: &PyAny) -> PyResult<bool> {
+        let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
+        target.unlink_from(&self.id);
+        let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
+        Ok(ret)
+    }
+
+    pub fn unlink_to_all(&mut self) {
+        let mut state = self.state.lock().unwrap();
+        for l in state.next.values_mut() {
+            l.unlink_from(&self.id);
+        }
+        state.next.clear();
+    }
+
     pub fn send(&mut self, val: String) -> PyResult<()> {
         let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
 
-        // let mut h = DefaultHasher::new();
-        // vec![self.id.clone()].hash(&mut h);
-        // let path_hash = h.finish();
-
-        if let Some(subscriber) = self.subscriber.load().deref() {
-            for action in actions {
-                let _ = subscriber.send(InputEvent::Raw(action.to_input_ev()));
-            }
+        let state = self.state.lock().unwrap();
+        for action in actions {
+            state.next.send_all(InputEvent::Raw(action.to_input_ev()));
         }
         Ok(())
     }
@@ -102,31 +120,34 @@ impl Reader {
     #[cfg(feature = "integration")]
     pub fn __test__write_ev(&mut self, ev: String) -> PyResult<()> {
         let ev: EvdevInputEvent = serde_json::from_str(&ev).unwrap();
-
-        // let mut h = DefaultHasher::new();
-        // vec![self.id.clone()].hash(&mut h);
-        // let path_hash = h.finish();
-
-        if let Some(subscriber) = self.subscriber.load().deref() {
-            let _ = subscriber.send(InputEvent::Raw(ev));
-        };
+        let _ = self.state.lock().unwrap().next.send_all(InputEvent::Raw(ev));
         Ok(())
+    }
+
+    pub fn unlink_all(&mut self) {
+        let mut state = self.state.lock().unwrap();
+        for l in state.next.values_mut() {
+            l.unlink_from(&self.id);
+        }
+        state.next.clear();
     }
 }
 
-impl Reader {
-    pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
-        use crate::subscriber::*;
+#[derive(Clone)]
+pub struct ReaderLink {
+    id: Uuid,
+    state: Arc<Mutex<State>>,
+}
 
-        match target {
-            Some(target) => {
-                self.subscriber.store(Some(Arc::new(target)));
-            }
-            None => {
-                self.subscriber.store(None);
-                return Ok(());
-            }
-        };
+impl LinkSrc for ReaderLink {
+    fn id(&self) -> &Uuid {
+        &self.id
+    }
+    fn link_to(&self, node: Arc<dyn LinkDst>) -> Result<()> {
+        self.state.lock().unwrap().next.insert(*node.id(), node);
         Ok(())
+    }
+    fn unlink_to(&self, id: &Uuid) -> Result<bool> {
+        Ok(self.state.lock().unwrap().next.remove(id).is_some())
     }
 }

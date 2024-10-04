@@ -89,7 +89,7 @@ impl EventLoop {
         EventLoop { thread_handle: Some(thread_handle), callback_tx }
     }
     pub fn execute(&self, callback_object: Py<PyAny>, args: Option<Args>) {
-        futures::executor::block_on(self.callback_tx.send((callback_object, args))).unwrap();
+        self.callback_tx.try_send((callback_object, args)).expect(&ApplicationError::TooManyEvents.to_string());
     }
 }
 

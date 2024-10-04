@@ -6,206 +6,38 @@ use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 use nom::Slice;
+use tokio::sync::mpsc::Sender;
 
-use self::subscriber::SubscriberNew;
-
+use ApplicationError::TooManyEvents;
 type Mappings = HashMap<Vec<Key>, RuntimeAction>;
 
+#[derive(Default)]
 struct State {
-    pub modifiers: Arc<KeyModifierState>,
+    transformer: Arc<XKBTransformer>,
+    prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
+    next: HashMap<Uuid, Arc<dyn LinkDst>>,
+    mappings: Mappings,
+    chorded_keys: HashSet<Key>,
+    modifiers: Arc<KeyModifierState>,
     stack: Vec<Key>,
     ignored_keys: HashSet<Key>,
     pressed_keys: HashSet<Key>,
     interval: Option<tokio::task::JoinHandle<()>>,
-    msg_tx: tokio::sync::mpsc::UnboundedSender<Msg>,
-}
-
-enum Msg {
-    Callback(InputEvent),
-}
-
-struct SharedState {
-    transformer: Arc<XKBTransformer>,
-    mappings: Mappings,
-    chorded_keys: HashSet<Key>,
-}
-
-impl State {
-    fn handle(&mut self, raw_ev: InputEvent, next: Option<&SubscriberNew>, shared_state: &SharedState) {
-        let ev = match &raw_ev {
-            InputEvent::Raw(ev) => ev,
-        };
-
-        let _key = Key { event_code: ev.event_code };
-
-        match ev {
-            EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-                event_handlers::update_modifiers(&mut self.modifiers, &KeyAction::from_input_ev(&ev));
-
-                match ev.value {
-                    TYPE_DOWN => {
-                        let should_handle = shared_state.chorded_keys.contains(&_key)
-                            && self.pressed_keys.iter().all(|x| self.stack.contains(x));
-
-                        self.pressed_keys.insert(_key.clone());
-
-                        if should_handle {
-                            self.stack.push(_key.clone());
-
-                            if self.stack.len() == 2 {
-                                self.handle_cb(raw_ev, next, shared_state);
-                            } else {
-                                let msg_tx = self.msg_tx.clone();
-                                self.interval = Some(tokio::spawn(async move {
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                                    msg_tx.send(Msg::Callback(raw_ev));
-                                }));
-                            }
-                        } else {
-                            let Some(next) = next else { return };
-
-                            if let Some(task) = self.interval.take() {
-                                task.abort();
-                            };
-
-                            for k in self.stack.iter() {
-                                let _ = next.send(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
-                                let _ = next.send(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
-                                self.ignored_keys.insert(k.clone());
-                            }
-                            self.stack.clear();
-
-                            let _ = next.send(raw_ev);
-                        }
-                    }
-                    TYPE_UP => {
-                        self.pressed_keys.remove(&_key);
-                        let Some(next) = next else { return };
-
-                        if let Some(task) = self.interval.take() {
-                            task.abort();
-                        };
-
-                        if let Some(pos) = self.stack.iter().position(|x| x == &_key) {
-                            self.stack.remove(pos);
-
-                            if !self.ignored_keys.remove(&_key) {
-                                let _ = next.send(InputEvent::Raw(_key.to_input_ev(TYPE_DOWN)));
-                                let _ = next.send(raw_ev);
-                            }
-                        } else {
-                            for k in self.stack.iter() {
-                                let _ = next.send(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
-                                let _ = next.send(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
-                            }
-
-                            self.stack.clear();
-
-                            if !self.ignored_keys.remove(&_key) {
-                                let _ = next.send(raw_ev);
-                            }
-                        }
-                    }
-                    TYPE_REPEAT => {
-                        if self.ignored_keys.contains(&_key) {
-                            return;
-                        }
-                        if self.stack.is_empty() {
-                            let Some(next) = next else { return };
-                            let _ = next.send(raw_ev);
-                        };
-                    }
-                    _ => unreachable!(),
-                };
-            }
-            _ => {}
-        }
-    }
-
-    // fired after the chord timeout has passed, submits the keys held on the stack
-    fn handle_cb(&mut self, raw_ev: InputEvent, next: Option<&SubscriberNew>, shared_state: &SharedState) {
-        let ev = match &raw_ev {
-            InputEvent::Raw(ev) => ev,
-        };
-
-        if let Some(task) = self.interval.take() {
-            task.abort();
-        };
-
-        if let Some(action) = shared_state.mappings.get(&self.stack) {
-            for k in self.stack.iter().cloned() {
-                self.ignored_keys.insert(k);
-            }
-
-            match action {
-                RuntimeAction::ActionSequence(seq) => {
-                    for action in seq {
-                        match action {
-                            RuntimeKeyAction::KeyAction(key_action) => {
-                                if let Some(next) = next {
-                                    let _ = next.send(InputEvent::Raw(key_action.to_input_ev()));
-                                }
-                            }
-                            RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                let new_events =
-                                    release_restore_modifiers(&self.modifiers, &from_flags, &to_flags, &to_type);
-                                if let Some(next) = next {
-                                    for ev in new_events {
-                                        let _ = next.send(InputEvent::Raw(ev));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                RuntimeAction::PythonCallback(from_modifiers, handler) => {
-                    if let Some(next) = next {
-                        // always release all trigger mods before running the callback
-                        let new_events = release_restore_modifiers(
-                            &self.modifiers,
-                            &from_modifiers,
-                            &KeyModifierFlags::new(),
-                            &TYPE_UP,
-                        );
-                        for ev in new_events {
-                            let _ = next.send(InputEvent::Raw(ev));
-                        }
-                    }
-
-                    run_python_handler(&handler, None, ev, &shared_state.transformer, next);
-                }
-                RuntimeAction::NOP => {}
-            }
-        } else {
-            let Some(next) = next else { return };
-
-            // only one key on the stack
-            if self.stack.len() == 1 && self.stack[0].event_code == ev.event_code {
-                let _ = next.send(InputEvent::Raw(ev.clone()));
-            } else {
-                // no match, send all buffered keys from stack
-                for k in self.stack.iter() {
-                    let _ = next.send(InputEvent::Raw(k.to_input_ev(1)));
-                    let _ = next.send(InputEvent::Raw(k.to_input_ev(0)));
-                }
-            }
-            self.stack.clear();
-        }
-    }
 }
 
 #[pyclass]
 pub struct ChordMapper {
     pub id: Uuid,
-    shared_state: Arc<RwLock<SharedState>>,
+    pub link: Arc<ChordMapperLink>,
+    ev_tx: tokio::sync::mpsc::Sender<InputEvent>,
+    control_tx: ClosureChannel<State>,
     transformer: Arc<XKBTransformer>,
-    tmp_next: Mutex<Option<SubscriberNew>>,
 }
 
 #[pymethods]
 impl ChordMapper {
     #[new]
-    #[pyo3(signature = (* * kwargs))]
+    #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract().unwrap(),
@@ -221,14 +53,28 @@ impl ChordMapper {
             .map_err(err_to_py)?;
 
         let id = Uuid::new_v4();
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(32);
+        let (control_tx, mut control_rx) = ClosureChannel::<State>::new();
+        let link = Arc::new(ChordMapperLink { id, ev_tx: ev_tx.clone(), control_tx: control_tx.clone() });
 
-        let shared_state = Arc::new(RwLock::new(SharedState {
-            transformer: transformer.clone(),
-            chorded_keys: Default::default(),
-            mappings: Default::default(),
-        }));
+        let _transformer = transformer.clone();
+        let _control_tx = control_tx.clone();
+        get_runtime().spawn(async move {
+            let mut state = State { transformer: _transformer, ..Default::default() };
+            loop {
+                tokio::select! {
+                    Some(ev) = ev_rx.recv() => {
+                        handle(&mut state, ev, &_control_tx);
+                    }
+                    Some(cb) = control_rx.recv() => {
+                        cb(&mut state);
+                    }
+                    else => {}
+                };
+            }
+        });
 
-        Ok(Self { id, shared_state, transformer, tmp_next: Default::default() })
+        Ok(Self { id, link, ev_tx, control_tx, transformer })
     }
 
     pub fn map(&mut self, py: Python, from: Vec<String>, to: PyObject) -> PyResult<()> {
@@ -247,8 +93,6 @@ impl ChordMapper {
                     ))
                 },
             )?;
-
-        let mut shared_state = self.shared_state.write().unwrap();
 
         let to = if to.as_ref(py).is_callable() {
             RuntimeAction::PythonCallback(Default::default(), to)
@@ -271,81 +115,316 @@ impl ChordMapper {
             RuntimeAction::ActionSequence(to)
         };
 
-        // mark chorded keys
-        shared_state.chorded_keys.extend(from_parsed.iter().cloned());
+        let mut from_parsed = from_parsed.clone();
 
-        // insert all combinations
-        shared_state.mappings.insert(from_parsed.clone(), to.clone());
-        from_parsed.reverse();
-        shared_state.mappings.insert(from_parsed, to);
+        self.control_tx.call(Box::new(move |state| {
+            // mark chorded keys
+            state.chorded_keys.extend(from_parsed.iter().cloned());
+
+            // insert all combinations
+            state.mappings.insert(from_parsed.clone(), to.clone());
+            from_parsed.reverse();
+            state.mappings.insert(from_parsed, to);
+        }));
 
         Ok(())
     }
 
     pub fn snapshot(&self, existing: Option<&ChordMapperSnapshot>) -> PyResult<Option<ChordMapperSnapshot>> {
-        if let Some(existing) = existing {
-            let mut shared_state = self.shared_state.write().unwrap();
-            shared_state.mappings = existing.mappings.clone();
-            shared_state.chorded_keys = shared_state.mappings.keys().fold(HashSet::new(), |mut acc, e| {
-                acc.extend(e.iter().cloned());
-                acc
-            });
-            return Ok(None);
-        }
-
-        let mut shared_state = self.shared_state.read().unwrap();
-
-        Ok(Some(ChordMapperSnapshot { mappings: shared_state.mappings.clone() }))
+        let ret = self
+            .control_tx
+            .call(Box::new(move |state| {
+                if let Some(existing) = existing {
+                    state.mappings = existing.mappings.clone();
+                    state.chorded_keys = state.mappings.keys().fold(HashSet::new(), |mut acc, e| {
+                        acc.extend(e.iter().cloned());
+                        acc
+                    });
+                    return None;
+                }
+                Some(ChordMapperSnapshot { mappings: state.mappings.clone() })
+            }))
+            .map_err(err_to_py)?;
+        Ok(ret)
     }
-}
 
-impl ChordMapper {
-    pub fn link(&mut self, target: Option<SubscriberNew>) -> PyResult<()> {
-        use crate::subscriber::*;
-
-        if let Some(target) = target {
-            *self.tmp_next.lock().unwrap() = Some(target);
-        };
+    pub fn link_to(&mut self, target: &PyAny) -> PyResult<()> {
+        let mut target = node_to_link_dst(target).unwrap();
+        target.link_from(self.link.clone());
+        self.link.link_to(target);
         Ok(())
     }
 
-    pub fn subscribe(&self) -> SubscriberNew {
-        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<InputEvent>();
-        let next = self.tmp_next.lock().unwrap().take();
+    pub fn unlink_to(&mut self, py: Python, target: &PyAny) -> PyResult<bool> {
+        let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
+        target.unlink_from(&self.id);
+        let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
+        Ok(ret)
+    }
 
-        let _shared_state = self.shared_state.clone();
-        get_runtime().spawn(async move {
-            let (msg_tx, mut msg_rx) = tokio::sync::mpsc::unbounded_channel();
-            let mut state = State {
-                modifiers: Default::default(),
-                stack: Default::default(),
-                ignored_keys: Default::default(),
-                pressed_keys: Default::default(),
-                interval: Default::default(),
-                msg_tx,
-            };
-            loop {
-                tokio::select! {
-                    Some(ev) = ev_rx.recv() => {
-                        let shared_state = _shared_state.read().unwrap();
-                        state.handle(ev, next.as_ref(), &shared_state);
-                    }
-                    msg = msg_rx.recv() => {
-                        let ev = match msg.unwrap() {
-                            Msg::Callback(ev) => ev,
-                        };
-                        let shared_state = _shared_state.read().unwrap();
-                        state.handle_cb(ev, next.as_ref(), &shared_state);
-                    }
-                };
-            }
-        });
+    pub fn unlink_to_all(&mut self) -> PyResult<()> {
+        let id = &self.id;
+        self.control_tx
+            .call(Box::new(move |state| {
+                for l in state.next.values_mut() {
+                    l.unlink_from(id);
+                }
+                state.next.clear();
+            }))
+            .map_err(err_to_py)?;
+        Ok(())
+    }
 
-        ev_tx.clone()
+    pub fn unlink_from(&mut self, target: &PyAny) -> PyResult<bool> {
+        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
+        target.unlink_to(&self.id);
+        let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;
+        Ok(ret)
+    }
+
+    pub fn unlink_from_all(&mut self) -> PyResult<()> {
+        let id = &self.id;
+        self.control_tx
+            .call(Box::new(move |state| {
+                for l in state.prev.values_mut() {
+                    l.unlink_to(id);
+                }
+                state.prev.clear();
+            }))
+            .map_err(err_to_py)?;
+        Ok(())
+    }
+
+    pub fn send(&mut self, val: String) -> PyResult<()> {
+        let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
+            .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
+            .to_key_actions();
+        for action in actions {
+            self.ev_tx.try_send(InputEvent::Raw(action.to_input_ev())).expect(&TooManyEvents.to_string());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct ChordMapperLink {
+    id: Uuid,
+    ev_tx: Sender<InputEvent>,
+    control_tx: ClosureChannel<State>,
+}
+
+impl LinkSrc for ChordMapperLink {
+    fn id(&self) -> &Uuid {
+        &self.id
+    }
+    fn link_to(&self, node: Arc<dyn LinkDst>) -> Result<()> {
+        self.control_tx.call(Box::new(move |state| {
+            state.next.insert(*node.id(), node);
+        }))?;
+        Ok(())
+    }
+    fn unlink_to(&self, id: &Uuid) -> Result<bool> {
+        self.control_tx.call(Box::new(move |state| state.next.remove(id).is_some()))
+    }
+}
+
+impl LinkDst for ChordMapperLink {
+    fn id(&self) -> &Uuid {
+        &self.id
+    }
+    fn link_from(&self, node: Arc<dyn LinkSrc>) -> Result<()> {
+        self.control_tx
+            .call(Box::new(move |state| {
+                state.prev.insert(*node.id(), node);
+            }))
+            .unwrap();
+
+        Ok(())
+    }
+    fn unlink_from(&self, id: &Uuid) -> Result<bool> {
+        self.control_tx.call(Box::new(move |state| state.prev.remove(id).is_some()))
+    }
+    fn send(&self, ev: InputEvent) {
+        self.ev_tx.try_send(ev).expect(&ApplicationError::TooManyEvents.to_string());
     }
 }
 
 #[pyclass]
+#[derive(Clone)]
 pub struct ChordMapperSnapshot {
     mappings: Mappings,
+}
+
+fn handle(state: &mut State, raw_ev: InputEvent, control_tx: &ClosureChannel<State>) {
+    let ev = match &raw_ev {
+        InputEvent::Raw(ev) => ev,
+    };
+
+    let _key = Key { event_code: ev.event_code };
+
+    match ev {
+        EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+            event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
+
+            match ev.value {
+                TYPE_DOWN => {
+                    let should_handle = state.chorded_keys.contains(&_key)
+                        && state.pressed_keys.iter().all(|x| state.stack.contains(x));
+
+                    state.pressed_keys.insert(_key.clone());
+
+                    if should_handle {
+                        state.stack.push(_key.clone());
+
+                        if state.stack.len() == 2 {
+                            handle_cb(state, raw_ev);
+                        } else {
+                            let control_tx = control_tx.clone();
+                            state.interval = Some(tokio::spawn(async move {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                                control_tx
+                                    .call_async(Box::new(move |state| {
+                                        handle_cb(state, raw_ev);
+                                    }))
+                                    .await;
+                            }));
+                        }
+                    } else {
+                        if state.next.is_empty() {
+                            return;
+                        };
+
+                        if let Some(task) = state.interval.take() {
+                            task.abort();
+                        };
+
+                        fn foo(v: &mut State) -> (&Vec<Key>, &mut HashSet<Key>) {
+                            (&v.stack, &mut v.ignored_keys)
+                        }
+
+                        let state = &mut *state;
+                        for k in state.stack.iter() {
+                            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
+                            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
+                            state.ignored_keys.insert(k.clone());
+                        }
+                        state.stack.clear();
+
+                        state.next.send_all(raw_ev);
+                    }
+                }
+                TYPE_UP => {
+                    state.pressed_keys.remove(&_key);
+                    if state.next.is_empty() {
+                        return;
+                    };
+
+                    if let Some(task) = state.interval.take() {
+                        task.abort();
+                    };
+
+                    if let Some(pos) = state.stack.iter().position(|x| x == &_key) {
+                        state.stack.remove(pos);
+
+                        if !state.ignored_keys.remove(&_key) {
+                            state.next.send_all(InputEvent::Raw(_key.to_input_ev(TYPE_DOWN)));
+                            state.next.send_all(raw_ev);
+                        }
+                    } else {
+                        for k in state.stack.iter() {
+                            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
+                            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
+                        }
+
+                        state.stack.clear();
+
+                        if !state.ignored_keys.remove(&_key) {
+                            state.next.send_all(raw_ev);
+                        }
+                    }
+                }
+                TYPE_REPEAT => {
+                    if state.ignored_keys.contains(&_key) {
+                        return;
+                    }
+                    if state.stack.is_empty() {
+                        state.next.send_all(raw_ev);
+                    };
+                }
+                _ => unreachable!(),
+            };
+        }
+        _ => {}
+    }
+}
+
+// fired after the chord timeout has passed, submits the keys held on the stack
+fn handle_cb(state: &mut State, raw_ev: InputEvent) {
+    let ev = match raw_ev {
+        InputEvent::Raw(ev) => ev,
+    };
+
+    if let Some(task) = state.interval.take() {
+        task.abort();
+    };
+
+    if let Some(action) = state.mappings.get(&state.stack) {
+        for k in state.stack.iter().cloned() {
+            state.ignored_keys.insert(k);
+        }
+
+        match action {
+            RuntimeAction::ActionSequence(seq) => {
+                for action in seq {
+                    match action {
+                        RuntimeKeyAction::KeyAction(key_action) => {
+                            state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
+                        }
+                        RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                            let new_events =
+                                release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
+                            if !state.next.is_empty() {
+                                for ev in new_events {
+                                    state.next.send_all(InputEvent::Raw(ev));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            RuntimeAction::PythonCallback(from_modifiers, handler) => {
+                if !state.next.is_empty() {
+                    // always release all trigger mods before running the callback
+                    let new_events = release_restore_modifiers(
+                        &state.modifiers,
+                        &from_modifiers,
+                        &KeyModifierFlags::new(),
+                        &TYPE_UP,
+                    );
+                    for ev in new_events {
+                        state.next.send_all(InputEvent::Raw(ev));
+                    }
+                }
+
+                run_python_handler(handler.clone(), None, ev, state.transformer.clone(), state.next.clone());
+            }
+            RuntimeAction::NOP => {}
+        }
+    } else {
+        if state.next.is_empty() {
+            return;
+        };
+
+        // only one key on the stack
+        if state.stack.len() == 1 && state.stack[0].event_code == ev.event_code {
+            state.next.send_all(InputEvent::Raw(ev.clone()));
+        } else {
+            // no match, send all buffered keys from stack
+            for k in state.stack.iter() {
+                state.next.send_all(InputEvent::Raw(k.to_input_ev(1)));
+                state.next.send_all(InputEvent::Raw(k.to_input_ev(0)));
+            }
+        }
+        state.stack.clear();
+    }
 }

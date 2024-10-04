@@ -15,7 +15,9 @@ async fn wasd_mouse_control() -> PyResult<()> {
         reader_send(py, m, "reader_kbd", &Key::from_str("w").unwrap().to_input_ev(1));
 
         // sleep for long enough to trigger the timeout once
-        py.allow_threads(|| { thread::sleep(Duration::from_millis(25)); });
+        py.allow_threads(|| {
+            thread::sleep(Duration::from_millis(25));
+        });
 
         reader_send(py, m, "reader_kbd", &Key::from_str("w").unwrap().to_input_ev(0));
 
@@ -31,3 +33,4 @@ async fn wasd_mouse_control() -> PyResult<()> {
     })?;
     Ok(())
 }
+

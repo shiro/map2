@@ -32,20 +32,22 @@ pub fn hyprland_window_handler() -> WindowHandler {
             let handle_window_change = {
                 let subscriptions = subscriptions.clone();
                 move |info: ActiveWindowInfo| {
-                    Python::with_gil(|py| {
-                        for callback in subscriptions.lock().unwrap().values() {
-                            let is_callable = callback.as_ref(py).is_callable();
-                            if !is_callable {
-                                continue;
-                            }
+                    tokio::task::spawn_blocking(move || {
+                        Python::with_gil(|py| {
+                            for callback in subscriptions.lock().unwrap().values() {
+                                let is_callable = callback.as_ref(py).is_callable();
+                                if !is_callable {
+                                    continue;
+                                }
 
-                            let ret = callback.call(py, (info.class.clone(),), None);
+                                let ret = callback.call(py, (info.class.clone(),), None);
 
-                            if let Err(err) = ret {
-                                eprintln!("{err}");
-                                std::process::exit(1);
+                                if let Err(err) = ret {
+                                    eprintln!("{err}");
+                                    std::process::exit(1);
+                                }
                             }
-                        }
+                        });
                     });
                 }
             };
@@ -64,29 +66,36 @@ pub fn hyprland_window_handler() -> WindowHandler {
                 })
             });
 
-            pyo3_asyncio::tokio::get_runtime().block_on(async move {
+            pyo3_asyncio::tokio::get_runtime().spawn_blocking(move || {
                 tokio::task::spawn(async move {
                     event_listener.start_listener_async().await;
                 });
 
                 tokio::task::spawn(async move {
                     loop {
-                        let msg = subscription_rx.recv().await.unwrap();
+                        let msg = match subscription_rx.recv().await {
+                            Some(v) => v,
+                            None => {
+                                eprintln!("lost hyprland window handler connection");
+                                return;
+                            }
+                        };
                         match msg {
                             WindowControlMessage::Subscribe(id, callback) => {
                                 subscriptions.lock().unwrap().insert(id, callback.clone());
 
                                 if let Ok(Some(info)) = Client::get_active() {
-                                    Python::with_gil(|py| {
-                                        let is_callable = callback.as_ref(py).is_callable();
-                                        //if !is_callable { continue; }
+                                    //if !is_callable { continue; }
 
-                                        let ret = callback.call(py, (info.class.clone(),), None);
-
-                                        if let Err(err) = ret {
-                                            eprintln!("{err}");
-                                            std::process::exit(1);
-                                        }
+                                    tokio::task::spawn_blocking(move || {
+                                        Python::with_gil(|py| {
+                                            let is_callable = callback.as_ref(py).is_callable();
+                                            let ret = callback.call(py, (info.class.clone(),), None);
+                                            if let Err(err) = ret {
+                                                eprintln!("{err}");
+                                                std::process::exit(1);
+                                            }
+                                        });
                                     });
                                 }
                             }

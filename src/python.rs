@@ -10,8 +10,6 @@ use crate::virtual_writer::VirtualWriter;
 use crate::window::Window;
 use crate::*;
 
-use self::subscriber::SubscriberNew;
-
 #[pyclass]
 struct PyKey {
     #[pyo3(get, set)]
@@ -52,46 +50,52 @@ fn default(options: Option<&PyDict>) -> PyResult<()> {
     Ok(())
 }
 
-fn subscribe_to(target: &PyAny) -> PyResult<Option<SubscriberNew>> {
-    if let Ok(target) = target.extract::<PyRefMut<Mapper>>() {
-        return Ok(Some(target.subscribe()));
-    }
-    if let Ok(target) = target.extract::<PyRefMut<TextMapper>>() {
-        return Ok(Some(target.subscribe()));
-    }
-    if let Ok(target) = target.extract::<PyRefMut<ChordMapper>>() {
-        return Ok(Some(target.subscribe()));
-    }
-    if let Ok(target) = target.extract::<PyRefMut<Writer>>() {
-        return Ok(Some(target.subscribe()));
-    }
-    if target.is_none() {
-        return Ok(None);
-    }
-    Err(ApplicationError::InvalidLinkTarget.into())
-}
-
 #[pyfunction]
-fn link(py: Python, chain: Vec<PyObject>) -> PyResult<()> {
-    let mut prev: Option<PyObject> = None;
+fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
+    let mut prev: Option<Arc<dyn LinkSrc>> = None;
 
-    for source in chain.into_iter().rev() {
-        if let Some(target) = prev {
-            if let Ok(mut source) = source.extract::<PyRefMut<Reader>>(py) {
-                source.link(subscribe_to(target.as_ref(py))?);
-            }
-            if let Ok(mut source) = source.extract::<PyRefMut<Mapper>>(py) {
-                source.link(subscribe_to(target.as_ref(py))?);
-            }
-            if let Ok(mut source) = source.extract::<PyRefMut<TextMapper>>(py) {
-                source.link(subscribe_to(target.as_ref(py))?);
-            }
-            if let Ok(mut source) = source.extract::<PyRefMut<ChordMapper>>(py) {
-                source.link(subscribe_to(target.as_ref(py))?);
-            }
-        }
-        prev = Some(source);
+    if chain.len() < 2 {
+        return Err(PyRuntimeError::new_err("expected at least 2 nodes"));
     }
+
+    let chain_len = chain.len();
+
+    let last = node_to_link_dst(chain.remove(chain_len - 1).as_ref(py)).ok_or_else(|| {
+        PyRuntimeError::new_err(format!("expected node at index {} to be a source node", chain_len - 1))
+    })?;
+
+    let mut prev = node_to_link_src(chain.remove(0).as_ref(py))
+        .ok_or_else(|| PyRuntimeError::new_err("expected node at index 0 to be a source node"))?;
+
+    let chain = chain
+        .into_iter()
+        .enumerate()
+        .map(|(idx, node)| {
+            Ok((
+                node_to_link_src(node.as_ref(py)).ok_or_else(|| {
+                    PyRuntimeError::new_err(format!(
+                        "expected node at index {} to be a source/desination node",
+                        idx + 1
+                    ))
+                })?,
+                node_to_link_dst(node.as_ref(py)).ok_or_else(|| {
+                    PyRuntimeError::new_err(format!(
+                        "expected node at index {} to be a source/desination node",
+                        idx + 1
+                    ))
+                })?,
+            ))
+        })
+        .collect::<Result<Vec<_>, PyErr>>()?;
+
+    chain.into_iter().for_each(|node| {
+        prev.link_to(node.1.clone());
+        node.1.link_from(prev.clone());
+        prev = node.0;
+    });
+
+    prev.link_to(last.clone());
+    last.link_from(prev);
 
     Ok(())
 }

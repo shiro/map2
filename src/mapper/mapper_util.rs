@@ -1,5 +1,4 @@
 use crate::python::*;
-use crate::subscriber::SubscriberNew;
 use crate::*;
 
 use self::xkb::XKBTransformer;
@@ -21,64 +20,63 @@ pub enum PythonReturn {
 }
 
 pub fn run_python_handler(
-    handler: &PyObject,
+    handler: PyObject,
     args: Option<Vec<PythonArgument>>,
-    ev: &EvdevInputEvent,
-    transformer: &Arc<XKBTransformer>,
-    next: Option<&SubscriberNew>,
+    ev: EvdevInputEvent,
+    transformer: Arc<XKBTransformer>,
+    next: HashMap<Uuid, Arc<dyn LinkDst>>,
 ) {
-    let ret = Python::with_gil(|py| -> Result<()> {
-        let asyncio = py.import("asyncio").expect("python runtime error: failed to import 'asyncio', is it installed?");
+    tokio::task::spawn_blocking(move || {
+        let ret = Python::with_gil(|py| -> Result<()> {
+            let asyncio =
+                py.import("asyncio").expect("python runtime error: failed to import 'asyncio', is it installed?");
 
-        let is_async_callback: bool = asyncio
-            .call_method1("iscoroutinefunction", (handler.as_ref(py),))
-            .expect("python runtime error: 'iscoroutinefunction' lookup failed")
-            .extract()
-            .expect("python runtime error: 'iscoroutinefunction' call failed");
+            let is_async_callback: bool = asyncio
+                .call_method1("iscoroutinefunction", (handler.as_ref(py),))
+                .expect("python runtime error: 'iscoroutinefunction' lookup failed")
+                .extract()
+                .expect("python runtime error: 'iscoroutinefunction' call failed");
 
-        if is_async_callback {
-            EVENT_LOOP.lock().unwrap().execute(handler.clone(), args);
-            Ok(())
-        } else {
-            let args = args_to_py(py, args.unwrap_or(vec![]));
-            let ret = handler.call(py, args, None).map_err(|err| anyhow!("{}", err)).and_then(|ret| {
-                if ret.is_none(py) {
-                    return Ok(None);
-                }
+            if is_async_callback {
+                // TODO spawn a task here, run cb
+                EVENT_LOOP.lock().unwrap().execute(handler.clone(), args);
+                Ok(())
+            } else {
+                let args = args_to_py(py, args.unwrap_or(vec![]));
+                let ret = handler.call(py, args, None).map_err(|err| anyhow!("{}", err)).and_then(|ret| {
+                    if ret.is_none(py) {
+                        return Ok(None);
+                    }
 
-                if let Ok(ret) = ret.extract::<String>(py) {
-                    return Ok(Some(PythonReturn::String(ret)));
-                }
-                if let Ok(ret) = ret.extract::<bool>(py) {
-                    return Ok(Some(PythonReturn::Bool(ret)));
-                }
+                    if let Ok(ret) = ret.extract::<String>(py) {
+                        return Ok(Some(PythonReturn::String(ret)));
+                    }
+                    if let Ok(ret) = ret.extract::<bool>(py) {
+                        return Ok(Some(PythonReturn::Bool(ret)));
+                    }
 
-                Err(anyhow!("unsupported python return value"))
-            })?;
+                    Err(anyhow!("unsupported python return value"))
+                })?;
 
-            match ret {
-                Some(PythonReturn::String(ret)) => {
-                    let seq = parse_key_sequence(&ret, Some(transformer))?;
+                match ret {
+                    Some(PythonReturn::String(ret)) => {
+                        let seq = parse_key_sequence(&ret, Some(&transformer))?;
 
-                    if let Some(next) = next {
                         for action in seq.to_key_actions() {
-                            let _ = next.send(InputEvent::Raw(action.to_input_ev()));
+                            next.send_all(InputEvent::Raw(action.to_input_ev()));
                         }
                     }
-                }
-                Some(PythonReturn::Bool(ret)) if ret => {
-                    if let Some(next) = next {
-                        let _ = next.send(InputEvent::Raw(ev.clone()));
+                    Some(PythonReturn::Bool(ret)) if ret => {
+                        next.send_all(InputEvent::Raw(ev.clone()));
                     }
-                }
-                _ => {}
-            };
-            Ok(())
+                    _ => {}
+                };
+                Ok(())
+            }
+        });
+        if let Err(err) = ret {
+            eprintln!("{err}");
+            std::process::exit(1);
         }
     });
-
-    if let Err(err) = ret {
-        eprintln!("{err}");
-        std::process::exit(1);
-    }
 }

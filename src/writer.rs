@@ -14,21 +14,26 @@ use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 
-use self::subscriber::SubscriberNew;
+struct State {
+    ev_tx: tokio::sync::mpsc::Sender<InputEvent>,
+    prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
+}
 
 #[pyclass]
 pub struct Writer {
-    ev_tx: SubscriberNew,
-    exit_tx: tokio::sync::mpsc::UnboundedSender<()>,
+    pub id: Uuid,
+    pub link: Arc<WriterLink>,
     transformer: Arc<XKBTransformer>,
+    state: Arc<Mutex<State>>,
+    exit_tx: tokio::sync::mpsc::Sender<()>,
     #[cfg(feature = "integration")]
-    ev_rx: tokio::sync::mpsc::UnboundedReceiver<InputEvent>,
+    ev_rx: tokio::sync::mpsc::Receiver<InputEvent>,
 }
 
 #[pymethods]
 impl Writer {
     #[new]
-    #[pyo3(signature = (* * kwargs))]
+    #[pyo3(signature = (**kwargs))]
     pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(py_dict) => py_dict.extract()?,
@@ -109,8 +114,11 @@ impl Writer {
             .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
             .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
-        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel::<InputEvent>();
-        let (exit_tx, mut exit_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+        let id = Uuid::new_v4();
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel::<InputEvent>(255);
+        let (exit_tx, mut exit_rx) = tokio::sync::mpsc::channel::<()>(32);
+        let state = Arc::new(Mutex::new(State { ev_tx, prev: Default::default() }));
+        let link = Arc::new(WriterLink { id, state: state.clone() });
 
         #[cfg(not(feature = "integration"))]
         {
@@ -120,7 +128,10 @@ impl Writer {
             get_runtime().spawn(async move {
                 loop {
                     loop {
-                        let ev = ev_rx.recv().await.unwrap();
+                        let ev = match ev_rx.recv().await {
+                            Some(v) => v,
+                            None => return,
+                        };
 
                         if let Ok(()) = exit_rx.try_recv() {
                             return;
@@ -149,7 +160,9 @@ impl Writer {
         }
 
         let handle = Self {
-            ev_tx,
+            id,
+            state,
+            link,
             exit_tx,
             transformer,
             #[cfg(feature = "integration")]
@@ -164,8 +177,12 @@ impl Writer {
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
 
+        let state = self.state.lock().unwrap();
         for action in actions {
-            let _ = self.ev_tx.send(InputEvent::Raw(action.to_input_ev()));
+            state
+                .ev_tx
+                .try_send(InputEvent::Raw(action.to_input_ev()))
+                .expect(&ApplicationError::TooManyEvents.to_string());
         }
         Ok(())
     }
@@ -184,15 +201,37 @@ impl Writer {
     }
 }
 
-impl Writer {
-    pub fn subscribe(&self) -> SubscriberNew {
-        self.ev_tx.clone()
-    }
-}
-
 impl Drop for Writer {
     fn drop(&mut self) {
         let _ = self.exit_tx.send(());
-        let _ = self.ev_tx.send(InputEvent::Raw(SYN_REPORT.clone()));
+        self.state
+            .lock()
+            .unwrap()
+            .ev_tx
+            .try_send(InputEvent::Raw(SYN_REPORT.clone()))
+            .expect(&ApplicationError::TooManyEvents.to_string());
+    }
+}
+
+#[derive(Clone)]
+pub struct WriterLink {
+    id: Uuid,
+    state: Arc<Mutex<State>>,
+}
+
+impl LinkDst for WriterLink {
+    fn id(&self) -> &Uuid {
+        &self.id
+    }
+    fn link_from(&self, node: Arc<dyn LinkSrc>) -> Result<()> {
+        let mut state = self.state.lock().unwrap();
+        state.prev.insert(*node.id(), node);
+        Ok(())
+    }
+    fn unlink_from(&self, id: &Uuid) -> Result<bool> {
+        Ok(self.state.lock().unwrap().prev.remove(id).is_some())
+    }
+    fn send(&self, ev: InputEvent) {
+        self.state.lock().unwrap().ev_tx.try_send(ev).expect(&ApplicationError::TooManyEvents.to_string());
     }
 }

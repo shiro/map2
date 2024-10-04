@@ -79,12 +79,7 @@ async fn multi_chord() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
         let m = pytests::include_python!();
 
-        reader_send_all(
-            py,
-            m,
-            "reader",
-            &keys("{a down}{b down}{b up}{b down}{a up}{b up}"),
-        );
+        reader_send_all(py, m, "reader", &keys("{a down}{b down}{b up}{b down}{a up}{b up}"));
         sleep(py, 55);
         assert_eq!(writer_read_all(py, m, WRITER), keys("cc"),);
 

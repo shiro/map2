@@ -18,6 +18,8 @@ pub enum ApplicationError {
     InvalidInputType { type_: String },
     #[error("[UNEXPECTED_NON_BUTTON_INPUT] expected only button inputs")]
     NonButton,
+    #[error("can't keep up with event processing, dropping events!")]
+    TooManyEvents,
 }
 
 impl From<ApplicationError> for PyErr {

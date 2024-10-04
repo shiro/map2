@@ -35,16 +35,18 @@ use event_loop::EVENT_LOOP;
 pub use mapper::*;
 pub use python::err_to_py;
 use reader::Reader;
+pub use subscriber::*;
 use writer::Writer;
 
+pub use crate::closure_channel::*;
 use crate::device::virtual_input_device::grab_udev_inputs;
 use crate::error::*;
 use crate::event::InputEvent;
 pub use crate::key_defs::*;
 use crate::key_primitives::*;
-use crate::state::*;
 
 pub mod capabilities;
+pub mod closure_channel;
 pub mod device;
 pub mod encoding;
 pub mod error;
@@ -57,7 +59,6 @@ pub mod key_primitives;
 pub mod logging;
 pub mod parsing;
 pub mod platform;
-pub mod state;
 pub mod subscriber;
 pub mod xkb;
 pub mod xkb_transformer_registry;

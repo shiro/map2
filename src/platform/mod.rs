@@ -17,7 +17,13 @@ pub fn get_platform() -> Platform {
 }
 
 fn platform_is_hyprland() -> bool {
-    Command::new("printenv").arg("HYPRLAND_INSTANCE_SIGNATURE").status().map(|status| status.success()).unwrap_or(false)
+    Command::new("printenv")
+        .arg("HYPRLAND_INSTANCE_SIGNATURE")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 fn platform_is_x11() -> bool {
