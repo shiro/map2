@@ -8,6 +8,7 @@ use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTR
 use crate::*;
 use nom::Slice;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::Mutex;
 
 use ApplicationError::TooManyEvents;
 
@@ -28,8 +29,7 @@ pub struct TextMapper {
     pub id: Uuid,
     pub link: Arc<TextMapperLink>,
     ev_tx: tokio::sync::mpsc::Sender<InputEvent>,
-    control_tx: ClosureChannel<State>,
-    transformer: Arc<XKBTransformer>,
+    state: Arc<Mutex<State>>,
 }
 
 #[pymethods]
@@ -52,33 +52,32 @@ impl TextMapper {
 
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(32);
-        let (control_tx, mut control_rx) = ClosureChannel::<State>::new();
-        let link = Arc::new(TextMapperLink { id, ev_tx: ev_tx.clone(), control_tx: control_tx.clone() });
+        let state = Arc::new(Mutex::new(State { transformer, ..Default::default() }));
+        let link = Arc::new(TextMapperLink { id, ev_tx: ev_tx.clone(), state: state.clone() });
 
-        let _transformer = transformer.clone();
-        get_runtime().spawn(async move {
-            let mut state = State { transformer: _transformer, ..Default::default() };
-            loop {
-                tokio::select! {
-                    Some(ev) = ev_rx.recv() => {
-                        handle(&mut state, ev).await;
+        {
+            let state = state.clone();
+            get_runtime().spawn(async move {
+                loop {
+                    let ev = ev_rx.recv().await;
+                    match ev {
+                        Some(ev) => handle(state.clone(), ev).await,
+                        None => return,
                     }
-                    Some(cb) = control_rx.recv() => {
-                        cb(&mut state);
-                    }
-                };
-            }
-        });
+                }
+            });
+        }
 
-        Ok(Self { id, link, ev_tx, control_tx, transformer })
+        Ok(Self { id, link, ev_tx, state })
     }
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
         if from.len() > 32 {
             return Err(PyRuntimeError::new_err("'from' side cannot be longer than 32 character"));
         }
 
-        let from_seq: Vec<KeyClickActionWithMods> = parse_key_sequence(&from, Some(&self.transformer))
+        let from_seq: Vec<KeyClickActionWithMods> = parse_key_sequence(&from, Some(&state.transformer))
             .map_err(|err| {
                 PyRuntimeError::new_err(format!(
                     "mapping error on the 'from' side:\n{}",
@@ -94,7 +93,7 @@ impl TextMapper {
             .ok_or_else(|| PyRuntimeError::new_err("invalid key sequence"))?;
 
         let to = if to.as_ref(py).is_callable() {
-            RuntimeAction::PythonCallback(Default::default(), to)
+            RuntimeAction::PythonCallback(Default::default(), Arc::new(to))
         } else {
             let to = to.extract::<String>(py).map_err(|err| {
                 PyRuntimeError::new_err(format!(
@@ -102,7 +101,7 @@ impl TextMapper {
                     ApplicationError::InvalidInputType { type_: "String".to_string() }
                 ))
             })?;
-            let to = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
+            let to = parse_key_sequence(&to, Some(&state.transformer)).map_err(|err| {
                 PyRuntimeError::new_err(format!(
                     "mapping error on the 'to' side:\n{}",
                     ApplicationError::KeySequenceParse(err.to_string()),
@@ -115,32 +114,22 @@ impl TextMapper {
             RuntimeAction::ActionSequence(to)
         };
 
-        let ret = self
-            .control_tx
-            .call(Box::new(move |state| {
-                state.mappings.insert(from, to);
-            }))
-            .map_err(err_to_py)?;
+        state.mappings.insert(from, to);
 
         Ok(())
     }
 
-    pub fn snapshot(&self, existing: Option<&TextMapperSnapshot>) -> PyResult<Option<TextMapperSnapshot>> {
-        let ret = self
-            .control_tx
-            .call(Box::new(move |state| {
-                if let Some(existing) = existing {
-                    state.mappings = existing.mappings.clone();
-                    return None;
-                }
-                Some(TextMapperSnapshot { mappings: state.mappings.clone() })
-            }))
-            .map_err(err_to_py)?;
-        Ok(ret)
+    pub fn snapshot(&self, existing: Option<&TextMapperSnapshot>) -> Option<TextMapperSnapshot> {
+        let mut state = self.state.blocking_lock();
+        if let Some(existing) = existing {
+            state.mappings = existing.mappings.clone();
+            return None;
+        }
+        Some(TextMapperSnapshot { mappings: state.mappings.clone() })
     }
 
     pub fn link_to(&mut self, target: &PyAny) -> PyResult<()> {
-        let mut target = node_to_link_dst(target).unwrap();
+        let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.link_from(self.link.clone());
         self.link.link_to(target);
         Ok(())
@@ -153,17 +142,12 @@ impl TextMapper {
         Ok(ret)
     }
 
-    pub fn unlink_to_all(&mut self) -> PyResult<()> {
-        let id = &self.id;
-        self.control_tx
-            .call(Box::new(move |state| {
-                for l in state.next.values_mut() {
-                    l.unlink_from(id);
-                }
-                state.next.clear();
-            }))
-            .map_err(err_to_py)?;
-        Ok(())
+    pub fn unlink_to_all(&mut self) {
+        let mut state = self.state.blocking_lock();
+        for l in state.next.values_mut() {
+            l.unlink_from(&self.id);
+        }
+        state.next.clear();
     }
 
     pub fn unlink_from(&mut self, target: &PyAny) -> PyResult<bool> {
@@ -173,21 +157,22 @@ impl TextMapper {
         Ok(ret)
     }
 
-    pub fn unlink_from_all(&mut self) -> PyResult<()> {
-        let id = &self.id;
-        self.control_tx
-            .call(Box::new(move |state| {
-                for l in state.prev.values_mut() {
-                    l.unlink_to(id);
-                }
-                state.prev.clear();
-            }))
-            .map_err(err_to_py)?;
-        Ok(())
+    pub fn unlink_from_all(&mut self) {
+        let mut state = self.state.blocking_lock();
+        for l in state.prev.values_mut() {
+            l.unlink_to(&self.id);
+        }
+        state.prev.clear();
+    }
+
+    pub fn unlink_all(&mut self) {
+        self.unlink_from_all();
+        self.unlink_to_all();
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
-        let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
+        let mut state = self.state.blocking_lock();
+        let actions = parse_key_sequence(val.as_str(), Some(&state.transformer))
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
         for action in actions {
@@ -197,11 +182,18 @@ impl TextMapper {
     }
 }
 
+impl Drop for TextMapper {
+    fn drop(&mut self) {
+        self.unlink_from_all();
+        self.unlink_to_all();
+    }
+}
+
 #[derive(Clone)]
 pub struct TextMapperLink {
     id: Uuid,
     ev_tx: Sender<InputEvent>,
-    control_tx: ClosureChannel<State>,
+    state: Arc<Mutex<State>>,
 }
 
 impl LinkSrc for TextMapperLink {
@@ -209,13 +201,11 @@ impl LinkSrc for TextMapperLink {
         &self.id
     }
     fn link_to(&self, node: Arc<dyn LinkDst>) -> Result<()> {
-        self.control_tx.call(Box::new(move |state| {
-            state.next.insert(*node.id(), node);
-        }))?;
+        self.state.blocking_lock().next.insert(*node.id(), node);
         Ok(())
     }
     fn unlink_to(&self, id: &Uuid) -> Result<bool> {
-        self.control_tx.call(Box::new(move |state| state.next.remove(id).is_some()))
+        Ok(self.state.blocking_lock().next.remove(id).is_some())
     }
 }
 
@@ -224,16 +214,11 @@ impl LinkDst for TextMapperLink {
         &self.id
     }
     fn link_from(&self, node: Arc<dyn LinkSrc>) -> Result<()> {
-        self.control_tx
-            .call(Box::new(move |state| {
-                state.prev.insert(*node.id(), node);
-            }))
-            .unwrap();
-
+        self.state.blocking_lock().prev.insert(*node.id(), node);
         Ok(())
     }
     fn unlink_from(&self, id: &Uuid) -> Result<bool> {
-        self.control_tx.call(Box::new(move |state| state.prev.remove(id).is_some()))
+        Ok(self.state.blocking_lock().prev.remove(id).is_some())
     }
     fn send(&self, ev: InputEvent) {
         self.ev_tx.try_send(ev).expect(&ApplicationError::TooManyEvents.to_string());
@@ -252,7 +237,9 @@ fn _map(from: &KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> Vec<RuntimeK
     seq
 }
 
-async fn handle(state: &mut State, raw_ev: InputEvent) {
+async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
+    let mut state = _state.lock().await;
+    let mut state = &mut *state;
     if !state.next.is_empty() {
         state.next.send_all(raw_ev.clone());
     }
@@ -341,8 +328,9 @@ async fn handle(state: &mut State, raw_ev: InputEvent) {
                                     None,
                                     ev,
                                     state.transformer.clone(),
-                                    state.next.clone(),
-                                );
+                                    state.next.values().cloned().collect(),
+                                )
+                                .await;
                             }
                             RuntimeAction::NOP => {}
                         }

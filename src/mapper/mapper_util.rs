@@ -19,27 +19,34 @@ pub enum PythonReturn {
     Bool(bool),
 }
 
-pub fn run_python_handler(
-    handler: PyObject,
+pub trait LinkDstState {
+    // fn get_next(&self) -> Vec<Arc<dyn LinkDst>>;
+    // fn get_next(&self) -> Box<dyn Iterator<Item = &Arc<dyn LinkDst>>>;
+    // fn get_next(&self) -> std::iter::;
+}
+
+pub async fn run_python_handler(
+    handler: Arc<PyObject>,
     args: Option<Vec<PythonArgument>>,
     ev: EvdevInputEvent,
     transformer: Arc<XKBTransformer>,
-    next: HashMap<Uuid, Arc<dyn LinkDst>>,
-) {
+    // next: &HashMap<Uuid, Arc<dyn LinkDst>>,
+    next: Vec<Arc<dyn LinkDst>>,
+) -> Result<()> {
     tokio::task::spawn_blocking(move || {
         let ret = Python::with_gil(|py| -> Result<()> {
             let asyncio =
                 py.import("asyncio").expect("python runtime error: failed to import 'asyncio', is it installed?");
 
             let is_async_callback: bool = asyncio
-                .call_method1("iscoroutinefunction", (handler.as_ref(py),))
+                .call_method1("iscoroutinefunction", (handler.deref().as_ref(py),))
                 .expect("python runtime error: 'iscoroutinefunction' lookup failed")
                 .extract()
                 .expect("python runtime error: 'iscoroutinefunction' call failed");
 
             if is_async_callback {
                 // TODO spawn a task here, run cb
-                EVENT_LOOP.lock().unwrap().execute(handler.clone(), args);
+                // EVENT_LOOP.lock().unwrap().execute(&handler, args);
                 Ok(())
             } else {
                 let args = args_to_py(py, args.unwrap_or(vec![]));
@@ -78,5 +85,8 @@ pub fn run_python_handler(
             eprintln!("{err}");
             std::process::exit(1);
         }
-    });
+    })
+    .await?;
+
+    Ok(())
 }

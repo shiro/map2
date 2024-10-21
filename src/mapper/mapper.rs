@@ -8,6 +8,7 @@ use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTR
 use crate::*;
 use futures::executor::block_on;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::Mutex;
 
 use ApplicationError::TooManyEvents;
 
@@ -17,9 +18,9 @@ struct State {
     prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
     next: HashMap<Uuid, Arc<dyn LinkDst>>,
     mappings: Mappings,
-    fallback_handler: Option<PyObject>,
-    relative_handler: Option<PyObject>,
-    absolute_handler: Option<PyObject>,
+    fallback_handler: Option<Arc<PyObject>>,
+    relative_handler: Option<Arc<PyObject>>,
+    absolute_handler: Option<Arc<PyObject>>,
     modifiers: Arc<KeyModifierState>,
 }
 
@@ -28,8 +29,7 @@ pub struct Mapper {
     pub id: Uuid,
     pub link: Arc<MapperLink>,
     ev_tx: tokio::sync::mpsc::Sender<InputEvent>,
-    control_tx: ClosureChannel<State>,
-    transformer: Arc<XKBTransformer>,
+    state: Arc<Mutex<State>>,
 }
 
 #[pymethods]
@@ -52,30 +52,28 @@ impl Mapper {
 
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(32);
-        let (control_tx, mut control_rx) = ClosureChannel::<State>::new();
-        let link = Arc::new(MapperLink { id, ev_tx: ev_tx.clone(), control_tx: control_tx.clone() });
+        let state = Arc::new(Mutex::new(State { transformer, ..Default::default() }));
+        let link = Arc::new(MapperLink { id, ev_tx: ev_tx.clone(), state: state.clone() });
 
-        let _transformer = transformer.clone();
-        get_runtime().spawn(async move {
-            let mut state = State { transformer: _transformer, ..Default::default() };
-            loop {
-                tokio::select! {
-                    Some(ev) = ev_rx.recv() => {
-                        handle(&mut state, ev).await;
+        {
+            let state = state.clone();
+            get_runtime().spawn(async move {
+                loop {
+                    let ev = ev_rx.recv().await;
+                    match ev {
+                        Some(ev) => handle(state.clone(), ev).await,
+                        None => return,
                     }
-                    Some(cb) = control_rx.recv() => {
-                        cb(&mut state);
-                    }
-                    else => {}
-                };
-            }
-        });
+                }
+            });
+        }
 
-        Ok(Self { id, link, ev_tx, control_tx, transformer })
+        Ok(Self { id, link, ev_tx, state })
     }
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer)).map_err(|err| {
+        let mut state = self.state.blocking_lock();
+        let from = parse_key_action_with_mods(&from, Some(&state.transformer)).map_err(|err| {
             PyRuntimeError::new_err(format!(
                 "mapping error on the 'from' side:\n{}",
                 ApplicationError::KeyParse(err.to_string()),
@@ -83,13 +81,14 @@ impl Mapper {
         })?;
 
         if let Ok(to) = to.extract::<String>(py) {
-            let to = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
+            let to = parse_key_sequence(&to, Some(&state.transformer)).map_err(|err| {
                 PyRuntimeError::new_err(format!(
                     "mapping error on the 'to' side:\n{}",
                     ApplicationError::KeySequenceParse(err.to_string()),
                 ))
             })?;
 
+            drop(state);
             self._map_key(from, to)?;
             return Ok(());
         }
@@ -97,6 +96,7 @@ impl Mapper {
         let is_callable = to.as_ref(py).is_callable();
 
         if is_callable {
+            drop(state);
             self._map_callback(from, to)?;
             return Ok(());
         }
@@ -105,109 +105,98 @@ impl Mapper {
     }
 
     pub fn map_key(&mut self, from: String, to: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer)).map_err(|err| {
+        let mut state = self.state.blocking_lock();
+        let from = parse_key_action_with_mods(&from, Some(&state.transformer)).map_err(|err| {
             PyRuntimeError::new_err(format!(
                 "mapping error on the 'from' side:\n{}",
                 ApplicationError::KeyParse(err.to_string()),
             ))
         })?;
 
-        let to = parse_key_action_with_mods(&to, Some(&self.transformer)).map_err(|err| {
+        let to = parse_key_action_with_mods(&to, Some(&state.transformer)).map_err(|err| {
             PyRuntimeError::new_err(format!(
                 "mapping error on the 'to' side:\n{}",
                 ApplicationError::KeyParse(err.to_string()),
             ))
         })?;
 
+        drop(state);
         self._map_key(from, vec![to])?;
         Ok(())
     }
 
     pub fn map_fallback(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
         if !handler.as_ref(py).is_callable() {
             return Err(ApplicationError::NotCallable.into());
         }
-        self.control_tx.call(Box::new(move |state| {
-            state.fallback_handler = Some(handler);
-        }));
+        state.fallback_handler = Some(Arc::new(handler));
         Ok(())
     }
 
     pub fn map_relative(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
         if !handler.as_ref(py).is_callable() {
             return Err(ApplicationError::NotCallable.into());
         }
-        self.control_tx.call(Box::new(move |state| {
-            state.relative_handler = Some(handler);
-        }));
+        state.relative_handler = Some(Arc::new(handler));
         Ok(())
     }
 
     pub fn map_absolute(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
         if !handler.as_ref(py).is_callable() {
             return Err(ApplicationError::NotCallable.into());
         }
-        self.control_tx.call(Box::new(move |state| {
-            state.absolute_handler = Some(handler);
-        }));
+        state.absolute_handler = Some(Arc::new(handler));
         Ok(())
     }
 
     pub fn nop(&mut self, from: String) -> PyResult<()> {
-        let from = parse_key_action_with_mods(&from, Some(&self.transformer)).map_err(|err| {
+        let mut state = self.state.blocking_lock();
+        let from = parse_key_action_with_mods(&from, Some(&state.transformer)).map_err(|err| {
             PyRuntimeError::new_err(format!(
                 "mapping error on the 'from' side:\n{}",
                 ApplicationError::KeyParse(err.to_string()),
             ))
         })?;
 
-        self.control_tx
-            .call(Box::new(move |state| {
-                match from {
-                    ParsedKeyAction::KeyAction(from) => {
-                        state.mappings.insert(from, RuntimeAction::NOP);
-                    }
-                    ParsedKeyAction::KeyClickAction(from) => {
-                        for value in 0..=2 {
-                            let from = KeyActionWithMods::new(from.key, value, from.modifiers);
-                            state.mappings.insert(from, RuntimeAction::NOP);
-                        }
-                    }
-                    ParsedKeyAction::Action(_) => {
-                        return Err(ApplicationError::NonButton);
-                    }
+        match from {
+            ParsedKeyAction::KeyAction(from) => {
+                state.mappings.insert(from, RuntimeAction::NOP);
+            }
+            ParsedKeyAction::KeyClickAction(from) => {
+                for value in 0..=2 {
+                    let from = KeyActionWithMods::new(from.key, value, from.modifiers);
+                    state.mappings.insert(from, RuntimeAction::NOP);
                 }
-                Ok(())
-            }))
-            .map_err(err_to_py)?;
-
+            }
+            ParsedKeyAction::Action(_) => {
+                return Err(ApplicationError::NonButton.into_py());
+            }
+        }
         Ok(())
     }
 
     pub fn snapshot(&self, py: Python, existing: Option<&KeyMapperSnapshot>) -> PyResult<Option<KeyMapperSnapshot>> {
-        let ret = self
-            .control_tx
-            .call(Box::new(move |state| {
-                if let Some(existing) = existing {
-                    state.mappings = existing.mappings.clone();
-                    state.fallback_handler = existing.fallback_handler.clone();
-                    state.relative_handler = existing.relative_handler.clone();
-                    state.absolute_handler = existing.absolute_handler.clone();
-                    return None;
-                }
-                Some(KeyMapperSnapshot {
-                    mappings: state.mappings.clone(),
-                    fallback_handler: state.fallback_handler.clone(),
-                    relative_handler: state.relative_handler.clone(),
-                    absolute_handler: state.absolute_handler.clone(),
-                })
-            }))
-            .map_err(err_to_py)?;
-        Ok(ret)
+        let mut state = self.state.blocking_lock();
+        if let Some(existing) = existing {
+            state.mappings = existing.mappings.clone();
+            state.fallback_handler = existing.fallback_handler.clone();
+            state.relative_handler = existing.relative_handler.clone();
+            state.absolute_handler = existing.absolute_handler.clone();
+            return Ok(None);
+        }
+        Ok(Some(KeyMapperSnapshot {
+            mappings: state.mappings.clone(),
+            fallback_handler: state.fallback_handler.clone(),
+            relative_handler: state.relative_handler.clone(),
+            absolute_handler: state.absolute_handler.clone(),
+        }))
     }
 
     pub fn link_to(&mut self, target: &PyAny) -> PyResult<()> {
-        let mut target = node_to_link_dst(target).unwrap();
+        let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.link_from(self.link.clone());
         self.link.link_to(target);
         Ok(())
@@ -220,17 +209,12 @@ impl Mapper {
         Ok(ret)
     }
 
-    pub fn unlink_to_all(&mut self) -> PyResult<()> {
-        let id = &self.id;
-        self.control_tx
-            .call(Box::new(move |state| {
-                for l in state.next.values_mut() {
-                    l.unlink_from(id);
-                }
-                state.next.clear();
-            }))
-            .map_err(err_to_py)?;
-        Ok(())
+    pub fn unlink_to_all(&mut self) {
+        let mut state = self.state.blocking_lock();
+        for l in state.next.values_mut() {
+            l.unlink_from(&self.id);
+        }
+        state.next.clear();
     }
 
     pub fn unlink_from(&mut self, target: &PyAny) -> PyResult<bool> {
@@ -240,21 +224,22 @@ impl Mapper {
         Ok(ret)
     }
 
-    pub fn unlink_from_all(&mut self) -> PyResult<()> {
-        let id = &self.id;
-        self.control_tx
-            .call(Box::new(move |state| {
-                for l in state.prev.values_mut() {
-                    l.unlink_to(id);
-                }
-                state.prev.clear();
-            }))
-            .map_err(err_to_py)?;
-        Ok(())
+    pub fn unlink_from_all(&mut self) {
+        let mut state = self.state.blocking_lock();
+        for l in state.prev.values_mut() {
+            l.unlink_to(&self.id);
+        }
+        state.prev.clear();
+    }
+
+    pub fn unlink_all(&mut self) {
+        self.unlink_from_all();
+        self.unlink_to_all();
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
-        let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
+        let mut state = self.state.blocking_lock();
+        let actions = parse_key_sequence(val.as_str(), Some(&state.transformer))
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
         for action in actions {
@@ -266,102 +251,103 @@ impl Mapper {
 
 impl Mapper {
     fn _map_callback(&mut self, from: ParsedKeyAction, to: PyObject) -> PyResult<()> {
-        self.control_tx
-            .call(Box::new(move |state| {
-                match from {
-                    ParsedKeyAction::KeyAction(from) => {
-                        state.mappings.insert(from, RuntimeAction::PythonCallback(from.modifiers, to));
-                    }
-                    ParsedKeyAction::KeyClickAction(from) => {
-                        state.mappings.insert(from.to_key_action(1), RuntimeAction::PythonCallback(from.modifiers, to));
-                        state.mappings.insert(from.to_key_action(0), RuntimeAction::NOP);
-                        state.mappings.insert(from.to_key_action(2), RuntimeAction::NOP);
-                    }
-                    ParsedKeyAction::Action(_) => {
-                        return Err(ApplicationError::NonButton.into());
-                    }
-                }
+        let mut state = self.state.blocking_lock();
+        let to = Arc::new(to);
+        match from {
+            ParsedKeyAction::KeyAction(from) => {
+                state.mappings.insert(from, RuntimeAction::PythonCallback(from.modifiers, to));
+            }
+            ParsedKeyAction::KeyClickAction(from) => {
+                state.mappings.insert(from.to_key_action(1), RuntimeAction::PythonCallback(from.modifiers, to));
+                state.mappings.insert(from.to_key_action(0), RuntimeAction::NOP);
+                state.mappings.insert(from.to_key_action(2), RuntimeAction::NOP);
+            }
+            ParsedKeyAction::Action(_) => {
+                return Err(ApplicationError::NonButton.into());
+            }
+        }
 
-                Ok(())
-            }))
-            .map_err(err_to_py)?
+        Ok(())
     }
 
     fn _map_key(&mut self, from: ParsedKeyAction, mut to: Vec<ParsedKeyAction>) -> PyResult<()> {
-        self.control_tx
-            .call(Box::new(move |state| {
-                match from {
-                    ParsedKeyAction::KeyAction(from) => {
-                        if to.len() == 1 {
-                            let to = to.remove(0);
-                            match to {
-                                // key action to click
-                                ParsedKeyAction::KeyClickAction(to) => {
-                                    let mapping = map_action_to_click(&from, &to);
-                                    state.mappings.insert(mapping.0, mapping.1);
-                                }
-                                // key action to key action
-                                ParsedKeyAction::KeyAction(to) => {
-                                    let mapping = map_action_to_action(&from, &to);
-                                    state.mappings.insert(mapping.0, mapping.1);
-                                }
-                                // key action to action
-                                ParsedKeyAction::Action(to) => {
-                                    let mapping =
-                                        map_action_to_action(&from, &to.to_key_action_with_mods(Default::default()));
-                                    state.mappings.insert(mapping.0, mapping.1);
-                                }
-                            }
-                            return Ok(());
+        let mut state = self.state.blocking_lock();
+        match from {
+            ParsedKeyAction::KeyAction(from) => {
+                if to.len() == 1 {
+                    let to = to.remove(0);
+                    match to {
+                        // key action to click
+                        ParsedKeyAction::KeyClickAction(to) => {
+                            let mapping = map_action_to_click(&from, &to);
+                            state.mappings.insert(mapping.0, mapping.1);
                         }
-
-                        // action to seq
-                        let mapping = map_action_to_seq(from, to);
-                        state.mappings.insert(mapping.0, mapping.1);
-                    }
-                    ParsedKeyAction::KeyClickAction(from) => {
-                        if to.len() == 1 {
-                            match to.remove(0) {
-                                // click to click
-                                ParsedKeyAction::KeyClickAction(to) => {
-                                    let mappings = map_click_to_click(&from, &to);
-
-                                    IntoIterator::into_iter(mappings).for_each(|(from, to)| {
-                                        state.mappings.insert(from, to);
-                                    });
-                                }
-                                // click to key action
-                                ParsedKeyAction::KeyAction(to) => {
-                                    let mappings = map_click_to_action(&from, &to);
-                                    IntoIterator::into_iter(mappings).for_each(|(from, to)| {
-                                        state.mappings.insert(from, to);
-                                    });
-                                }
-                                // click to action
-                                ParsedKeyAction::Action(to) => {
-                                    let to = to.to_key_action_with_mods(Default::default());
-                                    let mappings = map_click_to_action(&from, &to);
-                                    IntoIterator::into_iter(mappings).for_each(|(from, to)| {
-                                        state.mappings.insert(from, to);
-                                    });
-                                }
-                            };
-                            return Ok(());
+                        // key action to key action
+                        ParsedKeyAction::KeyAction(to) => {
+                            let mapping = map_action_to_action(&from, &to);
+                            state.mappings.insert(mapping.0, mapping.1);
                         }
-
-                        // click to seq
-                        let mappings = map_click_to_seq(from, to);
-                        IntoIterator::into_iter(mappings).for_each(|(from, to)| {
-                            state.mappings.insert(from, to);
-                        });
+                        // key action to action
+                        ParsedKeyAction::Action(to) => {
+                            let mapping = map_action_to_action(&from, &to.to_key_action_with_mods(Default::default()));
+                            state.mappings.insert(mapping.0, mapping.1);
+                        }
                     }
-                    ParsedKeyAction::Action(_) => {
-                        return Err(ApplicationError::NonButton.into());
-                    }
+                    return Ok(());
                 }
-                Ok(())
-            }))
-            .map_err(err_to_py)?
+
+                // action to seq
+                let mapping = map_action_to_seq(from, to);
+                state.mappings.insert(mapping.0, mapping.1);
+            }
+            ParsedKeyAction::KeyClickAction(from) => {
+                if to.len() == 1 {
+                    match to.remove(0) {
+                        // click to click
+                        ParsedKeyAction::KeyClickAction(to) => {
+                            let mappings = map_click_to_click(&from, &to);
+
+                            IntoIterator::into_iter(mappings).for_each(|(from, to)| {
+                                state.mappings.insert(from, to);
+                            });
+                        }
+                        // click to key action
+                        ParsedKeyAction::KeyAction(to) => {
+                            let mappings = map_click_to_action(&from, &to);
+                            IntoIterator::into_iter(mappings).for_each(|(from, to)| {
+                                state.mappings.insert(from, to);
+                            });
+                        }
+                        // click to action
+                        ParsedKeyAction::Action(to) => {
+                            let to = to.to_key_action_with_mods(Default::default());
+                            let mappings = map_click_to_action(&from, &to);
+                            IntoIterator::into_iter(mappings).for_each(|(from, to)| {
+                                state.mappings.insert(from, to);
+                            });
+                        }
+                    };
+                    return Ok(());
+                }
+
+                // click to seq
+                let mappings = map_click_to_seq(from, to);
+                IntoIterator::into_iter(mappings).for_each(|(from, to)| {
+                    state.mappings.insert(from, to);
+                });
+            }
+            ParsedKeyAction::Action(_) => {
+                return Err(ApplicationError::NonButton.into());
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Drop for Mapper {
+    fn drop(&mut self) {
+        self.unlink_from_all();
+        self.unlink_to_all();
     }
 }
 
@@ -369,7 +355,7 @@ impl Mapper {
 pub struct MapperLink {
     id: Uuid,
     ev_tx: Sender<InputEvent>,
-    control_tx: ClosureChannel<State>,
+    state: Arc<Mutex<State>>,
 }
 
 impl LinkSrc for MapperLink {
@@ -377,13 +363,11 @@ impl LinkSrc for MapperLink {
         &self.id
     }
     fn link_to(&self, node: Arc<dyn LinkDst>) -> Result<()> {
-        self.control_tx.call(Box::new(move |state| {
-            state.next.insert(*node.id(), node);
-        }))?;
+        self.state.blocking_lock().next.insert(*node.id(), node);
         Ok(())
     }
     fn unlink_to(&self, id: &Uuid) -> Result<bool> {
-        self.control_tx.call(Box::new(move |state| state.next.remove(id).is_some()))
+        Ok(self.state.blocking_lock().next.remove(id).is_some())
     }
 }
 
@@ -392,16 +376,11 @@ impl LinkDst for MapperLink {
         &self.id
     }
     fn link_from(&self, node: Arc<dyn LinkSrc>) -> Result<()> {
-        self.control_tx
-            .call(Box::new(move |state| {
-                state.prev.insert(*node.id(), node);
-            }))
-            .unwrap();
-
+        self.state.blocking_lock().prev.insert(*node.id(), node);
         Ok(())
     }
     fn unlink_from(&self, id: &Uuid) -> Result<bool> {
-        self.control_tx.call(Box::new(move |state| state.prev.remove(id).is_some()))
+        Ok(self.state.blocking_lock().prev.remove(id).is_some())
     }
     fn send(&self, ev: InputEvent) {
         self.ev_tx.try_send(ev).expect(&ApplicationError::TooManyEvents.to_string());
@@ -411,12 +390,13 @@ impl LinkDst for MapperLink {
 #[pyclass]
 pub struct KeyMapperSnapshot {
     mappings: Mappings,
-    fallback_handler: Option<PyObject>,
-    relative_handler: Option<PyObject>,
-    absolute_handler: Option<PyObject>,
+    fallback_handler: Option<Arc<PyObject>>,
+    relative_handler: Option<Arc<PyObject>>,
+    absolute_handler: Option<Arc<PyObject>>,
 }
 
-async fn handle(state: &mut State, raw_ev: InputEvent) {
+async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
+    let mut state = _state.lock().await;
     let ev = match &raw_ev {
         InputEvent::Raw(ev) => ev,
     };
@@ -471,7 +451,14 @@ async fn handle(state: &mut State, raw_ev: InputEvent) {
                         let ev = match raw_ev {
                             InputEvent::Raw(ev) => ev,
                         };
-                        run_python_handler(handler.clone(), None, ev, state.transformer.clone(), state.next.clone());
+                        run_python_handler(
+                            handler.clone(),
+                            None,
+                            ev,
+                            state.transformer.clone(),
+                            state.next.values().cloned().collect(),
+                        )
+                        .await;
                     }
                     RuntimeAction::NOP => {}
                 }
@@ -505,7 +492,14 @@ async fn handle(state: &mut State, raw_ev: InputEvent) {
                 let ev = match raw_ev {
                     InputEvent::Raw(ev) => ev,
                 };
-                run_python_handler(handler.clone(), Some(args), ev, state.transformer.clone(), state.next.clone());
+                run_python_handler(
+                    handler.clone(),
+                    Some(args),
+                    ev,
+                    state.transformer.clone(),
+                    state.next.values().cloned().collect(),
+                )
+                .await;
                 return;
             }
         }
@@ -521,13 +515,21 @@ async fn handle(state: &mut State, raw_ev: InputEvent) {
             if let Some(handler) = handler.as_ref() {
                 let name = format!("{key:?}");
                 // remove prefix REL_ / ABS_
-                let name = name[4..name.len()].to_string();
+                // let name = name[5..name.len() - 1].to_string();
+                let name = name[1..name.len() - 1].to_lowercase();
                 let args = vec![PythonArgument::String(name), PythonArgument::Number(*value)];
                 drop(ev);
                 let ev = match raw_ev {
                     InputEvent::Raw(ev) => ev,
                 };
-                run_python_handler(handler.clone(), Some(args), ev, state.transformer.clone(), state.next.clone());
+                run_python_handler(
+                    handler.clone(),
+                    Some(args),
+                    ev,
+                    state.transformer.clone(),
+                    state.next.values().cloned().collect(),
+                )
+                .await;
                 return;
             }
         }

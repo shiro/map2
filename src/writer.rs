@@ -172,6 +172,25 @@ impl Writer {
         Ok(handle)
     }
 
+    pub fn unlink_from(&mut self, target: &PyAny) -> PyResult<bool> {
+        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
+        target.unlink_to(&self.id);
+        let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;
+        Ok(ret)
+    }
+
+    pub fn unlink_from_all(&mut self) {
+        let mut state = self.state.lock().unwrap();
+        for l in state.prev.values_mut() {
+            l.unlink_to(&self.id);
+        }
+        state.prev.clear();
+    }
+
+    pub fn unlink_all(&mut self) {
+        self.unlink_from_all();
+    }
+
     pub fn send(&mut self, val: String) -> PyResult<()> {
         let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?

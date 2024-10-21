@@ -12,7 +12,7 @@ pub enum RuntimeKeyAction {
 pub enum RuntimeAction {
     ActionSequence(Vec<RuntimeKeyAction>),
     // flags are used to release modifiers in the trigger
-    PythonCallback(KeyModifierFlags, PyObject),
+    PythonCallback(KeyModifierFlags, Arc<PyObject>),
     NOP,
 }
 

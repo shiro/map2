@@ -60,3 +60,15 @@ impl SubscriberHashmapExt for HashMap<Uuid, Arc<dyn LinkDst>> {
         });
     }
 }
+
+pub trait SubscriberVecExt {
+    fn send_all(&self, ev: InputEvent);
+}
+
+impl SubscriberVecExt for Vec<Arc<dyn LinkDst>> {
+    fn send_all(&self, ev: InputEvent) {
+        self.iter().for_each(|link| {
+            link.send(ev.clone());
+        });
+    }
+}

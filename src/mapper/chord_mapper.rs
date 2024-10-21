@@ -7,6 +7,7 @@ use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTR
 use crate::*;
 use nom::Slice;
 use tokio::sync::mpsc::Sender;
+use tokio::sync::Mutex;
 
 use ApplicationError::TooManyEvents;
 type Mappings = HashMap<Vec<Key>, RuntimeAction>;
@@ -30,8 +31,7 @@ pub struct ChordMapper {
     pub id: Uuid,
     pub link: Arc<ChordMapperLink>,
     ev_tx: tokio::sync::mpsc::Sender<InputEvent>,
-    control_tx: ClosureChannel<State>,
-    transformer: Arc<XKBTransformer>,
+    state: Arc<Mutex<State>>,
 }
 
 #[pymethods]
@@ -54,30 +54,27 @@ impl ChordMapper {
 
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(32);
-        let (control_tx, mut control_rx) = ClosureChannel::<State>::new();
-        let link = Arc::new(ChordMapperLink { id, ev_tx: ev_tx.clone(), control_tx: control_tx.clone() });
+        let state = Arc::new(Mutex::new(State { transformer, ..Default::default() }));
+        let link = Arc::new(ChordMapperLink { id, ev_tx: ev_tx.clone(), state: state.clone() });
 
-        let _transformer = transformer.clone();
-        let _control_tx = control_tx.clone();
-        get_runtime().spawn(async move {
-            let mut state = State { transformer: _transformer, ..Default::default() };
-            loop {
-                tokio::select! {
-                    Some(ev) = ev_rx.recv() => {
-                        handle(&mut state, ev, &_control_tx);
+        {
+            let state = state.clone();
+            get_runtime().spawn(async move {
+                loop {
+                    let ev = ev_rx.recv().await;
+                    match ev {
+                        Some(ev) => handle(state.clone(), ev).await,
+                        None => return,
                     }
-                    Some(cb) = control_rx.recv() => {
-                        cb(&mut state);
-                    }
-                    else => {}
-                };
-            }
-        });
+                }
+            });
+        }
 
-        Ok(Self { id, link, ev_tx, control_tx, transformer })
+        Ok(Self { id, link, ev_tx, state })
     }
 
     pub fn map(&mut self, py: Python, from: Vec<String>, to: PyObject) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
         // if from.len() > 32 {
         //     return Err(PyRuntimeError::new_err(
         //         "'from' side cannot be longer than 32 character",
@@ -85,7 +82,7 @@ impl ChordMapper {
         // }
 
         let mut from_parsed =
-            from.into_iter().map(|x| parse_key(&x, Some(&self.transformer))).collect::<Result<Vec<_>>>().map_err(
+            from.into_iter().map(|x| parse_key(&x, Some(&state.transformer))).collect::<Result<Vec<_>>>().map_err(
                 |err| {
                     PyRuntimeError::new_err(format!(
                         "mapping error on the 'from' side:\n{}",
@@ -95,7 +92,7 @@ impl ChordMapper {
             )?;
 
         let to = if to.as_ref(py).is_callable() {
-            RuntimeAction::PythonCallback(Default::default(), to)
+            RuntimeAction::PythonCallback(Default::default(), Arc::new(to))
         } else {
             let to = to.extract::<String>(py).map_err(|err| {
                 PyRuntimeError::new_err(format!(
@@ -103,7 +100,7 @@ impl ChordMapper {
                     ApplicationError::InvalidInputType { type_: "String".to_string() }
                 ))
             })?;
-            let to = parse_key_sequence(&to, Some(&self.transformer)).map_err(|err| {
+            let to = parse_key_sequence(&to, Some(&state.transformer)).map_err(|err| {
                 PyRuntimeError::new_err(format!(
                     "mapping error on the 'to' side:\n{}",
                     ApplicationError::KeySequenceParse(err.to_string()),
@@ -117,35 +114,28 @@ impl ChordMapper {
 
         let mut from_parsed = from_parsed.clone();
 
-        self.control_tx.call(Box::new(move |state| {
-            // mark chorded keys
-            state.chorded_keys.extend(from_parsed.iter().cloned());
+        // mark chorded keys
+        state.chorded_keys.extend(from_parsed.iter().cloned());
 
-            // insert all combinations
-            state.mappings.insert(from_parsed.clone(), to.clone());
-            from_parsed.reverse();
-            state.mappings.insert(from_parsed, to);
-        }));
+        // insert all combinations
+        state.mappings.insert(from_parsed.clone(), to.clone());
+        from_parsed.reverse();
+        state.mappings.insert(from_parsed, to);
 
         Ok(())
     }
 
     pub fn snapshot(&self, existing: Option<&ChordMapperSnapshot>) -> PyResult<Option<ChordMapperSnapshot>> {
-        let ret = self
-            .control_tx
-            .call(Box::new(move |state| {
-                if let Some(existing) = existing {
-                    state.mappings = existing.mappings.clone();
-                    state.chorded_keys = state.mappings.keys().fold(HashSet::new(), |mut acc, e| {
-                        acc.extend(e.iter().cloned());
-                        acc
-                    });
-                    return None;
-                }
-                Some(ChordMapperSnapshot { mappings: state.mappings.clone() })
-            }))
-            .map_err(err_to_py)?;
-        Ok(ret)
+        let mut state = self.state.blocking_lock();
+        if let Some(existing) = existing {
+            state.mappings = existing.mappings.clone();
+            state.chorded_keys = state.mappings.keys().fold(HashSet::new(), |mut acc, e| {
+                acc.extend(e.iter().cloned());
+                acc
+            });
+            return Ok(None);
+        }
+        Ok(Some(ChordMapperSnapshot { mappings: state.mappings.clone() }))
     }
 
     pub fn link_to(&mut self, target: &PyAny) -> PyResult<()> {
@@ -162,17 +152,12 @@ impl ChordMapper {
         Ok(ret)
     }
 
-    pub fn unlink_to_all(&mut self) -> PyResult<()> {
-        let id = &self.id;
-        self.control_tx
-            .call(Box::new(move |state| {
-                for l in state.next.values_mut() {
-                    l.unlink_from(id);
-                }
-                state.next.clear();
-            }))
-            .map_err(err_to_py)?;
-        Ok(())
+    pub fn unlink_to_all(&mut self) {
+        let mut state = self.state.blocking_lock();
+        for l in state.next.values_mut() {
+            l.unlink_from(&self.id);
+        }
+        state.next.clear();
     }
 
     pub fn unlink_from(&mut self, target: &PyAny) -> PyResult<bool> {
@@ -182,21 +167,21 @@ impl ChordMapper {
         Ok(ret)
     }
 
-    pub fn unlink_from_all(&mut self) -> PyResult<()> {
-        let id = &self.id;
-        self.control_tx
-            .call(Box::new(move |state| {
-                for l in state.prev.values_mut() {
-                    l.unlink_to(id);
-                }
-                state.prev.clear();
-            }))
-            .map_err(err_to_py)?;
-        Ok(())
+    pub fn unlink_from_all(&mut self) {
+        let mut state = self.state.blocking_lock();
+        for l in state.prev.values_mut() {
+            l.unlink_to(&self.id);
+        }
+        state.prev.clear();
+    }
+
+    pub fn unlink_all(&mut self) {
+        self.unlink_from_all();
+        self.unlink_to_all();
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
-        let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
+        let actions = parse_key_sequence(val.as_str(), Some(&self.state.blocking_lock().transformer))
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
         for action in actions {
@@ -206,11 +191,18 @@ impl ChordMapper {
     }
 }
 
+impl Drop for ChordMapper {
+    fn drop(&mut self) {
+        self.unlink_from_all();
+        self.unlink_to_all();
+    }
+}
+
 #[derive(Clone)]
 pub struct ChordMapperLink {
     id: Uuid,
     ev_tx: Sender<InputEvent>,
-    control_tx: ClosureChannel<State>,
+    state: Arc<Mutex<State>>,
 }
 
 impl LinkSrc for ChordMapperLink {
@@ -218,13 +210,11 @@ impl LinkSrc for ChordMapperLink {
         &self.id
     }
     fn link_to(&self, node: Arc<dyn LinkDst>) -> Result<()> {
-        self.control_tx.call(Box::new(move |state| {
-            state.next.insert(*node.id(), node);
-        }))?;
+        self.state.blocking_lock().next.insert(*node.id(), node);
         Ok(())
     }
     fn unlink_to(&self, id: &Uuid) -> Result<bool> {
-        self.control_tx.call(Box::new(move |state| state.next.remove(id).is_some()))
+        Ok(self.state.blocking_lock().next.remove(id).is_some())
     }
 }
 
@@ -233,16 +223,11 @@ impl LinkDst for ChordMapperLink {
         &self.id
     }
     fn link_from(&self, node: Arc<dyn LinkSrc>) -> Result<()> {
-        self.control_tx
-            .call(Box::new(move |state| {
-                state.prev.insert(*node.id(), node);
-            }))
-            .unwrap();
-
+        self.state.blocking_lock().prev.insert(*node.id(), node);
         Ok(())
     }
     fn unlink_from(&self, id: &Uuid) -> Result<bool> {
-        self.control_tx.call(Box::new(move |state| state.prev.remove(id).is_some()))
+        Ok(self.state.blocking_lock().prev.remove(id).is_some())
     }
     fn send(&self, ev: InputEvent) {
         self.ev_tx.try_send(ev).expect(&ApplicationError::TooManyEvents.to_string());
@@ -255,7 +240,9 @@ pub struct ChordMapperSnapshot {
     mappings: Mappings,
 }
 
-fn handle(state: &mut State, raw_ev: InputEvent, control_tx: &ClosureChannel<State>) {
+async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
+    let mut state = _state.lock().await;
+
     let ev = match &raw_ev {
         InputEvent::Raw(ev) => ev,
     };
@@ -277,16 +264,13 @@ fn handle(state: &mut State, raw_ev: InputEvent, control_tx: &ClosureChannel<Sta
                         state.stack.push(_key.clone());
 
                         if state.stack.len() == 2 {
-                            handle_cb(state, raw_ev);
+                            drop(state);
+                            handle_cb(_state.clone(), raw_ev).await;
                         } else {
-                            let control_tx = control_tx.clone();
+                            let _state = _state.clone();
                             state.interval = Some(tokio::spawn(async move {
                                 tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                                control_tx
-                                    .call_async(Box::new(move |state| {
-                                        handle_cb(state, raw_ev);
-                                    }))
-                                    .await;
+                                handle_cb(_state.clone(), raw_ev).await;
                             }));
                         }
                     } else {
@@ -359,7 +343,9 @@ fn handle(state: &mut State, raw_ev: InputEvent, control_tx: &ClosureChannel<Sta
 }
 
 // fired after the chord timeout has passed, submits the keys held on the stack
-fn handle_cb(state: &mut State, raw_ev: InputEvent) {
+async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
+    let mut state = _state.lock().await;
+    let state = &mut *state;
     let ev = match raw_ev {
         InputEvent::Raw(ev) => ev,
     };
@@ -406,7 +392,14 @@ fn handle_cb(state: &mut State, raw_ev: InputEvent) {
                     }
                 }
 
-                run_python_handler(handler.clone(), None, ev, state.transformer.clone(), state.next.clone());
+                run_python_handler(
+                    handler.clone(),
+                    None,
+                    ev.clone(),
+                    state.transformer.clone(),
+                    state.next.values().cloned().collect(),
+                )
+                .await;
             }
             RuntimeAction::NOP => {}
         }

@@ -105,6 +105,10 @@ impl Reader {
         state.next.clear();
     }
 
+    pub fn unlink_all(&mut self) {
+        self.unlink_to_all();
+    }
+
     pub fn send(&mut self, val: String) -> PyResult<()> {
         let actions = parse_key_sequence(val.as_str(), Some(&self.transformer))
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
@@ -122,14 +126,6 @@ impl Reader {
         let ev: EvdevInputEvent = serde_json::from_str(&ev).unwrap();
         let _ = self.state.lock().unwrap().next.send_all(InputEvent::Raw(ev));
         Ok(())
-    }
-
-    pub fn unlink_all(&mut self) {
-        let mut state = self.state.lock().unwrap();
-        for l in state.next.values_mut() {
-            l.unlink_from(&self.id);
-        }
-        state.next.clear();
     }
 }
 
