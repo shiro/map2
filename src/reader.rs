@@ -1,4 +1,5 @@
 use ::oneshot;
+use device::virtual_input_device::DeviceMatcher;
 use std::hash::{Hash, Hasher};
 
 use crate::event::InputEvent;
@@ -29,20 +30,32 @@ pub struct Reader {
 impl Reader {
     #[new]
     #[pyo3(signature = (* * kwargs))]
-    pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
+    pub fn new(py: Python, kwargs: Option<&PyDict>) -> PyResult<Self> {
         let options: HashMap<&str, &PyAny> = match kwargs {
             Some(options) => options.extract()?,
             None => HashMap::new(),
         };
 
-        let patterns: Vec<&str> = match options.get("patterns") {
-            Some(patterns) => {
-                patterns.extract().map_err(|_| PyRuntimeError::new_err("'patterns' must be of type 'string[]?'"))?
+        let mut filters = vec![];
+
+        if let Some(v) = options.get("filters") {
+            if let Ok(v) = v.extract::<Vec<PyObject>>() {
+                for v in v.into_iter() {
+                    let filter = if let Ok(value) = v.extract::<String>(py) {
+                        DeviceMatcher::new().tap_mut(|v| {
+                            v.insert("path".to_string(), value);
+                        })
+                    } else if let Ok(matcher) = v.extract::<HashMap<String, String>>(py) {
+                        matcher
+                    } else {
+                        return Err(PyRuntimeError::new_err("'filters' must be of type 'string[]?'"));
+                    };
+                    filters.push(filter);
+                }
+            } else {
+                return Err(PyRuntimeError::new_err("'patterns' must be of type 'string[]?'"));
             }
-            None => {
-                vec![]
-            }
-        };
+        }
 
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());
         let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
@@ -60,13 +73,14 @@ impl Reader {
         let link = Arc::new(ReaderLink { id, state: state.clone() });
 
         #[cfg(not(feature = "integration"))]
-        let reader_thread_handle = if !patterns.is_empty() {
+        let reader_thread_handle = if !filters.is_empty() {
             let state = state.clone();
             let handler = Arc::new(move |_: &str, ev: EvdevInputEvent| {
+                // TODO handle error if channel full
                 state.lock().unwrap().next.send_all(InputEvent::Raw(ev));
             });
 
-            Some(grab_udev_inputs(&patterns, handler, reader_exit_rx).map_err(err_to_py)?)
+            Some(grab_udev_inputs(filters, handler, reader_exit_rx).map_err(err_to_py)?)
         } else {
             None
         };

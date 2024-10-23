@@ -250,7 +250,8 @@ impl LinkDst for WriterLink {
     fn unlink_from(&self, id: &Uuid) -> Result<bool> {
         Ok(self.state.lock().unwrap().prev.remove(id).is_some())
     }
-    fn send(&self, ev: InputEvent) {
-        self.state.lock().unwrap().ev_tx.try_send(ev).expect(&ApplicationError::TooManyEvents.to_string());
+    fn send(&self, ev: InputEvent) -> Result<()> {
+        self.state.lock().unwrap().ev_tx.try_send(ev).map_err(|err| ApplicationError::TooManyEvents.into_py())?;
+        Ok(())
     }
 }

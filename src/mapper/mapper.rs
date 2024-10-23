@@ -51,7 +51,7 @@ impl Mapper {
             .map_err(err_to_py)?;
 
         let id = Uuid::new_v4();
-        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(32);
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(64);
         let state = Arc::new(Mutex::new(State { transformer, ..Default::default() }));
         let link = Arc::new(MapperLink { id, ev_tx: ev_tx.clone(), state: state.clone() });
 
@@ -382,8 +382,9 @@ impl LinkDst for MapperLink {
     fn unlink_from(&self, id: &Uuid) -> Result<bool> {
         Ok(self.state.blocking_lock().prev.remove(id).is_some())
     }
-    fn send(&self, ev: InputEvent) {
-        self.ev_tx.try_send(ev).expect(&ApplicationError::TooManyEvents.to_string());
+    fn send(&self, ev: InputEvent) -> Result<()> {
+        self.ev_tx.try_send(ev).map_err(|err| ApplicationError::TooManyEvents.into_py())?;
+        Ok(())
     }
 }
 

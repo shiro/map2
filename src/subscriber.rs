@@ -46,7 +46,7 @@ pub trait LinkDst: Send + Sync {
     fn id(&self) -> &Uuid;
     fn link_from(&self, node: Arc<dyn LinkSrc>) -> Result<()>;
     fn unlink_from(&self, id: &Uuid) -> Result<bool>;
-    fn send(&self, ev: InputEvent);
+    fn send(&self, ev: InputEvent) -> Result<()>;
 }
 
 pub trait SubscriberHashmapExt {
@@ -56,6 +56,7 @@ pub trait SubscriberHashmapExt {
 impl SubscriberHashmapExt for HashMap<Uuid, Arc<dyn LinkDst>> {
     fn send_all(&self, ev: InputEvent) {
         self.values().for_each(|link| {
+            // TODO handle err
             link.send(ev.clone());
         });
     }

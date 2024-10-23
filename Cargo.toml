@@ -17,6 +17,7 @@ crate-type = ["lib", "cdylib"]
 anyhow = "1.0"
 clap = "4.5.3"
 evdev-rs = { path = "evdev-rs", features = ["serde"] }
+udev = "0.9.0"
 futures = "0.3.30"
 futures-time = "3.0.0"
 input-linux-sys = "0.3.1"
