@@ -33,10 +33,8 @@ fn find_fd_with_pattern(fd_path: &PathBuf, udev: &udev::Device, matchers: &Vec<P
     matchers.iter().filter(|matcher| !matcher.is_empty()).cloned().any(|mut matcher| {
         use std::collections::hash_map::Entry::Occupied;
 
-        // println!("a: {:?}", (fd_path, &matcher));
         if let Some(query) = matcher.remove("path") {
             if !query.find(fd_path.to_str().unwrap()).map_or(false, |m| m.len() == fd_path.to_str().unwrap().len()) {
-                // println!("no path");
                 return false;
             }
         }
@@ -260,6 +258,7 @@ pub fn grab_udev_inputs(
                         }
 
                         let abort_tx = grab_device(&fd_path, ev_handler.clone())?;
+                        println!("add {:?}", fd_path.clone());
                         device_map.insert(udev.syspath().to_owned(), abort_tx);
                     }
                     DebouncedEvent::Remove(path) => {

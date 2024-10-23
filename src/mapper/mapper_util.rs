@@ -33,6 +33,7 @@ pub async fn run_python_handler(
     // next: &HashMap<Uuid, Arc<dyn LinkDst>>,
     next: Vec<Arc<dyn LinkDst>>,
 ) -> Result<()> {
+    // println!("--> 1");
     tokio::task::spawn_blocking(move || {
         let ret = Python::with_gil(|py| -> Result<()> {
             let asyncio =
@@ -78,6 +79,7 @@ pub async fn run_python_handler(
                     }
                     _ => {}
                 };
+                // println!("--> 2");
                 Ok(())
             }
         });
