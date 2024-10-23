@@ -52,15 +52,15 @@ pub fn hyprland_window_handler() -> WindowHandler {
                 }
             };
 
-            event_listener.add_active_window_change_handler(move |info| {
+            event_listener.add_active_window_changed_handler(move |info| {
                 Box::pin({
                     let handle_window_change = handle_window_change.clone();
                     async move {
                         let info = info.unwrap();
                         handle_window_change(ActiveWindowInfo {
-                            class: info.window_class,
+                            class: info.class,
                             instance: "".to_string(),
-                            name: info.window_title,
+                            name: info.title,
                         });
                     }
                 })
