@@ -81,7 +81,6 @@ pub fn hyprland_window_handler() -> WindowHandler {
                             subscriptions.lock().unwrap().insert(id, callback.clone());
 
                             if let Ok(Some(info)) = Client::get_active_async().await {
-                                println!("info!");
                                 //if !is_callable { continue; }
 
                                 tokio::task::spawn_blocking(move || {

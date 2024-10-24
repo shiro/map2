@@ -324,14 +324,11 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                                 }
                                 // delay the callback until the backspace events are processed
                                 tokio::time::sleep(Duration::from_millis(10 * from_len as u64)).await;
-                                run_python_handler(
-                                    handler.clone(),
-                                    None,
-                                    ev,
-                                    state.transformer.clone(),
-                                    state.next.values().cloned().collect(),
-                                )
-                                .await;
+                                let handler = handler.clone();
+                                let transformer = state.transformer.clone();
+                                let next = state.next.values().cloned().collect();
+                                drop(state);
+                                run_python_handler(handler, None, ev, transformer, next).await;
                             }
                             RuntimeAction::NOP => {}
                         }

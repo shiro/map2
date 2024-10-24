@@ -393,14 +393,11 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     }
                 }
 
-                run_python_handler(
-                    handler.clone(),
-                    None,
-                    ev.clone(),
-                    state.transformer.clone(),
-                    state.next.values().cloned().collect(),
-                )
-                .await;
+                let handler = handler.clone();
+                let transformer = state.transformer.clone();
+                let next = state.next.values().cloned().collect();
+                drop(state);
+                run_python_handler(handler, None, ev.clone(), transformer, next).await;
             }
             RuntimeAction::NOP => {}
         }
