@@ -345,8 +345,8 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
 // fired after the chord timeout has passed, submits the keys held on the stack
 async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
-    let mut state = _state.lock().await;
-    let state = &mut *state;
+    let mut _state = _state.lock().await;
+    let state = &mut *_state;
     let ev = match raw_ev {
         InputEvent::Raw(ev) => ev,
     };
@@ -393,14 +393,12 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     }
                 }
 
-                run_python_handler(
-                    handler.clone(),
-                    None,
-                    ev.clone(),
-                    state.transformer.clone(),
-                    state.next.values().cloned().collect(),
-                )
-                .await;
+                let handler = handler.clone();
+                let transformer = state.transformer.clone();
+                let next = state.next.values().cloned().collect();
+                drop(state);
+                drop(_state);
+                run_python_handler(handler, None, ev.clone(), transformer, next).await;
             }
             RuntimeAction::NOP => {}
         }

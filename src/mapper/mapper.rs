@@ -452,14 +452,12 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         let ev = match raw_ev {
                             InputEvent::Raw(ev) => ev,
                         };
-                        run_python_handler(
-                            handler.clone(),
-                            None,
-                            ev,
-                            state.transformer.clone(),
-                            state.next.values().cloned().collect(),
-                        )
-                        .await;
+
+                        let handler = handler.clone();
+                        let transformer = state.transformer.clone();
+                        let next = state.next.values().cloned().collect();
+                        drop(state);
+                        run_python_handler(handler, None, ev, transformer, next).await;
                     }
                     RuntimeAction::NOP => {}
                 }
@@ -493,14 +491,12 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 let ev = match raw_ev {
                     InputEvent::Raw(ev) => ev,
                 };
-                run_python_handler(
-                    handler.clone(),
-                    Some(args),
-                    ev,
-                    state.transformer.clone(),
-                    state.next.values().cloned().collect(),
-                )
-                .await;
+
+                let handler = handler.clone();
+                let transformer = state.transformer.clone();
+                let next = state.next.values().cloned().collect();
+                drop(state);
+                run_python_handler(handler, Some(args), ev, transformer, next).await;
                 return;
             }
         }
@@ -523,14 +519,12 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 let ev = match raw_ev {
                     InputEvent::Raw(ev) => ev,
                 };
-                run_python_handler(
-                    handler.clone(),
-                    Some(args),
-                    ev,
-                    state.transformer.clone(),
-                    state.next.values().cloned().collect(),
-                )
-                .await;
+
+                let handler = handler.clone();
+                let transformer = state.transformer.clone();
+                let next = state.next.values().cloned().collect();
+                drop(state);
+                run_python_handler(handler, Some(args), ev, transformer, next).await;
                 return;
             }
         }

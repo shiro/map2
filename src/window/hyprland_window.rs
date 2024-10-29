@@ -34,7 +34,8 @@ pub fn hyprland_window_handler() -> WindowHandler {
                 move |info: ActiveWindowInfo| {
                     tokio::task::spawn_blocking(move || {
                         Python::with_gil(|py| {
-                            for callback in subscriptions.lock().unwrap().values() {
+                            let subscriptions = { subscriptions.lock().unwrap().values().cloned().collect::<Vec<_>>() };
+                            for callback in subscriptions {
                                 let is_callable = callback.as_ref(py).is_callable();
                                 if !is_callable {
                                     continue;
@@ -81,17 +82,19 @@ pub fn hyprland_window_handler() -> WindowHandler {
                             subscriptions.lock().unwrap().insert(id, callback.clone());
 
                             if let Ok(Some(info)) = Client::get_active_async().await {
-                                println!("info!");
+                                println!(" --> w1");
                                 //if !is_callable { continue; }
 
                                 tokio::task::spawn_blocking(move || {
                                     Python::with_gil(|py| {
+                                        println!(" --> w1 start");
                                         let is_callable = callback.as_ref(py).is_callable();
                                         let ret = callback.call(py, (info.class.clone(),), None);
                                         if let Err(err) = ret {
                                             eprintln!("{err}");
                                             std::process::exit(1);
                                         }
+                                        println!(" --> w1 done");
                                     });
                                 });
                             }
