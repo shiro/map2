@@ -139,13 +139,17 @@ fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(link, m)?)?;
     #[cfg(feature = "integration")]
     m.add_function(wrap_pyfunction!(__test, m)?)?;
+
     m.add_class::<Reader>()?;
+
     m.add_class::<Mapper>()?;
-    m.add_class::<KeyMapperSnapshot>()?;
     m.add_class::<TextMapper>()?;
     m.add_class::<ChordMapper>()?;
+    m.add_class::<ModifierMapper>()?;
+
     m.add_class::<Writer>()?;
     m.add_class::<VirtualWriter>()?;
+
     m.add_class::<Window>()?;
 
     Ok(())
