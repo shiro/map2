@@ -1,11 +1,11 @@
 .idea/workspace.xml
 
-/local
-/target
+local
+target
 pytests/target
-/pkg
-/venv
+pkg
+venv*
 *.zst
 *.tar.gz
-/dist
+dist
 .vim/

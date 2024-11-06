@@ -7,7 +7,7 @@ edition = "2021"
 [features]
 integration = []
 extension-module = ["pyo3/extension-module"]
-default = ["extension-module", "integration"]
+default = ["extension-module"]
 
 [lib]
 name = "map2"

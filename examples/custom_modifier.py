@@ -11,3 +11,4 @@ map2.link([reader, mapper, writer])
 
 # map 'capslock'+'a' to 'b'
 mapper.map("a", "b")
+mapper.map("#q", "w")

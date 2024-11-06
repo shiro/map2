@@ -48,6 +48,12 @@ pub fn writer_read(py: Python, module: &PyBound<PyModule>, name: &str) -> Option
 pub fn writer_read_all(py: Python, module: &PyBound<PyModule>, name: &str) -> Vec<EvdevInputEvent> {
     let mut acc = vec![];
     while let Some(ev) = writer_read(py, module, name) {
+        match ev.event_code {
+            evdev_rs::enums::EventCode::EV_SYN(_) => {
+                continue;
+            }
+            _ => {}
+        };
         acc.push(ev);
     }
     acc
