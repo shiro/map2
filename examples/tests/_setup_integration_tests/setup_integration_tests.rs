@@ -7,7 +7,7 @@ use std::time::Duration;
 use map2::python::*;
 use map2::*;
 
-#[pyo3_asyncio::tokio::main]
+#[pyo3_async_runtimes::tokio::main]
 async fn main() -> pyo3::PyResult<()> {
     let cmd = std::process::Command::new("maturin")
         .arg("dev")
@@ -23,15 +23,18 @@ async fn main() -> pyo3::PyResult<()> {
         std::process::exit(1);
     }
 
-    pyo3_asyncio::testing::main().await
+    pyo3_async_runtimes::testing::main().await
 }
+
+pub use pyo3::Bound as PyBound;
+pub use pyo3_async_runtimes::tokio::test as test_main;
 
 #[path = "../"]
 mod integration_tests {
     automod::dir!("examples/tests");
 }
 
-pub fn writer_read(py: Python, module: &PyModule, name: &str) -> Option<EvdevInputEvent> {
+pub fn writer_read(py: Python, module: &PyBound<PyModule>, name: &str) -> Option<EvdevInputEvent> {
     let target = module.getattr(name).unwrap().to_object(py);
 
     target
@@ -42,7 +45,7 @@ pub fn writer_read(py: Python, module: &PyModule, name: &str) -> Option<EvdevInp
         .and_then(|x| serde_json::from_str(&x).unwrap())
 }
 
-pub fn writer_read_all(py: Python, module: &PyModule, name: &str) -> Vec<EvdevInputEvent> {
+pub fn writer_read_all(py: Python, module: &PyBound<PyModule>, name: &str) -> Vec<EvdevInputEvent> {
     let mut acc = vec![];
     while let Some(ev) = writer_read(py, module, name) {
         acc.push(ev);
@@ -50,11 +53,11 @@ pub fn writer_read_all(py: Python, module: &PyModule, name: &str) -> Vec<EvdevIn
     acc
 }
 
-pub fn reader_send(py: Python, module: &PyModule, name: &str, ev: &EvdevInputEvent) {
+pub fn reader_send(py: Python, module: &PyBound<PyModule>, name: &str, ev: &EvdevInputEvent) {
     let target = module.getattr(name).unwrap().to_object(py);
     let ev = serde_json::to_string(ev).unwrap();
 
-    target.call_method(py, "__test__write_ev", (ev,), None).unwrap();
+    target.call_method_bound(py, "__test__write_ev", (ev,), None).unwrap();
 }
 
 pub fn sleep(py: Python, millis: u64) {
@@ -77,12 +80,12 @@ macro_rules! assert_empty {
     };
 }
 
-pub fn reader_send_all(py: Python, module: &PyModule, name: &str, ev_list: &Vec<EvdevInputEvent>) {
+pub fn reader_send_all(py: Python, module: &PyBound<PyModule>, name: &str, ev_list: &Vec<EvdevInputEvent>) {
     let target = module.getattr(name).unwrap().to_object(py);
 
     for ev in ev_list.iter() {
         let ev = serde_json::to_string(ev).unwrap();
-        target.call_method(py, "__test__write_ev", (ev,), None).unwrap();
+        target.call_method_bound(py, "__test__write_ev", (ev,), None).unwrap();
     }
 }
 

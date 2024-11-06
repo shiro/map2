@@ -44,9 +44,9 @@ pub struct ModifierMapper {
 impl ModifierMapper {
     #[new]
     #[pyo3(signature = (key, **kwargs))]
-    pub fn new(key: String, kwargs: Option<&PyDict>) -> PyResult<Self> {
-        let options: HashMap<&str, &PyAny> = match kwargs {
-            Some(py_dict) => py_dict.extract().unwrap(),
+    pub fn new(key: String, kwargs: Option<pyo3::Bound<PyDict>>) -> PyResult<Self> {
+        let options: HashMap<String, Bound<PyAny>> = match kwargs {
+            Some(py_dict) => py_dict.extract()?,
             None => HashMap::new(),
         };
 
@@ -105,7 +105,7 @@ impl ModifierMapper {
             return Ok(());
         }
 
-        let is_callable = to.as_ref(py).is_callable();
+        let is_callable = to.bind(py).is_callable();
 
         if is_callable {
             drop(state);
@@ -139,7 +139,7 @@ impl ModifierMapper {
 
     pub fn map_fallback(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
         let mut state = self.state.blocking_lock();
-        if !handler.as_ref(py).is_callable() {
+        if !handler.bind(py).is_callable() {
             return Err(ApplicationError::NotCallable.into());
         }
         state.fallback_handler = Some(Arc::new(handler));
@@ -163,14 +163,14 @@ impl ModifierMapper {
         }))
     }
 
-    pub fn link_to(&mut self, target: &PyAny) -> PyResult<()> {
+    pub fn link_to(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
         let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.link_from(self.link.clone());
         self.link.link_to(target);
         Ok(())
     }
 
-    pub fn unlink_to(&mut self, py: Python, target: &PyAny) -> PyResult<bool> {
+    pub fn unlink_to(&mut self, py: Python, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.unlink_from(&self.id);
         let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
@@ -185,7 +185,7 @@ impl ModifierMapper {
         state.next.clear();
     }
 
-    pub fn unlink_from(&mut self, target: &PyAny) -> PyResult<bool> {
+    pub fn unlink_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.unlink_to(&self.id);
         let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;

@@ -1,6 +1,6 @@
 use std::thread;
 
-use pyo3::types::PyTuple;
+use pyo3::types::{PyAnyMethods, PyTuple};
 use pyo3::{IntoPy, Py, PyAny, Python};
 
 use crate::*;
@@ -13,8 +13,8 @@ pub enum PythonArgument {
 
 type Args = Vec<PythonArgument>;
 
-pub fn args_to_py(py: Python<'_>, args: Args) -> &PyTuple {
-    PyTuple::new(
+pub fn args_to_py(py: Python<'_>, args: Args) -> pyo3::Bound<'_, PyTuple> {
+    PyTuple::new_bound(
         py,
         args.into_iter().map(|x| match x {
             PythonArgument::String(x) => x.into_py(py),
@@ -33,11 +33,11 @@ impl EventLoop {
         // TODO add exit channel
         let (callback_tx, mut callback_rx) = tokio::sync::mpsc::channel(128);
         let thread_handle = thread::spawn(move || {
-            pyo3_asyncio::tokio::get_runtime().block_on(async move {
+            pyo3_async_runtimes::tokio::get_runtime().block_on(async move {
                 // use std::time::Instant;
                 // let now = Instant::now();
                 Python::with_gil(|py| {
-                    pyo3_asyncio::tokio::run::<_, ()>(py, async move {
+                    pyo3_async_runtimes::tokio::run::<_, ()>(py, async move {
                         loop {
                             let (callback_object, args): (Py<PyAny>, Option<Args>) =
                                 callback_rx.recv().await.expect("python runtime error: event loop channel is closed");
@@ -46,33 +46,33 @@ impl EventLoop {
                                 let args = args_to_py(py, args.unwrap_or_default());
 
                                 let asyncio = py
-                                    .import("asyncio")
+                                    .import_bound("asyncio")
                                     .expect("python runtime error: failed to import 'asyncio', is it installed?");
 
                                 let is_async_callback: bool = asyncio
-                                    .call_method1("iscoroutinefunction", (callback_object.as_ref(py),))
+                                    .call_method1("iscoroutinefunction", (&callback_object,))
                                     .expect("python runtime error: 'iscoroutinefunction' lookup failed")
                                     .extract()
                                     .expect("python runtime error: 'iscoroutinefunction' call failed");
 
                                 if is_async_callback {
                                     let coroutine = callback_object
-                                        .call(py, args, None)
+                                        .call_bound(py, args, None)
                                         .expect("python runtime error: failed to call async callback");
 
-                                    let event_loop = pyo3_asyncio::tokio::get_current_loop(py)
+                                    let event_loop = pyo3_async_runtimes::tokio::get_current_loop(py)
                                         .expect("python runtime error: failed to get the event loop");
                                     let coroutine = event_loop
                                         .call_method1("create_task", (coroutine,))
                                         .expect("python runtime error: failed to create task");
 
                                     // tasks only actually get run if we convert the coroutine to a rust future, even though we don't use it...
-                                    if let Err(err) = pyo3_asyncio::tokio::into_future(coroutine) {
+                                    if let Err(err) = pyo3_async_runtimes::tokio::into_future(coroutine) {
                                         eprintln!("an uncaught error was thrown by the python callback: {}", err);
                                         std::process::exit(1);
                                     }
                                 } else {
-                                    if let Err(err) = callback_object.call(py, args, None) {
+                                    if let Err(err) = callback_object.call_bound(py, args, None) {
                                         eprintln!("an uncaught error was thrown by the python callback: {}", err);
                                         std::process::exit(1);
                                     }

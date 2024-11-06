@@ -29,10 +29,10 @@ pub struct Reader {
 #[pymethods]
 impl Reader {
     #[new]
-    #[pyo3(signature = (* * kwargs))]
-    pub fn new(py: Python, kwargs: Option<&PyDict>) -> PyResult<Self> {
-        let options: HashMap<&str, &PyAny> = match kwargs {
-            Some(options) => options.extract()?,
+    #[pyo3(signature = (**kwargs))]
+    pub fn new(py: Python, kwargs: Option<pyo3::Bound<PyDict>>) -> PyResult<Self> {
+        let options: HashMap<String, Bound<PyAny>> = match kwargs {
+            Some(py_dict) => py_dict.extract()?,
             None => HashMap::new(),
         };
 
@@ -97,14 +97,14 @@ impl Reader {
         })
     }
 
-    pub fn link_to(&mut self, target: &PyAny) -> PyResult<()> {
+    pub fn link_to(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
         let mut target = node_to_link_dst(target).unwrap();
         target.link_from(self.link.clone());
         self.link.link_to(target);
         Ok(())
     }
 
-    pub fn unlink_to(&mut self, py: Python, target: &PyAny) -> PyResult<bool> {
+    pub fn unlink_to(&mut self, py: Python, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.unlink_from(&self.id);
         let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;

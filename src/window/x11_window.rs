@@ -39,12 +39,12 @@ pub fn x11_window_handler() -> WindowHandler {
                 if let Ok(Some(val)) = info {
                     Python::with_gil(|py| {
                         for callback in subscriptions.lock().unwrap().values() {
-                            let is_callable = callback.as_ref(py).is_callable();
+                            let is_callable = callback.bind(py).is_callable();
                             if !is_callable {
                                 continue;
                             }
 
-                            let ret = callback.call(py, (val.class.clone(),), None);
+                            let ret = callback.call_bound(py, (val.class.clone(),), None);
 
                             if let Err(err) = ret {
                                 eprintln!("{err}");

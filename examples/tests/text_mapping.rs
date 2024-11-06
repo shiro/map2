@@ -3,10 +3,10 @@ use crate::*;
 const READER: &str = "reader";
 const WRITER: &str = "writer";
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn passes_through_unrealated_sequences() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, READER, &keys("hellp"));
         sleep(py, 5);
@@ -19,10 +19,10 @@ async fn passes_through_unrealated_sequences() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn hold_key() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, READER, &keys("hello"));
         sleep(py, 5);
@@ -40,10 +40,10 @@ async fn hold_key() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn map_to_function() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         let counter = m.getattr("counter").unwrap().extract::<i32>().unwrap();
         assert_eq!(counter, 0);
@@ -66,10 +66,10 @@ async fn map_to_function() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn capital_leters() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, READER, &keys("LaSeRs"));
         sleep(py, 5);

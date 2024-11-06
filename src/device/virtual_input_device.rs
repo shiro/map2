@@ -159,7 +159,7 @@ fn grab_device(
 
     // spawn tasks for reading devices
     let (abort_tx, abort_rx) = oneshot::channel();
-    pyo3_asyncio::tokio::get_runtime().spawn(async move {
+    pyo3_async_runtimes::tokio::get_runtime().spawn(async move {
         read_from_device_input_fd_thread_handler(device, ev_handler, abort_rx).await;
     });
 

@@ -4,7 +4,7 @@ use pyo3::{PyAny, PyRefMut};
 use crate::mapper::*;
 use crate::*;
 
-pub fn node_to_link_dst(target: &PyAny) -> Option<Arc<dyn LinkDst>> {
+pub fn node_to_link_dst(target: &pyo3::Bound<PyAny>) -> Option<Arc<dyn LinkDst>> {
     if let Ok(target) = target.extract::<PyRefMut<Mapper>>() {
         return Some(target.link.clone());
     }
@@ -24,7 +24,7 @@ pub fn node_to_link_dst(target: &PyAny) -> Option<Arc<dyn LinkDst>> {
     None
 }
 
-pub fn node_to_link_src(target: &PyAny) -> Option<Arc<dyn LinkSrc>> {
+pub fn node_to_link_src(target: &pyo3::Bound<PyAny>) -> Option<Arc<dyn LinkSrc>> {
     if let Ok(target) = target.extract::<PyRefMut<Reader>>() {
         return Some(target.link.clone());
     }

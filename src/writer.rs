@@ -34,8 +34,8 @@ pub struct Writer {
 impl Writer {
     #[new]
     #[pyo3(signature = (**kwargs))]
-    pub fn new(kwargs: Option<&PyDict>) -> PyResult<Self> {
-        let options: HashMap<&str, &PyAny> = match kwargs {
+    pub fn new(kwargs: Option<pyo3::Bound<PyDict>>) -> PyResult<Self> {
+        let options: HashMap<String, Bound<PyAny>> = match kwargs {
             Some(py_dict) => py_dict.extract()?,
             None => HashMap::new(),
         };
@@ -172,7 +172,7 @@ impl Writer {
         Ok(handle)
     }
 
-    pub fn unlink_from(&mut self, target: &PyAny) -> PyResult<bool> {
+    pub fn unlink_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.unlink_to(&self.id);
         let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;

@@ -3,10 +3,10 @@ use crate::*;
 const READER: &str = "reader";
 const WRITER: &str = "writer";
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn single_key_click() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, READER, &keys("a"));
         sleep(py, 55);
@@ -21,10 +21,10 @@ async fn single_key_click() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn hold_key() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, READER, &keys("{a down}"));
         sleep(py, 55);
@@ -39,10 +39,10 @@ async fn hold_key() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn break_chord() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, READER, &keys("{a down}"));
         sleep(py, 10);
@@ -58,10 +58,10 @@ async fn break_chord() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn simple_chord() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, READER, &keys("{a down}{b down}{a up}{b up}"));
         sleep(py, 55);
@@ -74,10 +74,10 @@ async fn simple_chord() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn multi_chord() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, "reader", &keys("{a down}{b down}{b up}{b down}{a up}{b up}"));
         sleep(py, 55);
@@ -88,10 +88,10 @@ async fn multi_chord() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn chord_to_function() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         let counter = m.getattr("counter").unwrap().extract::<i32>().unwrap();
         assert_eq!(counter, 0);

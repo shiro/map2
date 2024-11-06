@@ -19,9 +19,9 @@ struct PyKey {
 }
 
 #[pyfunction]
-#[pyo3(signature = (* * options))]
-fn default(options: Option<&PyDict>) -> PyResult<()> {
-    let options: HashMap<&str, &PyAny> = match options {
+#[pyo3(signature = (**options))]
+fn default(options: Option<pyo3::Bound<PyDict>>) -> PyResult<()> {
+    let options: HashMap<String, pyo3::Bound<PyAny>> = match options {
         Some(py_dict) => py_dict.extract().unwrap(),
         None => HashMap::new(),
     };
@@ -60,11 +60,11 @@ fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
 
     let chain_len = chain.len();
 
-    let last = node_to_link_dst(chain.remove(chain_len - 1).as_ref(py)).ok_or_else(|| {
+    let last = node_to_link_dst(chain.remove(chain_len - 1).bind(py)).ok_or_else(|| {
         PyRuntimeError::new_err(format!("expected node at index {} to be a source node", chain_len - 1))
     })?;
 
-    let mut prev = node_to_link_src(chain.remove(0).as_ref(py))
+    let mut prev = node_to_link_src(chain.remove(0).bind(py))
         .ok_or_else(|| PyRuntimeError::new_err("expected node at index 0 to be a source node"))?;
 
     let chain = chain
@@ -72,13 +72,13 @@ fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
         .enumerate()
         .map(|(idx, node)| {
             Ok((
-                node_to_link_src(node.as_ref(py)).ok_or_else(|| {
+                node_to_link_src(node.bind(py)).ok_or_else(|| {
                     PyRuntimeError::new_err(format!(
                         "expected node at index {} to be a source/desination node",
                         idx + 1
                     ))
                 })?,
-                node_to_link_dst(node.as_ref(py)).ok_or_else(|| {
+                node_to_link_dst(node.bind(py)).ok_or_else(|| {
                     PyRuntimeError::new_err(format!(
                         "expected node at index {} to be a source/desination node",
                         idx + 1
@@ -105,7 +105,7 @@ pub fn err_to_py(err: anyhow::Error) -> PyErr {
 }
 
 pub fn get_runtime<'a>() -> &'a Runtime {
-    pyo3_asyncio::tokio::get_runtime()
+    pyo3_async_runtimes::tokio::get_runtime()
 }
 
 #[pyfunction]
@@ -132,13 +132,13 @@ fn __test() -> PyResult<Vec<String>> {
 }
 
 #[pymodule]
-fn map2(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(wait, m)?)?;
-    m.add_function(wrap_pyfunction!(exit, m)?)?;
-    m.add_function(wrap_pyfunction!(default, m)?)?;
-    m.add_function(wrap_pyfunction!(link, m)?)?;
+fn map2(_py: Python, m: pyo3::Bound<PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(wait, &m)?)?;
+    m.add_function(wrap_pyfunction!(exit, &m)?)?;
+    m.add_function(wrap_pyfunction!(default, &m)?)?;
+    m.add_function(wrap_pyfunction!(link, &m)?)?;
     #[cfg(feature = "integration")]
-    m.add_function(wrap_pyfunction!(__test, m)?)?;
+    m.add_function(wrap_pyfunction!(__test, &m)?)?;
 
     m.add_class::<Reader>()?;
 

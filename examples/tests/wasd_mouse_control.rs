@@ -7,10 +7,10 @@ use map2::key_primitives::Key;
 
 use crate::*;
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn wasd_mouse_control() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send(py, m, "reader_kbd", &Key::from_str("w").unwrap().to_input_ev(1));
 
@@ -33,4 +33,3 @@ async fn wasd_mouse_control() -> PyResult<()> {
     })?;
     Ok(())
 }
-

@@ -34,14 +34,16 @@ pub fn hyprland_window_handler() -> WindowHandler {
                 move |info: ActiveWindowInfo| {
                     tokio::task::spawn_blocking(move || {
                         Python::with_gil(|py| {
-                            let subscriptions = { subscriptions.lock().unwrap().values().cloned().collect::<Vec<_>>() };
+                            let subscriptions = {
+                                subscriptions.lock().unwrap().values().map(|v| v.bind(py)).cloned().collect::<Vec<_>>()
+                            };
                             for callback in subscriptions {
-                                let is_callable = callback.as_ref(py).is_callable();
+                                let is_callable = callback.is_callable();
                                 if !is_callable {
                                     continue;
                                 }
 
-                                let ret = callback.call(py, (info.class.clone(),), None);
+                                let ret = callback.call((info.class.clone(),), None);
 
                                 if let Err(err) = ret {
                                     eprintln!("{err}");
@@ -79,7 +81,9 @@ pub fn hyprland_window_handler() -> WindowHandler {
                     };
                     match msg {
                         WindowControlMessage::Subscribe(id, callback) => {
-                            subscriptions.lock().unwrap().insert(id, callback.clone());
+                            Python::with_gil(|py| {
+                                subscriptions.lock().unwrap().insert(id, callback.clone_ref(py));
+                            });
 
                             if let Ok(Some(info)) = Client::get_active_async().await {
                                 println!(" --> w1");
@@ -88,8 +92,8 @@ pub fn hyprland_window_handler() -> WindowHandler {
                                 tokio::task::spawn_blocking(move || {
                                     Python::with_gil(|py| {
                                         println!(" --> w1 start");
-                                        let is_callable = callback.as_ref(py).is_callable();
-                                        let ret = callback.call(py, (info.class.clone(),), None);
+                                        let is_callable = callback.bind(py).is_callable();
+                                        let ret = callback.call_bound(py, (info.class.clone(),), None);
                                         if let Err(err) = ret {
                                             eprintln!("{err}");
                                             std::process::exit(1);

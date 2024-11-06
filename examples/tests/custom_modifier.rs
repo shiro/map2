@@ -3,10 +3,10 @@ use std::time::Duration;
 
 use crate::*;
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn key_passthrough() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, "reader", &keys("a"));
 
@@ -21,10 +21,10 @@ async fn key_passthrough() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn modifier_key_click() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, "reader", &keys("{capslock down}a{capslock up}"));
 
@@ -39,10 +39,10 @@ async fn modifier_key_click() -> PyResult<()> {
     Ok(())
 }
 
-#[pyo3_asyncio::tokio::test]
+#[test_main]
 async fn modifier_passthrough() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
-        let m = pytests::include_python!();
+        let m = &pytests::include_python!();
 
         reader_send_all(py, m, "reader", &keys("{capslock}"));
 
