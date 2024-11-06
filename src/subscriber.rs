@@ -14,6 +14,10 @@ pub fn node_to_link_dst(target: &PyAny) -> Option<Arc<dyn LinkDst>> {
     if let Ok(target) = target.extract::<PyRefMut<ChordMapper>>() {
         return Some(target.link.clone());
     }
+    if let Ok(target) = target.extract::<PyRefMut<ModifierMapper>>() {
+        return Some(target.link.clone());
+    }
+
     if let Ok(target) = target.extract::<PyRefMut<Writer>>() {
         return Some(target.link.clone());
     }
@@ -24,6 +28,7 @@ pub fn node_to_link_src(target: &PyAny) -> Option<Arc<dyn LinkSrc>> {
     if let Ok(target) = target.extract::<PyRefMut<Reader>>() {
         return Some(target.link.clone());
     }
+
     if let Ok(target) = target.extract::<PyRefMut<Mapper>>() {
         return Some(target.link.clone());
     }
@@ -31,6 +36,9 @@ pub fn node_to_link_src(target: &PyAny) -> Option<Arc<dyn LinkSrc>> {
         return Some(target.link.clone());
     }
     if let Ok(target) = target.extract::<PyRefMut<ChordMapper>>() {
+        return Some(target.link.clone());
+    }
+    if let Ok(target) = target.extract::<PyRefMut<ModifierMapper>>() {
         return Some(target.link.clone());
     }
     None

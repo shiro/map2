@@ -12,15 +12,23 @@ use tokio::sync::Mutex;
 
 use ApplicationError::TooManyEvents;
 
+#[derive(derive_new::new)]
 struct State {
     transformer: Arc<XKBTransformer>,
+    #[new(default)]
     prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
+    #[new(default)]
     next: HashMap<Uuid, Arc<dyn LinkDst>>,
+    #[new(default)]
     mappings: Mappings,
     key: Key,
+    #[new(default)]
+    active: bool,
+    #[new(default)]
+    surpressed: bool,
+    #[new(default)]
     fallback_handler: Option<Arc<PyObject>>,
-    relative_handler: Option<Arc<PyObject>>,
-    absolute_handler: Option<Arc<PyObject>>,
+    #[new(default)]
     modifiers: Arc<KeyModifierState>,
 }
 
@@ -50,9 +58,13 @@ impl ModifierMapper {
             .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
             .map_err(err_to_py)?;
 
+        let key = parse_key(&key, Some(&transformer)).map_err(|err| {
+            PyRuntimeError::new_err(format!("failed to parse key '{}'", ApplicationError::KeyParse(err.to_string()),))
+        })?;
+
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(64);
-        let state = Arc::new(Mutex::new(State { transformer, ..Default::default() }));
+        let state = Arc::new(Mutex::new(State::new(transformer, key)));
         let link = Arc::new(MapperLink { id, ev_tx: ev_tx.clone(), state: state.clone() });
 
         {
@@ -357,8 +369,41 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
     };
 
     match ev {
-        // key event
+        EvdevInputEvent { event_code, value, .. } if *event_code == state.key.event_code => {
+            match value {
+                0 => {
+                    state.active = false;
+                    // TODO on up/reset
+
+                    if !state.surpressed {
+                        state.next.send_all(InputEvent::Raw(state.key.to_input_ev(1)));
+                        state.next.send_all(InputEvent::Raw(state.key.to_input_ev(0)));
+                    }
+                }
+                1 => {
+                    state.active = true;
+                    // TODO on down
+                }
+                2 => {
+                    // TODO on repeat
+                }
+                _ => unreachable!(),
+            }
+            state.surpressed = false;
+            return;
+        }
+        _ => {}
+    };
+
+    if !state.active {
+        state.next.send_all(raw_ev);
+        return;
+    }
+
+    match ev {
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+            state.surpressed = true;
+
             let mut from_modifiers = KeyModifierFlags::new();
             from_modifiers.ctrl = state.modifiers.is_ctrl();
             from_modifiers.alt = state.modifiers.is_alt();
@@ -441,34 +486,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 .to_string();
 
                 let args = vec![PythonArgument::String(name), PythonArgument::String(value)];
-                drop(ev);
-                let ev = match raw_ev {
-                    InputEvent::Raw(ev) => ev,
-                };
-
-                let handler = handler.clone();
-                let transformer = state.transformer.clone();
-                let next = state.next.values().cloned().collect();
-                drop(state);
-                run_python_handler(handler, Some(args), ev, transformer, next).await;
-                return;
-            }
-        }
-        // rel/abs event
-        EvdevInputEvent { event_code, value, .. }
-            if matches!(event_code, EventCode::EV_REL(..)) || matches!(event_code, EventCode::EV_ABS(..)) =>
-        {
-            let (key, handler) = match event_code {
-                EventCode::EV_REL(key) => (format!("{key:?}").to_string(), &state.relative_handler),
-                EventCode::EV_ABS(key) => (format!("{key:?}").to_string(), &state.absolute_handler),
-                _ => unreachable!(),
-            };
-            if let Some(handler) = handler.as_ref() {
-                let name = format!("{key:?}");
-                // remove prefix REL_ / ABS_
-                // let name = name[5..name.len() - 1].to_string();
-                let name = name[1..name.len() - 1].to_lowercase();
-                let args = vec![PythonArgument::String(name), PythonArgument::Number(*value)];
                 drop(ev);
                 let ev = match raw_ev {
                     InputEvent::Raw(ev) => ev,
