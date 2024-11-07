@@ -372,19 +372,24 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
     };
 
     match ev {
-        EvdevInputEvent { event_code, value, .. } if *event_code == state.key.event_code => {
+        EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. }
+            if EventCode::EV_KEY(*key) == state.key.event_code =>
+        {
+            let surpressed = state.surpressed;
+            state.surpressed = false;
+
             match value {
                 0 => {
                     state.active = false;
 
-                    if !state.surpressed {
+                    if !surpressed {
                         state.next.send_all(InputEvent::Raw(state.key.to_input_ev(1)));
                         state.next.send_all(InputEvent::Raw(state.key.to_input_ev(0)));
                     }
 
                     // TODO order
-                    for key in state.down_keys.iter() {
-                        let key = Key::from(key.clone());
+                    for key_raw in state.down_keys.clone().iter() {
+                        let key = Key::from(key_raw.clone());
                         let mut from_modifiers = KeyModifierFlags::new();
                         from_modifiers.ctrl = state.modifiers.is_ctrl();
                         from_modifiers.alt = state.modifiers.is_alt();
@@ -402,32 +407,14 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         // trigger up action on mapped key
                         from_key_action.value = 0;
                         if let Some(runtime_action) = state.mappings.get(&from_key_action) {
-                            match runtime_action {
-                                RuntimeAction::ActionSequence(seq) => {
-                                    for action in seq {
-                                        match action {
-                                            RuntimeKeyAction::KeyAction(key_action) => {
-                                                let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
-                                            }
-                                            RuntimeKeyAction::ReleaseRestoreModifiers(
-                                                from_flags,
-                                                to_flags,
-                                                to_type,
-                                            ) => {
-                                                let new_events = release_restore_modifiers(
-                                                    &state.modifiers,
-                                                    &from_flags,
-                                                    &to_flags,
-                                                    &to_type,
-                                                );
-                                                for ev in new_events {
-                                                    state.next.send_all(InputEvent::Raw(ev));
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                _ => {}
+                            if let Some(handler) = handle_action(&state, key_raw, *value, runtime_action) {
+                                let args = Some(make_args(&state, key_raw, *value));
+                                drop(ev);
+                                let transformer = state.transformer.clone();
+                                let next = state.next.values().cloned().collect();
+                                drop(state);
+                                run_python_handler(handler, args, ev.clone(), transformer, next).await;
+                                state = _state.lock().await;
                             };
                         }
                     }
@@ -435,28 +422,17 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     let mut from_key_action =
                         KeyActionWithMods { key: state.key.clone(), value: 0, modifiers: KeyModifierFlags::new() };
                     if let Some(runtime_action) = state.mappings.get(&from_key_action) {
-                        match runtime_action {
-                            RuntimeAction::ActionSequence(seq) => {
-                                for action in seq {
-                                    match action {
-                                        RuntimeKeyAction::KeyAction(key_action) => {
-                                            let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
-                                        }
-                                        RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                            let new_events = release_restore_modifiers(
-                                                &state.modifiers,
-                                                &from_flags,
-                                                &to_flags,
-                                                &to_type,
-                                            );
-                                            for ev in new_events {
-                                                state.next.send_all(InputEvent::Raw(ev));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {}
+                        if let Some(handler) = handle_action(&state, key, *value, runtime_action) {
+                            let args = Some(make_args(&state, key, *value));
+                            drop(ev);
+                            let ev = match raw_ev {
+                                InputEvent::Raw(ev) => ev,
+                            };
+                            let transformer = state.transformer.clone();
+                            let next = state.next.values().cloned().collect();
+                            drop(state);
+                            run_python_handler(handler, args, ev, transformer, next).await;
+                            state = _state.lock().await;
                         };
                     }
 
@@ -473,52 +449,16 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     let mut from_key_action =
                         KeyActionWithMods { key: state.key.clone(), value: 1, modifiers: KeyModifierFlags::new() };
                     if let Some(runtime_action) = state.mappings.get(&from_key_action) {
-                        match runtime_action {
-                            RuntimeAction::ActionSequence(seq) => {
-                                for action in seq {
-                                    match action {
-                                        RuntimeKeyAction::KeyAction(key_action) => {
-                                            let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
-                                        }
-                                        RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                            let new_events = release_restore_modifiers(
-                                                &state.modifiers,
-                                                &from_flags,
-                                                &to_flags,
-                                                &to_type,
-                                            );
-                                            for ev in new_events {
-                                                state.next.send_all(InputEvent::Raw(ev));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            RuntimeAction::PythonCallback(from_modifiers, handler) => {
-                                if !state.next.is_empty() {
-                                    // always release all trigger mods before running the callback
-                                    let new_events = release_restore_modifiers(
-                                        &state.modifiers,
-                                        &from_modifiers,
-                                        &KeyModifierFlags::new(),
-                                        &TYPE_UP,
-                                    );
-                                    new_events.iter().cloned().for_each(|ev| state.next.send_all(InputEvent::Raw(ev)));
-                                }
-
-                                let ev = match raw_ev.clone() {
-                                    InputEvent::Raw(ev) => ev,
-                                };
-
-                                let handler = handler.clone();
-                                let transformer = state.transformer.clone();
-                                let next = state.next.values().cloned().collect();
-
-                                drop(state);
-                                run_python_handler(handler, None, ev, transformer, next).await;
-                                state = _state.lock().await;
-                            }
-                            _ => {}
+                        if let Some(handler) = handle_action(&state, key, *value, runtime_action) {
+                            let args = Some(make_args(&state, key, *value));
+                            drop(ev);
+                            let ev = match raw_ev {
+                                InputEvent::Raw(ev) => ev,
+                            };
+                            let transformer = state.transformer.clone();
+                            let next = state.next.values().cloned().collect();
+                            drop(state);
+                            run_python_handler(handler, args, ev, transformer, next).await;
                         };
                     }
                 }
@@ -527,7 +467,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 }
                 _ => unreachable!(),
             }
-            state.surpressed = false;
             return;
         }
         _ => {}
@@ -563,48 +502,17 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             };
 
             if let Some(runtime_action) = state.mappings.get(&from_key_action) {
-                match runtime_action {
-                    RuntimeAction::ActionSequence(seq) => {
-                        for action in seq {
-                            match action {
-                                RuntimeKeyAction::KeyAction(key_action) => {
-                                    let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
-                                }
-                                RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                    let new_events =
-                                        release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
-                                    for ev in new_events {
-                                        state.next.send_all(InputEvent::Raw(ev));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    RuntimeAction::PythonCallback(from_modifiers, handler) => {
-                        if !state.next.is_empty() {
-                            // always release all trigger mods before running the callback
-                            let new_events = release_restore_modifiers(
-                                &state.modifiers,
-                                &from_modifiers,
-                                &KeyModifierFlags::new(),
-                                &TYPE_UP,
-                            );
-                            new_events.iter().cloned().for_each(|ev| state.next.send_all(InputEvent::Raw(ev)));
-                        }
-
-                        drop(ev);
-                        let ev = match raw_ev {
-                            InputEvent::Raw(ev) => ev,
-                        };
-
-                        let handler = handler.clone();
-                        let transformer = state.transformer.clone();
-                        let next = state.next.values().cloned().collect();
-                        drop(state);
-                        run_python_handler(handler, None, ev, transformer, next).await;
-                    }
-                    RuntimeAction::NOP => {}
-                }
+                if let Some(handler) = handle_action(&state, key, *value, runtime_action) {
+                    let args = Some(make_args(&state, key, *value));
+                    drop(ev);
+                    let ev = match raw_ev {
+                        InputEvent::Raw(ev) => ev,
+                    };
+                    let transformer = state.transformer.clone();
+                    let next = state.next.values().cloned().collect();
+                    drop(state);
+                    run_python_handler(handler, args, ev, transformer, next).await;
+                };
 
                 return;
             }
@@ -612,35 +520,16 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
 
             if let Some(handler) = state.fallback_handler.as_ref() {
-                let name = match key {
-                    KEY_SPACE => "space".to_string(),
-                    KEY_TAB => "tab".to_string(),
-                    KEY_ENTER => "enter".to_string(),
-                    _ => state.transformer.raw_to_utf(key, &*state.modifiers).unwrap_or_else(|| {
-                        let name = format!("{key:?}").to_string();
-                        name[4..name.len()].to_lowercase()
-                    }),
-                };
-
-                let value = match *value {
-                    0 => "up",
-                    1 => "down",
-                    2 => "repeat",
-                    _ => unreachable!(),
-                }
-                .to_string();
-
-                let args = vec![PythonArgument::String(name), PythonArgument::String(value)];
+                let args = Some(make_args(&state, key, *value));
                 drop(ev);
                 let ev = match raw_ev {
                     InputEvent::Raw(ev) => ev,
                 };
-
                 let handler = handler.clone();
                 let transformer = state.transformer.clone();
                 let next = state.next.values().cloned().collect();
                 drop(state);
-                run_python_handler(handler, Some(args), ev, transformer, next).await;
+                run_python_handler(handler, args, ev, transformer, next).await;
                 return;
             }
         }
@@ -648,4 +537,58 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
     }
 
     state.next.send_all(raw_ev);
+}
+
+fn handle_action(state: &State, key: &EV_KEY, value: i32, runtime_action: &RuntimeAction) -> Option<Arc<PyObject>> {
+    match runtime_action {
+        RuntimeAction::ActionSequence(seq) => {
+            for action in seq {
+                match action {
+                    RuntimeKeyAction::KeyAction(key_action) => {
+                        let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
+                    }
+                    RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                        let new_events = release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
+                        for ev in new_events {
+                            state.next.send_all(InputEvent::Raw(ev));
+                        }
+                    }
+                }
+            }
+        }
+        RuntimeAction::PythonCallback(from_modifiers, handler) => {
+            if !state.next.is_empty() {
+                // always release all trigger mods before running the callback
+                let new_events =
+                    release_restore_modifiers(&state.modifiers, &from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                new_events.iter().cloned().for_each(|ev| state.next.send_all(InputEvent::Raw(ev)));
+            }
+
+            return Some(handler.clone());
+        }
+        _ => {}
+    };
+    None
+}
+
+fn make_args(state: &State, key: &EV_KEY, value: i32) -> Vec<PythonArgument> {
+    let name = match key {
+        KEY_SPACE => "space".to_string(),
+        KEY_TAB => "tab".to_string(),
+        KEY_ENTER => "enter".to_string(),
+        _ => state.transformer.raw_to_utf(key, &*state.modifiers).unwrap_or_else(|| {
+            let name = format!("{key:?}").to_string();
+            name[4..name.len()].to_lowercase()
+        }),
+    };
+
+    let value = match value {
+        0 => "up",
+        1 => "down",
+        2 => "repeat",
+        _ => unreachable!(),
+    }
+    .to_string();
+
+    vec![PythonArgument::String(name), PythonArgument::String(value)]
 }
