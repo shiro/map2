@@ -86,19 +86,16 @@ pub fn hyprland_window_handler() -> WindowHandler {
                             });
 
                             if let Ok(Some(info)) = Client::get_active_async().await {
-                                println!(" --> w1");
                                 //if !is_callable { continue; }
 
                                 tokio::task::spawn_blocking(move || {
                                     Python::with_gil(|py| {
-                                        println!(" --> w1 start");
                                         let is_callable = callback.bind(py).is_callable();
                                         let ret = callback.call_bound(py, (info.class.clone(),), None);
                                         if let Err(err) = ret {
                                             eprintln!("{err}");
                                             std::process::exit(1);
                                         }
-                                        println!(" --> w1 done");
                                     });
                                 });
                             }

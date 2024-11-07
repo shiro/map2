@@ -86,7 +86,7 @@ async fn modifier_key_click_reverse_release_order() -> PyResult<()> {
         });
 
         // TODO is this what we want?
-        assert_eq!(writer_read_all(py, m, "writer"), keys("{b down}{a up}"),);
+        assert_eq!(writer_read_all(py, m, "writer"), keys("{b down}{a down}{a up}"),);
         Ok(())
     })?;
     Ok(())
