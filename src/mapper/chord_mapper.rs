@@ -254,6 +254,16 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
             event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
 
+            // ignore modifiers
+            match key {
+                KEY_LEFTCTRL | KEY_RIGHTCTRL | KEY_LEFTSHIFT | KEY_RIGHTSHIFT | KEY_LEFTALT | KEY_RIGHTALT
+                | KEY_LEFTMETA | KEY_RIGHTMETA => {
+                    state.next.send_all(raw_ev);
+                    return;
+                }
+                _ => {}
+            };
+
             match ev.value {
                 TYPE_DOWN => {
                     let should_handle = state.chorded_keys.contains(&_key)
