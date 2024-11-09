@@ -172,6 +172,13 @@ impl Writer {
         Ok(handle)
     }
 
+    pub fn link_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
+        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
+        target.link_to(self.link.clone());
+        self.link.link_from(target);
+        Ok(())
+    }
+
     pub fn unlink_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.unlink_to(&self.id);

@@ -15,6 +15,7 @@ use ApplicationError::TooManyEvents;
 
 #[derive(derive_new::new)]
 struct State {
+    name: String,
     transformer: Arc<XKBTransformer>,
     #[new(default)]
     prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
@@ -29,6 +30,8 @@ struct State {
     surpressed: bool,
     #[new(default)]
     down_keys: HashSet<EV_KEY>,
+    #[new(default)]
+    click_action: Option<RuntimeAction>,
     #[new(default)]
     fallback_handler: Option<Arc<PyObject>>,
     #[new(default)]
@@ -53,6 +56,7 @@ impl ModifierMapper {
             None => HashMap::new(),
         };
 
+        let name = options.get("name").and_then(|x| x.extract().ok()).unwrap_or("Unnamed modifier mapper").to_string();
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());
         let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
@@ -67,7 +71,7 @@ impl ModifierMapper {
 
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(64);
-        let state = Arc::new(Mutex::new(State::new(transformer, key)));
+        let state = Arc::new(Mutex::new(State::new(name, transformer, key)));
         let link = Arc::new(MapperLink { id, ev_tx: ev_tx.clone(), state: state.clone() });
 
         {
@@ -140,6 +144,43 @@ impl ModifierMapper {
         Ok(())
     }
 
+    pub fn map_click(&mut self, py: Python, to: PyObject) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
+
+        if let Ok(to) = to.extract::<String>(py) {
+            let to = parse_key_sequence(&to, Some(&state.transformer)).map_err(|err| {
+                PyRuntimeError::new_err(format!(
+                    "mapping error on the 'to' side:\n{}",
+                    ApplicationError::KeySequenceParse(err.to_string()),
+                ))
+            })?;
+
+            let mut seq: Vec<RuntimeKeyAction> =
+                to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
+            state.click_action = Some(RuntimeAction::ActionSequence(seq));
+            // TODO release resotre here needed?
+
+            return Ok(());
+        }
+
+        let is_callable = to.bind(py).is_callable();
+
+        if is_callable {
+            // TODO check flags field (1)
+            state.click_action = Some(RuntimeAction::PythonCallback(Default::default(), Arc::new(to)));
+            return Ok(());
+        }
+
+        Err(ApplicationError::NotCallable.into())
+
+        // let mut state = self.state.blocking_lock();
+        // if !handler.bind(py).is_callable() {
+        //     return Err(ApplicationError::NotCallable.into());
+        // }
+        // state.click_handler = Some(Arc::new(handler));
+        // Ok(())
+    }
+
     pub fn map_fallback(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
         let mut state = self.state.blocking_lock();
         if !handler.bind(py).is_callable() {
@@ -157,11 +198,13 @@ impl ModifierMapper {
         let mut state = self.state.blocking_lock();
         if let Some(existing) = existing {
             state.mappings = existing.mappings.clone();
+            state.click_action = existing.click_action.clone();
             state.fallback_handler = existing.fallback_handler.clone();
             return Ok(None);
         }
         Ok(Some(ModifierMapperSnapshot {
             mappings: state.mappings.clone(),
+            click_action: state.click_action.clone(),
             fallback_handler: state.fallback_handler.clone(),
         }))
     }
@@ -188,6 +231,13 @@ impl ModifierMapper {
         state.next.clear();
     }
 
+    pub fn link_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
+        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
+        target.link_to(self.link.clone());
+        self.link.link_from(target);
+        Ok(())
+    }
+
     pub fn unlink_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.unlink_to(&self.id);
@@ -206,6 +256,14 @@ impl ModifierMapper {
     pub fn unlink_all(&mut self) {
         self.unlink_from_all();
         self.unlink_to_all();
+    }
+
+    pub fn name(&self) -> String {
+        self.state.blocking_lock().name.clone()
+    }
+
+    pub fn reset(&mut self) {
+        self.state.blocking_lock().mappings.clear();
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
@@ -317,6 +375,7 @@ impl ModifierMapper {
 
 impl Drop for ModifierMapper {
     fn drop(&mut self) {
+        println!("bye");
         self.unlink_from_all();
         self.unlink_to_all();
     }
@@ -362,6 +421,7 @@ impl LinkDst for MapperLink {
 #[pyclass]
 pub struct ModifierMapperSnapshot {
     mappings: Mappings,
+    click_action: Option<RuntimeAction>,
     fallback_handler: Option<Arc<PyObject>>,
 }
 
@@ -382,11 +442,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 0 => {
                     state.active = false;
 
-                    if !surpressed {
-                        state.next.send_all(InputEvent::Raw(state.key.to_input_ev(1)));
-                        state.next.send_all(InputEvent::Raw(state.key.to_input_ev(0)));
-                    }
-
+                    // release all other held keys
                     // TODO order
                     for key_raw in state.down_keys.clone().iter() {
                         let key = Key::from(key_raw.clone());
@@ -419,13 +475,14 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         }
                     }
 
+                    // up action on modifier
                     let mut from_key_action =
                         KeyActionWithMods { key: state.key.clone(), value: 0, modifiers: KeyModifierFlags::new() };
                     if let Some(runtime_action) = state.mappings.get(&from_key_action) {
                         if let Some(handler) = handle_action(&state, key, *value, runtime_action) {
                             let args = Some(make_args(&state, key, *value));
                             drop(ev);
-                            let ev = match raw_ev {
+                            let ev = match raw_ev.clone() {
                                 InputEvent::Raw(ev) => ev,
                             };
                             let transformer = state.transformer.clone();
@@ -436,7 +493,28 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         };
                     }
 
-                    // press down on held keys after modifier is released
+                    // other keys were not pressed pressed
+                    if !surpressed {
+                        if let Some(runtime_action) = &state.click_action {
+                            if let Some(handler) = handle_action(&state, key, *value, runtime_action) {
+                                let args = Some(make_args(&state, key, *value));
+                                drop(ev);
+                                let ev = match raw_ev {
+                                    InputEvent::Raw(ev) => ev,
+                                };
+                                let transformer = state.transformer.clone();
+                                let next = state.next.values().cloned().collect();
+                                drop(state);
+                                run_python_handler(handler, args, ev, transformer, next).await;
+                                state = _state.lock().await;
+                            }
+                        } else {
+                            state.next.send_all(InputEvent::Raw(state.key.to_input_ev(1)));
+                            state.next.send_all(InputEvent::Raw(state.key.to_input_ev(0)));
+                        }
+                    }
+
+                    // press down other held keys after modifier is released
                     for key in state.down_keys.iter() {
                         let key = Key::from(key.clone());
                         state.next.send_all(InputEvent::Raw(key.to_input_ev(1)));

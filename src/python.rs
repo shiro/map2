@@ -100,6 +100,15 @@ fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
     Ok(())
 }
 
+#[pyfunction]
+fn unlink(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
+    for v in chain.iter() {
+        // TODO nice error message
+        v.call_method0(py, "unlink")?;
+    }
+    Ok(())
+}
+
 pub fn err_to_py(err: anyhow::Error) -> PyErr {
     PyRuntimeError::new_err(err.to_string())
 }
