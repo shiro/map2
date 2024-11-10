@@ -1,3 +1,5 @@
+use evdev_rs::enums::EV_KEY;
+
 use crate::python::*;
 use crate::*;
 
@@ -17,12 +19,6 @@ pub fn hash_path(path: &Vec<uuid::Uuid>) -> u64 {
 pub enum PythonReturn {
     String(String),
     Bool(bool),
-}
-
-pub trait LinkDstState {
-    // fn get_next(&self) -> Vec<Arc<dyn LinkDst>>;
-    // fn get_next(&self) -> Box<dyn Iterator<Item = &Arc<dyn LinkDst>>>;
-    // fn get_next(&self) -> std::iter::;
 }
 
 pub async fn run_python_handler(
@@ -89,4 +85,46 @@ pub async fn run_python_handler(
     .await?;
 
     Ok(())
+}
+
+pub fn python_callback_args(
+    ev: &EventCode,
+    modifiers: &KeyModifierState,
+    value: i32,
+    transformer: &XKBTransformer,
+) -> Vec<PythonArgument> {
+    let name = match ev {
+        EventCode::EV_KEY(key) => match key {
+            KEY_SPACE => "space".to_string(),
+            KEY_TAB => "tab".to_string(),
+            KEY_ENTER => "enter".to_string(),
+            _ => transformer.raw_to_utf(key, modifiers).unwrap_or_else(|| {
+                let name = format!("{key:?}").to_string().to_lowercase();
+                if name.starts_with("rel_") || name.starts_with("abs_") {
+                    name[1..name.len() - 1].to_string()
+                } else {
+                    name.strip_prefix("key_").unwrap_or(&name).to_string()
+                }
+            }),
+        },
+        EventCode::EV_REL(ev) => {
+            let name = format!("{ev:?}");
+            name[1..name.len() - 1].to_lowercase()
+        }
+        EventCode::EV_ABS(ev) => {
+            let name = format!("{ev:?}");
+            name[1..name.len() - 1].to_lowercase()
+        }
+        _ => unreachable!(),
+    };
+
+    let value = match value {
+        0 => "up",
+        1 => "down",
+        2 => "repeat",
+        _ => unreachable!(),
+    }
+    .to_string();
+
+    vec![PythonArgument::String(name), PythonArgument::String(value)]
 }

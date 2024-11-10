@@ -24,6 +24,10 @@ impl<Value> SuffixTree<Value> {
     pub fn get(&self, key: &String) -> Option<&Value> {
         self.root.get(&key.chars().last().unwrap()).and_then(|x| x.get(&key[0..key.len() - 1]))
     }
+
+    pub fn clear(&mut self) {
+        self.root.clear();
+    }
 }
 
 impl<Value: Clone> Clone for SuffixTree<Value> {

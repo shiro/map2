@@ -14,8 +14,13 @@ use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 
+const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+
+#[derive(derive_new::new)]
 struct State {
+    name: String,
     ev_tx: tokio::sync::mpsc::Sender<InputEvent>,
+    #[new(default)]
     prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
 }
 
@@ -34,12 +39,17 @@ pub struct Writer {
 impl Writer {
     #[new]
     #[pyo3(signature = (**kwargs))]
-    pub fn new(kwargs: Option<pyo3::Bound<PyDict>>) -> PyResult<Self> {
+    pub fn new(py: Python, kwargs: Option<PyBound<PyDict>>) -> PyResult<Py<Self>> {
         let options: HashMap<String, Bound<PyAny>> = match kwargs {
             Some(py_dict) => py_dict.extract()?,
             None => HashMap::new(),
         };
 
+        let name = options
+            .get("name")
+            .and_then(|x| x.extract().ok())
+            .unwrap_or(format!("writer {}", node_util::get_id_and_incremen(&ID_COUNTER)))
+            .to_string();
         let device_name = match options.get("name") {
             Some(option) => {
                 option.extract::<String>().map_err(|_| PyRuntimeError::new_err("'name' must be a string"))?
@@ -117,8 +127,8 @@ impl Writer {
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel::<InputEvent>(255);
         let (exit_tx, mut exit_rx) = tokio::sync::mpsc::channel::<()>(32);
-        let state = Arc::new(Mutex::new(State { ev_tx, prev: Default::default() }));
-        let link = Arc::new(WriterLink { id, state: state.clone() });
+        let state = Arc::new(Mutex::new(State::new(name, ev_tx)));
+        let link = Arc::new(WriterLink::new(id, state.clone()));
 
         #[cfg(not(feature = "integration"))]
         {
@@ -159,27 +169,31 @@ impl Writer {
             });
         }
 
-        let handle = Self {
-            id,
-            state,
-            link,
-            exit_tx,
-            transformer,
-            #[cfg(feature = "integration")]
-            ev_rx,
-        };
-
-        Ok(handle)
+        let _link = link.clone();
+        let _self = Py::new(
+            py,
+            Self {
+                id,
+                state,
+                link,
+                exit_tx,
+                transformer,
+                #[cfg(feature = "integration")]
+                ev_rx,
+            },
+        )?;
+        _link.py_object.set(Arc::new(_self.to_object(py)));
+        Ok(_self)
     }
 
-    pub fn link_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
+    pub fn link_from(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.link_to(self.link.clone());
         self.link.link_from(target);
         Ok(())
     }
 
-    pub fn unlink_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
+    pub fn unlink_from(&mut self, target: &PyBound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.unlink_to(&self.id);
         let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;
@@ -196,6 +210,14 @@ impl Writer {
 
     pub fn unlink_all(&mut self) {
         self.unlink_from_all();
+    }
+
+    pub fn name(&self) -> String {
+        self.state.lock().unwrap().name.clone()
+    }
+
+    pub fn prev(&self, py: Python) -> Vec<PyObject> {
+        self.state.lock().unwrap().prev.values().map(|v| v.py_object().to_object(py)).collect()
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
@@ -239,10 +261,12 @@ impl Drop for Writer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derive_new::new)]
 pub struct WriterLink {
     id: Uuid,
     state: Arc<Mutex<State>>,
+    #[new(default)]
+    py_object: OnceLock<Arc<PyObject>>,
 }
 
 impl LinkDst for WriterLink {
@@ -260,5 +284,8 @@ impl LinkDst for WriterLink {
     fn send(&self, ev: InputEvent) -> Result<()> {
         self.state.lock().unwrap().ev_tx.try_send(ev).map_err(|err| ApplicationError::TooManyEvents.into_py())?;
         Ok(())
+    }
+    fn py_object(&self) -> Arc<PyObject> {
+        self.py_object.get().unwrap().clone()
     }
 }

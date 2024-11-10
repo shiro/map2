@@ -10,10 +10,11 @@ use futures::executor::block_on;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 
-use ApplicationError::TooManyEvents;
+const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Default)]
 struct State {
+    name: String,
     transformer: Arc<XKBTransformer>,
     prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
     next: HashMap<Uuid, Arc<dyn LinkDst>>,
@@ -36,12 +37,17 @@ pub struct Mapper {
 impl Mapper {
     #[new]
     #[pyo3(signature = (**kwargs))]
-    pub fn new(kwargs: Option<pyo3::Bound<PyDict>>) -> PyResult<Self> {
+    pub fn new(py: Python, kwargs: Option<PyBound<PyDict>>) -> PyResult<Py<Self>> {
         let options: HashMap<String, Bound<PyAny>> = match kwargs {
             Some(py_dict) => py_dict.extract()?,
             None => HashMap::new(),
         };
 
+        let name = options
+            .get("name")
+            .and_then(|x| x.extract().ok())
+            .unwrap_or(format!("text mapper {}", node_util::get_id_and_incremen(&ID_COUNTER)))
+            .to_string();
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());
         let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
@@ -53,7 +59,7 @@ impl Mapper {
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(64);
         let state = Arc::new(Mutex::new(State { transformer, ..Default::default() }));
-        let link = Arc::new(MapperLink { id, ev_tx: ev_tx.clone(), state: state.clone() });
+        let link = Arc::new(MapperLink::new(id, ev_tx.clone(), state.clone()));
 
         {
             let state = state.clone();
@@ -68,7 +74,10 @@ impl Mapper {
             });
         }
 
-        Ok(Self { id, link, ev_tx, state })
+        let _link = link.clone();
+        let _self = Py::new(py, Self { id, link, ev_tx, state })?;
+        _link.py_object.set(Arc::new(_self.to_object(py)));
+        Ok(_self)
     }
 
     pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
@@ -195,21 +204,21 @@ impl Mapper {
         }))
     }
 
-    pub fn link_to(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
+    pub fn link_to(&self, target: &PyBound<PyAny>) -> PyResult<()> {
         let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.link_from(self.link.clone());
         self.link.link_to(target);
         Ok(())
     }
 
-    pub fn unlink_to(&mut self, py: Python, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
+    pub fn unlink_to(&self, py: Python, target: &PyBound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.unlink_from(&self.id);
         let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
         Ok(ret)
     }
 
-    pub fn unlink_to_all(&mut self) {
+    pub fn unlink_to_all(&self) {
         let mut state = self.state.blocking_lock();
         for l in state.next.values_mut() {
             l.unlink_from(&self.id);
@@ -217,21 +226,21 @@ impl Mapper {
         state.next.clear();
     }
 
-    pub fn link_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
+    pub fn link_from(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.link_to(self.link.clone());
         self.link.link_from(target);
         Ok(())
     }
 
-    pub fn unlink_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
+    pub fn unlink_from(&mut self, target: &PyBound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.unlink_to(&self.id);
         let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;
         Ok(ret)
     }
 
-    pub fn unlink_from_all(&mut self) {
+    pub fn unlink_from_all(&self) {
         let mut state = self.state.blocking_lock();
         for l in state.prev.values_mut() {
             l.unlink_to(&self.id);
@@ -239,13 +248,43 @@ impl Mapper {
         state.prev.clear();
     }
 
-    pub fn unlink_all(&mut self) {
+    pub fn unlink_all(&self) {
         self.unlink_from_all();
         self.unlink_to_all();
     }
 
+    // pub fn replace(&self, other: &PyBound<PyAny>) {
+    //     let state = self.state.blocking_lock();
+    //     state.prev.values()
+    // }
+
+    pub fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
+
+        let target_src =
+            node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source+destination node"))?;
+        let target_dst =
+            node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a source+destination node"))?;
+
+        for (_, node) in state.next.drain() {
+            target_src.link_to(node);
+        }
+        drop(state);
+        self.link_to(target);
+
+        Ok(())
+    }
+
     pub fn name(&self) -> String {
-        "".to_string()
+        self.state.blocking_lock().name.clone()
+    }
+
+    pub fn next(&self, py: Python) -> Vec<PyObject> {
+        self.state.blocking_lock().next.values().map(|v| v.py_object().to_object(py)).collect()
+    }
+
+    pub fn prev(&self, py: Python) -> Vec<PyObject> {
+        self.state.blocking_lock().prev.values().map(|v| v.py_object().to_object(py)).collect()
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
@@ -254,7 +293,9 @@ impl Mapper {
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
         for action in actions {
-            self.ev_tx.try_send(InputEvent::Raw(action.to_input_ev())).expect(&TooManyEvents.to_string());
+            self.ev_tx
+                .try_send(InputEvent::Raw(action.to_input_ev()))
+                .expect(&ApplicationError::TooManyEvents.to_string());
         }
         Ok(())
     }
@@ -362,11 +403,13 @@ impl Drop for Mapper {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derive_new::new)]
 pub struct MapperLink {
     id: Uuid,
     ev_tx: Sender<InputEvent>,
     state: Arc<Mutex<State>>,
+    #[new(default)]
+    py_object: OnceLock<Arc<PyObject>>,
 }
 
 impl LinkSrc for MapperLink {
@@ -379,6 +422,9 @@ impl LinkSrc for MapperLink {
     }
     fn unlink_to(&self, id: &Uuid) -> Result<bool> {
         Ok(self.state.blocking_lock().next.remove(id).is_some())
+    }
+    fn py_object(&self) -> Arc<PyObject> {
+        self.py_object.get().unwrap().clone()
     }
 }
 
@@ -396,6 +442,9 @@ impl LinkDst for MapperLink {
     fn send(&self, ev: InputEvent) -> Result<()> {
         self.ev_tx.try_send(ev).map_err(|err| ApplicationError::TooManyEvents.into_py())?;
         Ok(())
+    }
+    fn py_object(&self) -> Arc<PyObject> {
+        self.py_object.get().unwrap().clone()
     }
 }
 
@@ -479,25 +528,8 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
 
             if let Some(handler) = state.fallback_handler.as_ref() {
-                let name = match key {
-                    KEY_SPACE => "space".to_string(),
-                    KEY_TAB => "tab".to_string(),
-                    KEY_ENTER => "enter".to_string(),
-                    _ => state.transformer.raw_to_utf(key, &*state.modifiers).unwrap_or_else(|| {
-                        let name = format!("{key:?}").to_string();
-                        name[4..name.len()].to_lowercase()
-                    }),
-                };
-
-                let value = match *value {
-                    0 => "up",
-                    1 => "down",
-                    2 => "repeat",
-                    _ => unreachable!(),
-                }
-                .to_string();
-
-                let args = vec![PythonArgument::String(name), PythonArgument::String(value)];
+                let args =
+                    Some(python_callback_args(&EventCode::EV_KEY(*key), &state.modifiers, *value, &state.transformer));
                 drop(ev);
                 let ev = match raw_ev {
                     InputEvent::Raw(ev) => ev,
@@ -507,25 +539,21 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 let transformer = state.transformer.clone();
                 let next = state.next.values().cloned().collect();
                 drop(state);
-                run_python_handler(handler, Some(args), ev, transformer, next).await;
+                run_python_handler(handler, args, ev, transformer, next).await;
                 return;
             }
         }
         // rel/abs event
-        EvdevInputEvent { event_code, value, .. }
-            if matches!(event_code, EventCode::EV_REL(..)) || matches!(event_code, EventCode::EV_ABS(..)) =>
+        EvdevInputEvent { event_code: ev, value, .. }
+            if matches!(ev, EventCode::EV_REL(..)) || matches!(ev, EventCode::EV_ABS(..)) =>
         {
-            let (key, handler) = match event_code {
-                EventCode::EV_REL(key) => (format!("{key:?}").to_string(), &state.relative_handler),
-                EventCode::EV_ABS(key) => (format!("{key:?}").to_string(), &state.absolute_handler),
+            let handler = match ev {
+                EventCode::EV_REL(key) => &state.relative_handler,
+                EventCode::EV_ABS(key) => &state.absolute_handler,
                 _ => unreachable!(),
             };
             if let Some(handler) = handler.as_ref() {
-                let name = format!("{key:?}");
-                // remove prefix REL_ / ABS_
-                // let name = name[5..name.len() - 1].to_string();
-                let name = name[1..name.len() - 1].to_lowercase();
-                let args = vec![PythonArgument::String(name), PythonArgument::Number(*value)];
+                let args = Some(python_callback_args(ev, &state.modifiers, *value, &state.transformer));
                 drop(ev);
                 let ev = match raw_ev {
                     InputEvent::Raw(ev) => ev,
@@ -535,7 +563,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 let transformer = state.transformer.clone();
                 let next = state.next.values().cloned().collect();
                 drop(state);
-                run_python_handler(handler, Some(args), ev, transformer, next).await;
+                run_python_handler(handler, args, ev, transformer, next).await;
                 return;
             }
         }

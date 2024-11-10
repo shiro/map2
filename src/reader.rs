@@ -9,8 +9,12 @@ use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 
-#[derive(Default)]
+const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+
+#[derive(derive_new::new)]
 struct State {
+    name: String,
+    #[new(default)]
     next: HashMap<Uuid, Arc<dyn LinkDst>>,
 }
 
@@ -30,7 +34,7 @@ pub struct Reader {
 impl Reader {
     #[new]
     #[pyo3(signature = (**kwargs))]
-    pub fn new(py: Python, kwargs: Option<pyo3::Bound<PyDict>>) -> PyResult<Self> {
+    pub fn new(py: Python, kwargs: Option<PyBound<PyDict>>) -> PyResult<Self> {
         let options: HashMap<String, Bound<PyAny>> = match kwargs {
             Some(py_dict) => py_dict.extract()?,
             None => HashMap::new(),
@@ -57,6 +61,11 @@ impl Reader {
             }
         }
 
+        let name = options
+            .get("name")
+            .and_then(|x| x.extract().ok())
+            .unwrap_or(format!("reader {}", node_util::get_id_and_incremen(&ID_COUNTER)))
+            .to_string();
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());
         let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
@@ -69,8 +78,8 @@ impl Reader {
         let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
 
         let id = Uuid::new_v4();
-        let state = Arc::new(Mutex::new(State::default()));
-        let link = Arc::new(ReaderLink { id, state: state.clone() });
+        let state = Arc::new(Mutex::new(State::new(name)));
+        let link = Arc::new(ReaderLink::new(id, state.clone()));
 
         #[cfg(not(feature = "integration"))]
         let reader_thread_handle = if !filters.is_empty() {
@@ -97,14 +106,14 @@ impl Reader {
         })
     }
 
-    pub fn link_to(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
+    pub fn link_to(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
         let mut target = node_to_link_dst(target).unwrap();
         target.link_from(self.link.clone());
         self.link.link_to(target);
         Ok(())
     }
 
-    pub fn unlink_to(&mut self, py: Python, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
+    pub fn unlink_to(&mut self, py: Python, target: &PyBound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.unlink_from(&self.id);
         let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
@@ -121,6 +130,14 @@ impl Reader {
 
     pub fn unlink_all(&mut self) {
         self.unlink_to_all();
+    }
+
+    pub fn name(&self) -> String {
+        self.state.lock().unwrap().name.clone()
+    }
+
+    pub fn next(&self, py: Python) -> Vec<PyObject> {
+        self.state.lock().unwrap().next.values().map(|v| v.py_object().to_object(py)).collect()
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
@@ -143,10 +160,12 @@ impl Reader {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derive_new::new)]
 pub struct ReaderLink {
     id: Uuid,
     state: Arc<Mutex<State>>,
+    #[new(default)]
+    py_object: OnceLock<Arc<PyObject>>,
 }
 
 impl LinkSrc for ReaderLink {
@@ -159,5 +178,8 @@ impl LinkSrc for ReaderLink {
     }
     fn unlink_to(&self, id: &Uuid) -> Result<bool> {
         Ok(self.state.lock().unwrap().next.remove(id).is_some())
+    }
+    fn py_object(&self) -> Arc<PyObject> {
+        self.py_object.get().unwrap().clone()
     }
 }

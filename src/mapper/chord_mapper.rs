@@ -9,20 +9,31 @@ use nom::Slice;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 
-use ApplicationError::TooManyEvents;
 type Mappings = HashMap<Vec<Key>, RuntimeAction>;
 
-#[derive(Default)]
+const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+
+#[derive(derive_new::new)]
 struct State {
+    name: String,
     transformer: Arc<XKBTransformer>,
+    #[new(default)]
     prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
+    #[new(default)]
     next: HashMap<Uuid, Arc<dyn LinkDst>>,
+    #[new(default)]
     mappings: Mappings,
+    #[new(default)]
     chorded_keys: HashSet<Key>,
+    #[new(default)]
     modifiers: Arc<KeyModifierState>,
+    #[new(default)]
     stack: Vec<Key>,
+    #[new(default)]
     ignored_keys: HashSet<Key>,
+    #[new(default)]
     pressed_keys: HashSet<Key>,
+    #[new(default)]
     interval: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -38,12 +49,17 @@ pub struct ChordMapper {
 impl ChordMapper {
     #[new]
     #[pyo3(signature = (**kwargs))]
-    pub fn new(kwargs: Option<pyo3::Bound<PyDict>>) -> PyResult<Self> {
+    pub fn new(py: Python, kwargs: Option<PyBound<PyDict>>) -> PyResult<Py<Self>> {
         let options: HashMap<String, Bound<PyAny>> = match kwargs {
             Some(py_dict) => py_dict.extract()?,
             None => HashMap::new(),
         };
 
+        let name = options
+            .get("name")
+            .and_then(|x| x.extract().ok())
+            .unwrap_or(format!("chord mapper {}", node_util::get_id_and_incremen(&ID_COUNTER)))
+            .to_string();
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());
         let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
         let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
@@ -54,8 +70,8 @@ impl ChordMapper {
 
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(64);
-        let state = Arc::new(Mutex::new(State { transformer, ..Default::default() }));
-        let link = Arc::new(ChordMapperLink { id, ev_tx: ev_tx.clone(), state: state.clone() });
+        let state = Arc::new(Mutex::new(State::new(name, transformer)));
+        let link = Arc::new(ChordMapperLink::new(id, ev_tx.clone(), state.clone()));
 
         {
             let state = state.clone();
@@ -70,7 +86,10 @@ impl ChordMapper {
             });
         }
 
-        Ok(Self { id, link, ev_tx, state })
+        let _link = link.clone();
+        let _self = Py::new(py, Self { id, link, ev_tx, state })?;
+        _link.py_object.set(Arc::new(_self.to_object(py)));
+        Ok(_self)
     }
 
     pub fn map(&mut self, py: Python, from: Vec<String>, to: PyObject) -> PyResult<()> {
@@ -138,14 +157,14 @@ impl ChordMapper {
         Ok(Some(ChordMapperSnapshot { mappings: state.mappings.clone() }))
     }
 
-    pub fn link_to(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
+    pub fn link_to(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
         let mut target = node_to_link_dst(target).unwrap();
         target.link_from(self.link.clone());
         self.link.link_to(target);
         Ok(())
     }
 
-    pub fn unlink_to(&mut self, py: Python, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
+    pub fn unlink_to(&mut self, py: Python, target: &PyBound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.unlink_from(&self.id);
         let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
@@ -160,14 +179,14 @@ impl ChordMapper {
         state.next.clear();
     }
 
-    pub fn link_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<()> {
+    pub fn link_from(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.link_to(self.link.clone());
         self.link.link_from(target);
         Ok(())
     }
 
-    pub fn unlink_from(&mut self, target: &pyo3::Bound<PyAny>) -> PyResult<bool> {
+    pub fn unlink_from(&mut self, target: &PyBound<PyAny>) -> PyResult<bool> {
         let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
         target.unlink_to(&self.id);
         let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;
@@ -188,7 +207,19 @@ impl ChordMapper {
     }
 
     pub fn name(&self) -> String {
-        "".to_string()
+        self.state.blocking_lock().name.clone()
+    }
+
+    pub fn next(&self, py: Python) -> Vec<PyObject> {
+        self.state.blocking_lock().next.values().map(|v| v.py_object().to_object(py)).collect()
+    }
+
+    pub fn prev(&self, py: Python) -> Vec<PyObject> {
+        self.state.blocking_lock().prev.values().map(|v| v.py_object().to_object(py)).collect()
+    }
+
+    pub fn reset(&mut self) {
+        self.state.blocking_lock().mappings.clear();
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
@@ -196,7 +227,9 @@ impl ChordMapper {
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
         for action in actions {
-            self.ev_tx.try_send(InputEvent::Raw(action.to_input_ev())).expect(&TooManyEvents.to_string());
+            self.ev_tx
+                .try_send(InputEvent::Raw(action.to_input_ev()))
+                .expect(&ApplicationError::TooManyEvents.to_string());
         }
         Ok(())
     }
@@ -209,11 +242,13 @@ impl Drop for ChordMapper {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, derive_new::new)]
 pub struct ChordMapperLink {
     id: Uuid,
     ev_tx: Sender<InputEvent>,
     state: Arc<Mutex<State>>,
+    #[new(default)]
+    py_object: OnceLock<Arc<PyObject>>,
 }
 
 impl LinkSrc for ChordMapperLink {
@@ -226,6 +261,9 @@ impl LinkSrc for ChordMapperLink {
     }
     fn unlink_to(&self, id: &Uuid) -> Result<bool> {
         Ok(self.state.blocking_lock().next.remove(id).is_some())
+    }
+    fn py_object(&self) -> Arc<PyObject> {
+        self.py_object.get().unwrap().clone()
     }
 }
 
@@ -243,6 +281,9 @@ impl LinkDst for ChordMapperLink {
     fn send(&self, ev: InputEvent) -> Result<()> {
         self.ev_tx.try_send(ev).map_err(|err| ApplicationError::TooManyEvents.into_py())?;
         Ok(())
+    }
+    fn py_object(&self) -> Arc<PyObject> {
+        self.py_object.get().unwrap().clone()
     }
 }
 

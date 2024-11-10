@@ -2,6 +2,7 @@ pub use pyo3::exceptions::PyRuntimeError;
 pub use pyo3::impl_::wrap::OkWrap;
 pub use pyo3::prelude::*;
 pub use pyo3::types::PyDict;
+pub use pyo3::Bound as PyBound;
 pub use pyo3::PyClass;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use tokio::runtime::Runtime;
@@ -20,8 +21,8 @@ struct PyKey {
 
 #[pyfunction]
 #[pyo3(signature = (**options))]
-fn default(options: Option<pyo3::Bound<PyDict>>) -> PyResult<()> {
-    let options: HashMap<String, pyo3::Bound<PyAny>> = match options {
+fn default(options: Option<PyBound<PyDict>>) -> PyResult<()> {
+    let options: HashMap<String, PyBound<PyAny>> = match options {
         Some(py_dict) => py_dict.extract().unwrap(),
         None => HashMap::new(),
     };
@@ -55,7 +56,7 @@ fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
     let mut prev: Option<Arc<dyn LinkSrc>> = None;
 
     if chain.len() < 2 {
-        return Err(PyRuntimeError::new_err("expected at least 2 nodes"));
+        return Ok(());
     }
 
     let chain_len = chain.len();
@@ -102,10 +103,12 @@ fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
 
 #[pyfunction]
 fn unlink(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
-    for v in chain.iter() {
-        // TODO nice error message
-        v.call_method0(py, "unlink")?;
+    use itertools::Itertools;
+
+    for (from, to) in chain.iter().tuple_windows() {
+        from.call_method1(py, "unlink_to", (to,))?;
     }
+
     Ok(())
 }
 
@@ -141,11 +144,12 @@ fn __test() -> PyResult<Vec<String>> {
 }
 
 #[pymodule]
-fn map2(_py: Python, m: pyo3::Bound<PyModule>) -> PyResult<()> {
+fn map2(_py: Python, m: PyBound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(wait, &m)?)?;
     m.add_function(wrap_pyfunction!(exit, &m)?)?;
     m.add_function(wrap_pyfunction!(default, &m)?)?;
     m.add_function(wrap_pyfunction!(link, &m)?)?;
+    m.add_function(wrap_pyfunction!(unlink, &m)?)?;
     #[cfg(feature = "integration")]
     m.add_function(wrap_pyfunction!(__test, &m)?)?;
 

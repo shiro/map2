@@ -1,3 +1,4 @@
+use crate::*;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::{Seek, SeekFrom, Write};
@@ -33,7 +34,7 @@ pub struct VirtualWriter {
 impl VirtualWriter {
     #[new]
     #[pyo3(signature = (**kwargs))]
-    pub fn new(kwargs: Option<pyo3::Bound<PyDict>>) -> PyResult<Self> {
+    pub fn new(kwargs: Option<PyBound<PyDict>>) -> PyResult<Self> {
         let keyboard = VirtualKeyboard::new().unwrap();
         Ok(Self { keyboard })
     }
