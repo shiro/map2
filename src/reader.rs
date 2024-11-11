@@ -160,6 +160,16 @@ impl Reader {
     }
 }
 
+impl Drop for Reader {
+    fn drop(&mut self) {
+        let _ = self.reader_exit_tx.take().map(|v| {
+            v.send(());
+        });
+        self.unlink_all();
+        println!("drop");
+    }
+}
+
 #[derive(Clone, derive_new::new)]
 pub struct ReaderLink {
     id: Uuid,

@@ -68,6 +68,7 @@ pub async fn read_from_device_input_fd_thread_handler(
     abort_rx: oneshot::Receiver<()>,
 ) {
     let mut read_buf: io::Result<(ReadStatus, InputEvent)>;
+    // TODO remove id
     let id = Uuid::new_v4().to_string();
 
     let file = device.file().as_ref().unwrap().as_raw_fd();
