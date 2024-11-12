@@ -25,9 +25,7 @@ pub struct Reader {
     state: Arc<Mutex<State>>,
     transformer: Arc<XKBTransformer>,
     #[cfg(not(feature = "integration"))]
-    reader_exit_tx: Option<oneshot::Sender<()>>,
-    #[cfg(not(feature = "integration"))]
-    reader_thread_handle: Option<thread::JoinHandle<Result<()>>>,
+    reader_exit_tx: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 #[pymethods]
@@ -75,7 +73,7 @@ impl Reader {
             .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
 
         #[cfg(not(feature = "integration"))]
-        let (reader_exit_tx, reader_exit_rx) = oneshot::channel();
+        let (reader_exit_tx, reader_exit_rx) = tokio::sync::oneshot::channel();
 
         let id = Uuid::new_v4();
         let state = Arc::new(Mutex::new(State::new(name)));
@@ -99,10 +97,10 @@ impl Reader {
             state,
             transformer,
             link,
-            #[cfg(not(feature = "integration"))]
+            // #[cfg(not(feature = "integration"))]
             reader_exit_tx: Some(reader_exit_tx),
-            #[cfg(not(feature = "integration"))]
-            reader_thread_handle,
+            // #[cfg(not(feature = "integration"))]
+            // reader_thread_handle,
         })
     }
 
@@ -166,7 +164,6 @@ impl Drop for Reader {
             v.send(());
         });
         self.unlink_all();
-        println!("drop");
     }
 }
 

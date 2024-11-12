@@ -93,38 +93,37 @@ pub fn python_callback_args(
     value: i32,
     transformer: &XKBTransformer,
 ) -> Vec<PythonArgument> {
-    let name = match ev {
-        EventCode::EV_KEY(key) => match key {
-            KEY_SPACE => "space".to_string(),
-            KEY_TAB => "tab".to_string(),
-            KEY_ENTER => "enter".to_string(),
-            _ => transformer.raw_to_utf(key, modifiers).unwrap_or_else(|| {
-                let name = format!("{key:?}").to_string().to_lowercase();
-                if name.starts_with("rel_") || name.starts_with("abs_") {
-                    name[1..name.len() - 1].to_string()
-                } else {
+    let (name, format_value) = match ev {
+        EventCode::EV_KEY(key) => (
+            match key {
+                KEY_SPACE => "space".to_string(),
+                KEY_TAB => "tab".to_string(),
+                KEY_ENTER => "enter".to_string(),
+                _ => transformer.raw_to_utf(key, modifiers).unwrap_or_else(|| {
+                    let name = format!("{key:?}").to_string().to_lowercase();
                     name.strip_prefix("key_").unwrap_or(&name).to_string()
-                }
-            }),
-        },
-        EventCode::EV_REL(ev) => {
-            let name = format!("{ev:?}");
-            name[1..name.len() - 1].to_lowercase()
-        }
-        EventCode::EV_ABS(ev) => {
-            let name = format!("{ev:?}");
-            name[1..name.len() - 1].to_lowercase()
-        }
-        _ => unreachable!(),
+                }),
+            },
+            true,
+        ),
+        EventCode::EV_REL(ev) => (format!("{ev:?}").to_lowercase(), false),
+        EventCode::EV_ABS(ev) => (format!("{ev:?}").to_lowercase(), false),
+        val => panic!("got unexpected value: {}", val),
     };
 
-    let value = match value {
-        0 => "up",
-        1 => "down",
-        2 => "repeat",
-        _ => unreachable!(),
-    }
-    .to_string();
+    let value = if format_value {
+        PythonArgument::String(
+            match value {
+                0 => "up",
+                1 => "down",
+                2 => "repeat",
+                _ => unreachable!(),
+            }
+            .to_string(),
+        )
+    } else {
+        PythonArgument::Number(value)
+    };
 
-    vec![PythonArgument::String(name), PythonArgument::String(value)]
+    vec![PythonArgument::String(name), value]
 }

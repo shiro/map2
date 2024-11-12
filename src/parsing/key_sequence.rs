@@ -55,7 +55,7 @@ mod tests {
                 vec![
                     ParsedKeyAction::KeyClickAction(KeyClickActionWithMods {
                         key: KEY_H.into(),
-                        modifiers: KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                        modifiers: KeyModifierFlags::new().tap_mut(|x| x.left_shift()),
                     }),
                     ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new(KEY_I.into())),
                     ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new(KEY_SPACE.into())),
@@ -66,7 +66,7 @@ mod tests {
                     ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new(KEY_E.into())),
                     ParsedKeyAction::KeyClickAction(KeyClickActionWithMods {
                         key: KEY_1.into(),
-                        modifiers: KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                        modifiers: KeyModifierFlags::new().tap_mut(|x| x.left_shift()),
                     }),
                 ],
                 CustomError { input: "", expected: vec![] }
@@ -146,7 +146,7 @@ mod tests {
             nom_ok((
                 vec![ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
                     KEY_LEFTBRACE.into(),
-                    KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                    KeyModifierFlags::new().tap_mut(|x| x.left_shift()),
                 )),],
                 CustomError { input: "", expected: vec![] },
             ))
@@ -157,7 +157,7 @@ mod tests {
             nom_ok((
                 vec![ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
                     KEY_RIGHTBRACE.into(),
-                    KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                    KeyModifierFlags::new().tap_mut(|x| x.left_shift()),
                 )),],
                 CustomError { input: "", expected: vec![] },
             ))

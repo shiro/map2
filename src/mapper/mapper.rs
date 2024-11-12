@@ -22,7 +22,7 @@ struct State {
     fallback_handler: Option<Arc<PyObject>>,
     relative_handler: Option<Arc<PyObject>>,
     absolute_handler: Option<Arc<PyObject>>,
-    modifiers: Arc<KeyModifierState>,
+    modifiers: Arc<KeyModifierFlags>,
 }
 
 #[pyclass]
@@ -465,33 +465,27 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
     match ev {
         // key event
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-            let mut from_modifiers = KeyModifierFlags::new();
-            from_modifiers.ctrl = state.modifiers.is_ctrl();
-            from_modifiers.alt = state.modifiers.is_alt();
-            from_modifiers.right_alt = state.modifiers.is_right_alt();
-            from_modifiers.shift = state.modifiers.is_shift();
-            from_modifiers.meta = state.modifiers.is_meta();
-
             let from_key_action = KeyActionWithMods {
                 key: Key { event_code: ev.event_code },
                 value: ev.value,
-                modifiers: from_modifiers,
+                modifiers: *state.modifiers,
             };
 
             if let Some(runtime_action) = state.mappings.get(&from_key_action) {
                 match runtime_action {
                     RuntimeAction::ActionSequence(seq) => {
+                        let current_flags = *state.modifiers;
                         for action in seq {
                             match action {
                                 RuntimeKeyAction::KeyAction(key_action) => {
                                     let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
                                 }
-                                RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                    let new_events =
-                                        release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
+                                RuntimeKeyAction::ReleaseRestoreModifiers(to_flags) => {
+                                    let new_events = release_restore_modifiers(&current_flags, &to_flags);
                                     for ev in new_events {
                                         state.next.send_all(InputEvent::Raw(ev));
                                     }
+                                    current_flags = to_flags;
                                 }
                             }
                         }
@@ -499,12 +493,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     RuntimeAction::PythonCallback(from_modifiers, handler) => {
                         if !state.next.is_empty() {
                             // always release all trigger mods before running the callback
-                            let new_events = release_restore_modifiers(
-                                &state.modifiers,
-                                &from_modifiers,
-                                &KeyModifierFlags::new(),
-                                &TYPE_UP,
-                            );
+                            let new_events = release_restore_modifiers(&state.modifiers, &KeyModifierFlags::default());
                             new_events.iter().cloned().for_each(|ev| state.next.send_all(InputEvent::Raw(ev)));
                         }
 

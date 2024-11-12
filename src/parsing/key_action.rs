@@ -20,70 +20,70 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
         // TODO keep track of modifier keys and revert to a sane state after every action
         self.into_iter().fold(vec![], |mut acc, v| match v {
             ParsedKeyAction::KeyAction(action) => {
-                if action.modifiers.ctrl {
+                if action.modifiers.left_ctrl {
                     acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN));
                 }
-                if action.modifiers.shift {
+                if action.modifiers.left_shift {
                     acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN));
                 }
-                if action.modifiers.alt {
+                if action.modifiers.left_alt {
                     acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN));
                 }
                 if action.modifiers.right_alt {
                     acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_DOWN));
                 }
-                if action.modifiers.meta {
+                if action.modifiers.left_meta {
                     acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN));
                 }
                 acc.push(KeyAction::new(action.key, action.value));
-                if action.modifiers.ctrl {
+                if action.modifiers.left_ctrl {
                     acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_UP));
                 }
-                if action.modifiers.shift {
+                if action.modifiers.left_shift {
                     acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_UP));
                 }
-                if action.modifiers.alt {
+                if action.modifiers.left_alt {
                     acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_UP));
                 }
                 if action.modifiers.right_alt {
                     acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_UP));
                 }
-                if action.modifiers.meta {
+                if action.modifiers.left_meta {
                     acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_UP));
                 }
                 acc
             }
             ParsedKeyAction::KeyClickAction(action) => {
-                if action.modifiers.ctrl {
+                if action.modifiers.left_ctrl {
                     acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN));
                 }
-                if action.modifiers.shift {
+                if action.modifiers.left_shift {
                     acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN));
                 }
-                if action.modifiers.alt {
+                if action.modifiers.left_alt {
                     acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN));
                 }
                 if action.modifiers.right_alt {
                     acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_DOWN));
                 }
-                if action.modifiers.meta {
+                if action.modifiers.left_meta {
                     acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN));
                 }
                 acc.push(KeyAction::new(action.key, TYPE_DOWN));
                 acc.push(KeyAction::new(action.key, TYPE_UP));
-                if action.modifiers.ctrl {
+                if action.modifiers.left_ctrl {
                     acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_UP));
                 }
-                if action.modifiers.shift {
+                if action.modifiers.left_shift {
                     acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_UP));
                 }
-                if action.modifiers.alt {
+                if action.modifiers.left_alt {
                     acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_UP));
                 }
                 if action.modifiers.right_alt {
                     acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_UP));
                 }
-                if action.modifiers.meta {
+                if action.modifiers.left_meta {
                     acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_UP));
                 }
                 acc
@@ -276,7 +276,7 @@ mod tests {
             nom_ok(ParsedKeyAction::KeyAction(KeyActionWithMods::new(
                 Key::from_str("KEY_A").unwrap(),
                 1,
-                KeyModifierFlags::new().tap_mut(|v| v.shift())
+                KeyModifierFlags::new().tap_mut(|v| v.left_shift())
             )))
         );
 
@@ -285,7 +285,7 @@ mod tests {
             nom_ok(ParsedKeyAction::KeyAction(KeyActionWithMods::new(
                 Key::from_str("KEY_J").unwrap(),
                 1,
-                KeyModifierFlags::new().tap_mut(|v| v.alt())
+                KeyModifierFlags::new().tap_mut(|v| v.left_alt())
             )))
         );
     }
@@ -299,7 +299,7 @@ mod tests {
             nom_ok(ParsedKeyAction::KeyAction(KeyActionWithMods::new(
                 Key::from_str("semicolon").unwrap(),
                 1,
-                KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                KeyModifierFlags::new().tap_mut(|x| x.left_shift()),
             )))
         );
 
@@ -308,7 +308,7 @@ mod tests {
             nom_ok(ParsedKeyAction::KeyAction(KeyActionWithMods::new(
                 Key::from_str("6").unwrap(),
                 1,
-                KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                KeyModifierFlags::new().tap_mut(|x| x.left_shift()),
             )))
         );
 
@@ -316,7 +316,7 @@ mod tests {
             key_action_utf(Some(&t))("^"),
             nom_ok(ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
                 Key::from_str("6").unwrap(),
-                KeyModifierFlags::new().tap_mut(|x| x.shift()),
+                KeyModifierFlags::new().tap_mut(|x| x.left_shift()),
             )))
         );
     }
@@ -331,7 +331,7 @@ mod tests {
             single_key_action_utf_with_flags_utf(Some(&t))("\\^"),
             nom_ok(ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
                 Key::from_str("6").unwrap(),
-                KeyModifierFlags::new().tap_mut(|v| v.shift())
+                KeyModifierFlags::new().tap_mut(|v| v.left_shift())
             )))
         );
 
@@ -339,7 +339,7 @@ mod tests {
             single_key_action_utf_with_flags_utf(Some(&t))("\\{"),
             nom_ok(ParsedKeyAction::KeyClickAction(KeyClickActionWithMods::new_with_mods(
                 Key::from_str("leftbrace").unwrap(),
-                KeyModifierFlags::new().tap_mut(|v| v.shift())
+                KeyModifierFlags::new().tap_mut(|v| v.left_shift())
             )))
         );
 

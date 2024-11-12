@@ -8,7 +8,7 @@ use std::{fs, io, thread, time};
 use crate::EvdevInputEvent;
 use anyhow::{anyhow, Result};
 use evdev_rs::{Device, GrabMode, InputEvent, ReadFlag, ReadStatus};
-use notify::{DebouncedEvent, Watcher};
+use notify::Watcher;
 use regex::Regex;
 use tokio::io::unix::AsyncFd;
 use uuid::Uuid;
@@ -65,7 +65,7 @@ fn find_fd_with_pattern(fd_path: &PathBuf, udev: &udev::Device, matchers: &Vec<P
 pub async fn read_from_device_input_fd_thread_handler(
     device: Device,
     ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
-    abort_rx: oneshot::Receiver<()>,
+    // abort_rx: oneshot::Receiver<()>,
 ) {
     let mut read_buf: io::Result<(ReadStatus, InputEvent)>;
     // TODO remove id
@@ -75,9 +75,9 @@ pub async fn read_from_device_input_fd_thread_handler(
     let async_fd = AsyncFd::new(file).unwrap();
 
     loop {
-        if abort_rx.try_recv().is_ok() {
-            return;
-        }
+        // if abort_rx.try_recv().is_ok() {
+        //     return;
+        // }
 
         let mut guard = async_fd.readable().await.unwrap();
         guard.clear_ready();
@@ -106,14 +106,14 @@ pub async fn read_from_device_input_fd_thread_handler(
             } else {
                 let err = read_buf.err().unwrap();
                 match err.raw_os_error() {
-                    // Some(libc::ENODEV) => { return; }
+                    Some(libc::ENODEV) => return,
                     Some(libc::EWOULDBLOCK) => {
                         // println!("would block!");
                         // thread::sleep(time::Duration::from_millis(10));
                         // thread::yield_now();
                         break;
                     }
-                    Some(libc::EWOULDBLOCK) => {}
+                    // Some(libc::EWOULDBLOCK) => {}
                     _ => {
                         println!("Reader event polling loop error: {}", err);
                         std::process::exit(1);
@@ -137,7 +137,7 @@ enum GrabDeviceError {
 fn grab_device(
     fd_path: &Path,
     ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
-) -> Result<oneshot::Sender<()>, GrabDeviceError> {
+) -> Result<tokio::task::AbortHandle, GrabDeviceError> {
     use nix::fcntl::{FcntlArg, OFlag};
 
     let fd_file = fs::OpenOptions::new()
@@ -159,12 +159,11 @@ fn grab_device(
         .map_err(|err| GrabDeviceError::FailedToGrabDevice(fd_path.to_string_lossy().to_string()))?;
 
     // spawn tasks for reading devices
-    let (abort_tx, abort_rx) = oneshot::channel();
-    pyo3_async_runtimes::tokio::get_runtime().spawn(async move {
-        read_from_device_input_fd_thread_handler(device, ev_handler, abort_rx).await;
+    let handle = pyo3_async_runtimes::tokio::get_runtime().spawn(async move {
+        read_from_device_input_fd_thread_handler(device, ev_handler).await;
     });
 
-    Ok(abort_tx)
+    Ok(handle.abort_handle())
 }
 
 pub type DeviceMatcher = HashMap<String, String>;
@@ -181,8 +180,8 @@ pub fn grab_udev_inputs(
     // fd_patterns: &[impl AsRef<str>],
     matchers: Vec<DeviceMatcher>,
     ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
-    exit_rx: oneshot::Receiver<()>,
-) -> Result<thread::JoinHandle<Result<()>>> {
+    mut exit_rx: tokio::sync::oneshot::Receiver<()>,
+) -> Result<()> {
     let parsed_matchers = matchers
         .into_iter()
         // .map(|x| Regex::new(x.as_ref()))
@@ -207,11 +206,15 @@ pub fn grab_udev_inputs(
         .unwrap();
 
     // devices are monitored and hooked up when added/removed, so we need another thread
-    let join_handle = thread::spawn(move || {
-        let (fs_ev_tx, fs_ev_rx) = mpsc::channel();
+    pyo3_async_runtimes::tokio::get_runtime().spawn(async move {
+        let (fs_ev_tx, mut fs_ev_rx) = tokio::sync::mpsc::channel(32);
 
-        let mut watcher: notify::RecommendedWatcher = notify::Watcher::new(fs_ev_tx, time::Duration::from_secs(2))?;
-        watcher.watch("/dev/input", notify::RecursiveMode::Recursive)?;
+        let mut watcher: notify::RecommendedWatcher = notify::recommended_watcher(move |res| {
+            futures::executor::block_on(async {
+                fs_ev_tx.send(res).await.unwrap();
+            })
+        })?;
+        watcher.watch(Path::new("/dev/input"), notify::RecursiveMode::Recursive)?;
 
         let mut device_map = HashMap::new();
 
@@ -228,7 +231,7 @@ pub fn grab_udev_inputs(
                 continue;
             }
             let res = grab_device(&fd_path, ev_handler.clone());
-            let abort_tx = match res {
+            let abort_handle = match res {
                 Ok(v) => v,
                 Err(err) => {
                     eprintln!("{}", err);
@@ -236,48 +239,53 @@ pub fn grab_udev_inputs(
                 }
             };
 
-            println!("add {:?}", fd_path.clone());
-            device_map.insert(udev.syspath().to_owned(), abort_tx);
+            device_map.insert(udev.syspath().to_owned(), abort_handle);
         }
 
         // continuously check if devices are added/removed and handle it
-        loop {
-            if let Ok(()) = exit_rx.try_recv() {
-                return Ok(());
-            }
+        tokio::select!(
+            Ok(()) = exit_rx => {
+                device_map.values().for_each(|v| v.abort());
+                return Ok::<_, anyhow::Error>(());
+            },
+            (_) = async {
+                loop {
+                    if let Some(Ok(event)) = fs_ev_rx.recv().await {
+                        match event.kind {
+                            notify::EventKind::Create(_) => {
+                                let fd_path = event.paths.first().unwrap();
+                                let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
 
-            while let Ok(event) = fs_ev_rx.try_recv() {
-                match event {
-                    DebouncedEvent::Create(fd_path) => {
-                        let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
+                                if device_map.contains_key(udev.syspath()) {
+                                    continue;
+                                }
+                                if !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
+                                    continue;
+                                }
 
-                        if device_map.contains_key(udev.syspath()) {
-                            continue;
-                        }
-                        if !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
-                            continue;
-                        }
+                                let abort_handle = grab_device(&fd_path, ev_handler.clone())?;
+                                device_map.insert(udev.syspath().to_owned(), abort_handle).map(|(v)|{v.abort()});
+                            }
+                            notify::EventKind::Remove(_) => {
+                                let fd_path = event.paths.first().unwrap().to_path_buf();
 
-                        let abort_tx = grab_device(&fd_path, ev_handler.clone())?;
-                        println!("add {:?}", fd_path.clone());
-                        device_map.insert(udev.syspath().to_owned(), abort_tx);
+                                if let Some(abort_handle) = device_map.remove(&fd_path) {
+                                    // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
+                                    let _ = abort_handle.abort();
+                                }
+                            }
+                            _ => {
+                                continue;
+                            }
+                        };
                     }
-                    DebouncedEvent::Remove(path) => {
-                        if let Some(abort_tx) = device_map.remove(&path) {
-                            // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
-                            let _ = abort_tx.send(());
-                        }
-                    }
-                    _ => {
-                        continue;
-                    }
-                };
-            }
-
-            thread::sleep(time::Duration::from_millis(100));
-            thread::yield_now();
-        }
+                }
+                // anyhow::Ok(())
+                Ok::<_, anyhow::Error>(())
+            } => {},
+        );
+        Ok(())
     });
 
-    Ok(join_handle)
+    Ok(())
 }

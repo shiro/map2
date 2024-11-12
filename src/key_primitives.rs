@@ -54,47 +54,68 @@ impl KeyValue {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct KeyModifierFlags {
-    pub ctrl: bool,
-    pub shift: bool,
-    pub alt: bool,
+    pub left_ctrl: bool,
+    pub right_ctrl: bool,
+    pub left_shift: bool,
+    pub right_shift: bool,
+    pub left_alt: bool,
     pub right_alt: bool,
-    pub meta: bool,
+    pub left_meta: bool,
+    pub right_meta: bool,
 }
 
 impl KeyModifierFlags {
     pub fn new() -> Self {
-        KeyModifierFlags { ctrl: false, shift: false, alt: false, right_alt: false, meta: false }
+        Default::default()
     }
-    pub fn ctrl(&mut self) {
-        self.ctrl = true;
+    pub fn left_ctrl(&mut self) {
+        self.left_ctrl = true;
     }
-    pub fn alt(&mut self) {
-        self.alt = true;
+    pub fn right_ctrl(&mut self) {
+        self.right_ctrl = true;
+    }
+    pub fn left_alt(&mut self) {
+        self.left_alt = true;
     }
     pub fn right_alt(&mut self) {
         self.right_alt = true;
     }
-    pub fn shift(&mut self) {
-        self.shift = true;
+    pub fn left_shift(&mut self) {
+        self.left_shift = true;
     }
-    pub fn meta(&mut self) {
-        self.meta = true;
+    pub fn right_shift(&mut self) {
+        self.right_shift = true;
+    }
+    pub fn left_meta(&mut self) {
+        self.left_meta = true;
+    }
+    pub fn right_meta(&mut self) {
+        self.right_meta = true;
     }
     pub fn apply_from(&mut self, other: &KeyModifierFlags) {
-        if other.ctrl {
-            self.ctrl();
+        if other.left_ctrl {
+            self.left_ctrl();
         }
-        if other.alt {
-            self.alt();
+        if other.right_ctrl {
+            self.right_ctrl();
+        }
+        if other.left_alt {
+            self.left_alt();
         }
         if other.right_alt {
             self.right_alt();
         }
-        if other.shift {
-            self.shift();
+        if other.left_shift {
+            self.left_shift();
         }
-        if other.meta {
-            self.meta();
+        if other.right_shift {
+            self.right_shift();
+        }
+        if other.left_meta {
+            self.left_meta();
+        }
+        if other.right_meta {
+            self.right_meta();
         }
     }
 }

@@ -5,7 +5,7 @@ use crate::*;
 #[derive(Clone, Debug)]
 pub enum RuntimeKeyAction {
     KeyAction(KeyAction),
-    ReleaseRestoreModifiers(KeyModifierFlags, KeyModifierFlags, i32),
+    ReleaseRestoreModifiers(KeyModifierFlags),
 }
 
 #[derive(Clone, Debug)]
@@ -23,7 +23,7 @@ pub fn map_action_to_seq(from: KeyActionWithMods, to: Vec<ParsedKeyAction>) -> M
     let mut seq: Vec<RuntimeKeyAction> =
         to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
 
-    seq.insert(0, RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP));
+    seq.insert(0, RuntimeKeyAction::ReleaseRestoreModifiers(KeyModifierFlags::new()));
 
     (from, RuntimeAction::ActionSequence(seq))
 }
@@ -32,19 +32,19 @@ pub fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods
     let mut seq = vec![];
     seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
-    if !from.modifiers.ctrl && to.modifiers.ctrl {
+    if !from.modifiers.left_ctrl && to.modifiers.left_ctrl {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTCTRL.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.alt && to.modifiers.alt {
+    if !from.modifiers.left_alt && to.modifiers.left_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTALT.into(), value: TYPE_DOWN }));
     }
     if !from.modifiers.right_alt && to.modifiers.right_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_RIGHTALT.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.shift && to.modifiers.shift {
+    if !from.modifiers.left_shift && to.modifiers.left_shift {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTSHIFT.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.meta && to.modifiers.meta {
+    if !from.modifiers.left_meta && to.modifiers.left_meta {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTMETA.into(), value: TYPE_DOWN }));
     }
 
@@ -52,19 +52,19 @@ pub fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods
     seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_UP }));
 
     // revert to original
-    if !from.modifiers.ctrl && to.modifiers.ctrl {
+    if !from.modifiers.left_ctrl && to.modifiers.left_ctrl {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTCTRL.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.alt && to.modifiers.alt {
+    if !from.modifiers.left_alt && to.modifiers.left_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTALT.into(), value: TYPE_UP }));
     }
     if !from.modifiers.right_alt && to.modifiers.right_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_RIGHTALT.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.shift && to.modifiers.shift {
+    if !from.modifiers.left_shift && to.modifiers.left_shift {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTSHIFT.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.meta && to.modifiers.meta {
+    if !from.modifiers.left_meta && to.modifiers.left_meta {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTMETA.into(), value: TYPE_UP }));
     }
 
@@ -77,38 +77,38 @@ pub fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) ->
     let mut seq = vec![];
     seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
-    if !from.modifiers.ctrl && to.modifiers.ctrl {
+    if !from.modifiers.left_ctrl && to.modifiers.left_ctrl {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTCTRL.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.alt && to.modifiers.alt {
+    if !from.modifiers.left_alt && to.modifiers.left_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTALT.into(), value: TYPE_DOWN }));
     }
     if !from.modifiers.right_alt && to.modifiers.right_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_RIGHTALT.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.shift && to.modifiers.shift {
+    if !from.modifiers.left_shift && to.modifiers.left_shift {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTSHIFT.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.meta && to.modifiers.meta {
+    if !from.modifiers.left_meta && to.modifiers.left_meta {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTMETA.into(), value: TYPE_DOWN }));
     }
 
     seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: to.value }));
 
     // revert to original
-    if !from.modifiers.ctrl && to.modifiers.ctrl {
+    if !from.modifiers.left_ctrl && to.modifiers.left_ctrl {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTCTRL.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.alt && to.modifiers.alt {
+    if !from.modifiers.left_alt && to.modifiers.left_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTALT.into(), value: TYPE_UP }));
     }
     if !from.modifiers.right_alt && to.modifiers.right_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_RIGHTALT.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.shift && to.modifiers.shift {
+    if !from.modifiers.left_shift && to.modifiers.left_shift {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTSHIFT.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.meta && to.modifiers.meta {
+    if !from.modifiers.left_meta && to.modifiers.left_meta {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTMETA.into(), value: TYPE_UP }));
     }
 
@@ -142,19 +142,19 @@ pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWith
     {
         let mut seq = vec![];
         seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
-        if to.modifiers.ctrl && !from.modifiers.ctrl {
+        if to.modifiers.left_ctrl && !from.modifiers.left_ctrl {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTCTRL.into(), value: TYPE_DOWN }));
         }
-        if to.modifiers.alt && !from.modifiers.alt {
+        if to.modifiers.left_alt && !from.modifiers.left_alt {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTALT.into(), value: TYPE_DOWN }));
         }
         if to.modifiers.right_alt && !from.modifiers.right_alt {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_RIGHTALT.into(), value: TYPE_DOWN }));
         }
-        if to.modifiers.shift && !from.modifiers.shift {
+        if to.modifiers.left_shift && !from.modifiers.left_shift {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTSHIFT.into(), value: TYPE_DOWN }));
         }
-        if to.modifiers.meta && !from.modifiers.meta {
+        if to.modifiers.left_meta && !from.modifiers.left_meta {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTMETA.into(), value: TYPE_DOWN }));
         }
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_DOWN }));
@@ -167,19 +167,19 @@ pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWith
     {
         let mut seq = vec![];
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: TYPE_UP }));
-        if to.modifiers.ctrl && !from.modifiers.ctrl {
+        if to.modifiers.left_ctrl && !from.modifiers.left_ctrl {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTCTRL.into(), value: TYPE_UP }));
         }
-        if to.modifiers.alt && !from.modifiers.alt {
+        if to.modifiers.left_alt && !from.modifiers.left_alt {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTALT.into(), value: TYPE_UP }));
         }
         if to.modifiers.right_alt && !from.modifiers.right_alt {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_RIGHTALT.into(), value: TYPE_UP }));
         }
-        if to.modifiers.shift && !from.modifiers.shift {
+        if to.modifiers.left_shift && !from.modifiers.left_shift {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTSHIFT.into(), value: TYPE_UP }));
         }
-        if to.modifiers.meta && !from.modifiers.meta {
+        if to.modifiers.left_meta && !from.modifiers.left_meta {
             seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTMETA.into(), value: TYPE_UP }));
         }
         seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_DOWN));
@@ -205,38 +205,38 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
 
     seq.push(RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), to.modifiers.clone(), TYPE_UP));
 
-    if !from.modifiers.ctrl && to.modifiers.ctrl {
+    if !from.modifiers.left_ctrl && to.modifiers.left_ctrl {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTCTRL.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.alt && to.modifiers.alt {
+    if !from.modifiers.left_alt && to.modifiers.left_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTALT.into(), value: TYPE_DOWN }));
     }
     if !from.modifiers.right_alt && to.modifiers.right_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_RIGHTALT.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.shift && to.modifiers.shift {
+    if !from.modifiers.left_shift && to.modifiers.left_shift {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTSHIFT.into(), value: TYPE_DOWN }));
     }
-    if !from.modifiers.meta && to.modifiers.meta {
+    if !from.modifiers.left_meta && to.modifiers.left_meta {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTMETA.into(), value: TYPE_DOWN }));
     }
 
     seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: to.key, value: to.value }));
 
     // revert to original
-    if !from.modifiers.ctrl && to.modifiers.ctrl {
+    if !from.modifiers.left_ctrl && to.modifiers.left_ctrl {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTCTRL.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.alt && to.modifiers.alt {
+    if !from.modifiers.left_alt && to.modifiers.left_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTALT.into(), value: TYPE_UP }));
     }
     if !from.modifiers.right_alt && to.modifiers.right_alt {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_RIGHTALT.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.shift && to.modifiers.shift {
+    if !from.modifiers.left_shift && to.modifiers.left_shift {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTSHIFT.into(), value: TYPE_UP }));
     }
-    if !from.modifiers.meta && to.modifiers.meta {
+    if !from.modifiers.left_meta && to.modifiers.left_meta {
         seq.push(RuntimeKeyAction::KeyAction(KeyAction { key: KEY_LEFTMETA.into(), value: TYPE_UP }));
     }
 
@@ -257,45 +257,26 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
 }
 
 pub fn release_restore_modifiers(
-    actual_state: &KeyModifierState,
     from_flags: &KeyModifierFlags,
     to_flags: &KeyModifierFlags,
-    to_type: &i32,
 ) -> Vec<evdev_rs::InputEvent> {
     let mut output_events = vec![];
 
-    // takes into account the actual state of a modifier and decides whether to release/restore it or not
-    let mut release_or_restore_modifier = |is_actual_down: &bool, key: &Key| {
-        if *to_type == 1 {
-            // restore mods if actual mod is still pressed
-            if *is_actual_down {
-                output_events.push(KeyAction { key: *key, value: *to_type }.to_input_ev());
-            }
-        } else {
-            // release mods if actual mod is still pressed (prob. always true since it was necessary to trigger the mapping)
-            if *is_actual_down {
-                output_events.push(KeyAction { key: *key, value: *to_type }.to_input_ev());
-            }
+    for (from, to, key) in [
+        (from_flags.left_ctrl, to_flags.left_ctrl, KEY_LEFTCTRL),
+        (from_flags.left_ctrl, to_flags.left_ctrl, KEY_RIGHTCTRL),
+        (from_flags.left_shift, to_flags.left_shift, KEY_LEFTSHIFT),
+        (from_flags.left_shift, to_flags.left_shift, KEY_RIGHTSHIFT),
+        (from_flags.left_alt, to_flags.left_alt, KEY_LEFTALT),
+        (from_flags.right_alt, to_flags.right_alt, KEY_RIGHTALT),
+        (from_flags.left_meta, to_flags.left_meta, KEY_LEFTMETA),
+        (from_flags.left_meta, to_flags.left_meta, KEY_RIGHTMETA),
+    ] {
+        match (from, to) {
+            (false, true) => output_events.push(KeyAction { key: key.into(), value: 1 }.to_input_ev()),
+            (true, false) => output_events.push(KeyAction { key: key.into(), value: 0 }.to_input_ev()),
+            _ => {}
         }
-    };
-
-    if from_flags.ctrl && !to_flags.ctrl {
-        release_or_restore_modifier(&actual_state.left_ctrl, &KEY_LEFTCTRL.into());
-        release_or_restore_modifier(&actual_state.right_ctrl, &KEY_RIGHTCTRL.into());
-    }
-    if from_flags.shift && !to_flags.shift {
-        release_or_restore_modifier(&actual_state.left_shift, &KEY_LEFTSHIFT.into());
-        release_or_restore_modifier(&actual_state.right_shift, &KEY_RIGHTSHIFT.into());
-    }
-    if from_flags.alt && !to_flags.alt {
-        release_or_restore_modifier(&actual_state.left_alt, &KEY_LEFTALT.into());
-    }
-    if from_flags.right_alt && !to_flags.right_alt {
-        release_or_restore_modifier(&actual_state.right_alt, &KEY_RIGHTALT.into());
-    }
-    if from_flags.meta && !to_flags.meta {
-        release_or_restore_modifier(&actual_state.left_meta, &KEY_LEFTMETA.into());
-        release_or_restore_modifier(&actual_state.right_meta, &KEY_RIGHTMETA.into());
     }
 
     if output_events.len() > 0 {
@@ -303,6 +284,4 @@ pub fn release_restore_modifiers(
     }
 
     output_events
-
-    // TODO eat keys we just released, un-eat keys we just restored
 }

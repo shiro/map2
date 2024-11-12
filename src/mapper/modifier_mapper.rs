@@ -9,7 +9,7 @@ use crate::*;
 use evdev_rs::enums::EV_KEY;
 use futures::executor::block_on;
 use tokio::sync::mpsc::Sender;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard};
 
 use ApplicationError::TooManyEvents;
 
@@ -181,13 +181,6 @@ impl ModifierMapper {
         }
 
         Err(ApplicationError::NotCallable.into())
-
-        // let mut state = self.state.blocking_lock();
-        // if !handler.bind(py).is_callable() {
-        //     return Err(ApplicationError::NotCallable.into());
-        // }
-        // state.click_handler = Some(Arc::new(handler));
-        // Ok(())
     }
 
     pub fn map_fallback(&mut self, py: Python, handler: PyObject) -> PyResult<()> {
@@ -473,11 +466,11 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     for key_raw in state.down_keys.clone().iter() {
                         let key = Key::from(key_raw.clone());
                         let mut from_modifiers = KeyModifierFlags::new();
-                        from_modifiers.ctrl = state.modifiers.is_ctrl();
-                        from_modifiers.alt = state.modifiers.is_alt();
+                        from_modifiers.left_ctrl = state.modifiers.is_ctrl();
+                        from_modifiers.left_alt = state.modifiers.is_alt();
                         from_modifiers.right_alt = state.modifiers.is_right_alt();
-                        from_modifiers.shift = state.modifiers.is_shift();
-                        from_modifiers.meta = state.modifiers.is_meta();
+                        from_modifiers.left_shift = state.modifiers.is_shift();
+                        from_modifiers.left_meta = state.modifiers.is_meta();
                         let mut from_key_action =
                             KeyActionWithMods { key: key.clone(), value: 1, modifiers: from_modifiers };
 
@@ -509,6 +502,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     // up action on modifier
                     let mut from_key_action =
                         KeyActionWithMods { key: state.key.clone(), value: 0, modifiers: KeyModifierFlags::new() };
+
                     if let Some(runtime_action) = state.mappings.get(&from_key_action) {
                         if let Some(handler) = handle_action(&state, key, *value, runtime_action) {
                             let args =
@@ -593,24 +587,25 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
         return;
     }
 
-    let mut _state = &mut *state;
+    // let mut state_ref = &mut *state;
     match ev {
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+            state.surpressed = true;
             let event_code = EventCode::EV_KEY(*key);
 
             if *value == 1 {
-                _state.down_keys.insert(key.clone());
+                state.down_keys.insert(key.clone());
             }
             if *value == 0 {
-                _state.down_keys.remove(key);
+                state.down_keys.remove(key);
             }
 
             let mut from_modifiers = KeyModifierFlags::new();
-            from_modifiers.ctrl = _state.modifiers.is_ctrl();
-            from_modifiers.alt = _state.modifiers.is_alt();
-            from_modifiers.right_alt = _state.modifiers.is_right_alt();
-            from_modifiers.shift = _state.modifiers.is_shift();
-            from_modifiers.meta = _state.modifiers.is_meta();
+            from_modifiers.left_ctrl = state.modifiers.is_ctrl();
+            from_modifiers.left_alt = state.modifiers.is_alt();
+            from_modifiers.right_alt = state.modifiers.is_right_alt();
+            from_modifiers.left_shift = state.modifiers.is_shift();
+            from_modifiers.left_meta = state.modifiers.is_meta();
 
             let from_key_action = KeyActionWithMods {
                 key: Key { event_code: ev.event_code },
@@ -618,38 +613,107 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 modifiers: from_modifiers,
             };
 
-            if let Some(runtime_action) = _state.mappings.get(&from_key_action) {
-                _state.surpressed = true;
-                if let Some(handler) = handle_action(&_state, key, *value, runtime_action) {
-                    let args = Some(python_callback_args(&event_code, &_state.modifiers, *value, &_state.transformer));
-                    drop(ev);
-                    let ev = match raw_ev {
-                        InputEvent::Raw(ev) => ev,
+            if state.mappings.get(&from_key_action).is_some() {
+                // TODO here
+                let mut from_modifiers = KeyModifierFlags::new();
+                from_modifiers.left_ctrl = state.modifiers.is_ctrl();
+                from_modifiers.left_alt = state.modifiers.is_alt();
+                from_modifiers.right_alt = state.modifiers.is_right_alt();
+                from_modifiers.left_shift = state.modifiers.is_shift();
+                from_modifiers.left_meta = state.modifiers.is_meta();
+                let mut from_key_action =
+                    KeyActionWithMods { key: state.key.clone(), value: 0, modifiers: from_modifiers };
+
+                if let Some(runtime_action) = state.mappings.get(&from_key_action) {
+                    if let Some(handler) = handle_action(&state, key, *value, runtime_action) {
+                        let args =
+                            Some(python_callback_args(&event_code, &state.modifiers, *value, &state.transformer));
+                        drop(ev);
+                        let ev = match raw_ev.clone() {
+                            InputEvent::Raw(ev) => ev,
+                        };
+                        let transformer = state.transformer.clone();
+                        let next = state.next.values().cloned().collect();
+                        drop(state);
+                        run_python_handler(handler, args, ev, transformer, next).await;
+                        state = _state.lock().await;
                     };
-                    let transformer = _state.transformer.clone();
-                    let next = _state.next.values().cloned().collect();
-                    drop(_state);
-                    drop(state);
-                    run_python_handler(handler, args, ev, transformer, next).await;
+                }
+                // untill here
+            }
+            if let Some(runtime_action) = state.mappings.get(&from_key_action) {
+                // handle mapping if it exists
+                // if let Some(handler) = handle_action(&state, key, *value, runtime_action) {
+                // let args =
+                //     Some(python_callback_args(&event_code, &state.modifiers, *value, &state.transformer, true));
+                // drop(ev);
+                // let ev = match raw_ev {
+                //     InputEvent::Raw(ev) => ev,
+                // };
+                // let transformer = state.transformer.clone();
+                // let next = state.next.values().cloned().collect();
+                // drop(state);
+                // // drop(state);
+                // run_python_handler(handler, args, ev, transformer, next).await;
+                // };
+
+                match runtime_action {
+                    RuntimeAction::ActionSequence(seq) => {
+                        for action in seq {
+                            match action {
+                                RuntimeKeyAction::KeyAction(key_action) => {
+                                    let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
+                                }
+                                RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                                    let new_events =
+                                        release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
+                                    for ev in new_events {
+                                        state.next.send_all(InputEvent::Raw(ev));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    RuntimeAction::PythonCallback(from_modifiers, handler) => {
+                        if !state.next.is_empty() {
+                            // always release all trigger mods before running the callback
+                            let new_events = release_restore_modifiers(&state.modifiers, &KeyModifierFlags::new());
+                            new_events.iter().cloned().for_each(|ev| state.next.send_all(InputEvent::Raw(ev)));
+                        }
+
+                        let from_modifiers = from_modifiers.clone();
+                        let handler = handler.clone();
+
+                        let args =
+                            Some(python_callback_args(&ev.event_code, &state.modifiers, *value, &state.transformer));
+                        handle_action_python_callback(ev, state, &handler, args);
+
+                        // let args =
+                        //     Some(python_callback_args(&ev.event_code, &state.modifiers, ev.value, &state.transformer));
+                        // let transformer = state.transformer.clone();
+                        // let next = state.next.values().cloned().collect();
+                        // drop(state);
+                        // run_python_handler(handler, args, ev.clone(), transformer, next).await;
+                        return;
+                    }
+                    _ => {}
                 };
 
                 return;
             }
 
-            event_handlers::update_modifiers(&mut _state.modifiers, &KeyAction::from_input_ev(&ev));
+            event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
 
-            if let Some(handler) = _state.fallback_handler.as_ref() {
-                _state.surpressed = true;
-                let args = Some(python_callback_args(&event_code, &_state.modifiers, *value, &_state.transformer));
-                drop(ev);
-                let ev = match raw_ev {
+            if let Some(handler) = state.fallback_handler.as_ref() {
+                let args = Some(python_callback_args(&event_code, &state.modifiers, *value, &state.transformer));
+                let ev = match raw_ev.clone() {
                     InputEvent::Raw(ev) => ev,
                 };
                 let handler = handler.clone();
-                let transformer = _state.transformer.clone();
-                let next = _state.next.values().cloned().collect();
-                drop(_state);
-                drop(state);
+                let transformer = state.transformer.clone();
+                let next = state.next.values().cloned().collect();
+                // drop(state);
+                // drop(state);
                 run_python_handler(handler, args, ev, transformer, next).await;
                 return;
             }
@@ -690,4 +754,74 @@ fn handle_action(state: &State, key: &EV_KEY, value: i32, runtime_action: &Runti
         _ => {}
     };
     None
+}
+
+async fn handle_action2<'a>(
+    ev: &EvdevInputEvent,
+    _state: Arc<Mutex<State>>,
+    mut state: MutexGuard<'a, State>,
+    runtime_action: &RuntimeAction,
+) {
+    match runtime_action {
+        RuntimeAction::ActionSequence(seq) => {
+            for action in seq {
+                match action {
+                    RuntimeKeyAction::KeyAction(key_action) => {
+                        let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
+                    }
+                    RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                        let new_events = release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
+                        for ev in new_events {
+                            state.next.send_all(InputEvent::Raw(ev));
+                        }
+                    }
+                }
+            }
+        }
+        RuntimeAction::PythonCallback(from_modifiers, handler) => {
+            if !state.next.is_empty() {
+                // always release all trigger mods before running the callback
+                let new_events =
+                    release_restore_modifiers(&state.modifiers, &from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
+                new_events.iter().cloned().for_each(|ev| state.next.send_all(InputEvent::Raw(ev)));
+            }
+
+            let args = Some(python_callback_args(&ev.event_code, &state.modifiers, ev.value, &state.transformer));
+            let transformer = state.transformer.clone();
+            let next = state.next.values().cloned().collect();
+            drop(state);
+            run_python_handler(handler.clone(), args, ev.clone(), transformer, next).await;
+            state = _state.lock().await;
+            return;
+        }
+        _ => {}
+    };
+}
+
+async fn handle_action_python_callback<'a>(
+    ev: &EvdevInputEvent,
+    mut state: MutexGuard<'a, State>,
+    handler: &Arc<PyObject>,
+    args: Option<Vec<PythonArgument>>,
+) {
+    let transformer = state.transformer.clone();
+    let next = state.next.values().cloned().collect();
+    drop(state);
+    run_python_handler(handler.clone(), args, ev.clone(), transformer, next).await;
+}
+
+async fn handle_action_seq<'a>(ev: &EvdevInputEvent, seq: &Vec<RuntimeKeyAction>, state: &State) {
+    for action in seq {
+        match action 
+            RuntimeKeyActio::KeyAction(key_action) => {
+                let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
+            }
+            RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                let new_events = release_restore_modifiers(&state.modifiers, to_flags);
+                for ev in new_events {
+                    state.next.send_all(InputEvent::Raw(ev));
+                }
+            }
+        }
+    }
 }
