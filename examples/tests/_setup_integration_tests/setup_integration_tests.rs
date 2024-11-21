@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use map2::python::*;
 use map2::*;
+use pytests::*;
 
 #[pyo3_async_runtimes::tokio::main]
 async fn main() -> pyo3::PyResult<()> {
@@ -99,6 +100,29 @@ pub fn keys(input: &str) -> Vec<EvdevInputEvent> {
     parse_key_sequence(input, Some(&Default::default())).unwrap().to_input_ev()
 }
 
+trait EvdevInputEventExt {
+    fn to_string(&self) -> String;
+}
+
+impl EvdevInputEventExt for Vec<EvdevInputEvent> {
+    fn to_string(&self) -> String {
+        self.iter()
+            .map(|v| {
+                let name = match v.event_code {
+                    evdev_rs::enums::EventCode::EV_KEY(key) => {
+                        let name = format!("{key:?}").to_string().to_lowercase();
+                        name.strip_prefix("key_").unwrap_or(&name).to_string()
+                    }
+                    _ => format!("{:?}", v.event_code).to_lowercase(),
+                };
+
+                format!("{{{name} {}}}", v.value)
+            })
+            .collect::<Vec<String>>()
+            .join("")
+    }
+}
+
 #[macro_export]
 macro_rules! send {
     ($reader: expr, $keys: expr) => {
@@ -109,11 +133,18 @@ macro_rules! send {
 #[macro_export]
 macro_rules! assert_output {
     ($writer: expr, $keys: expr) => {
-        assert_eq!(writer_read_all(py, m, $writer), keys($keys),);
+        assert_eq_events!(writer_read_all(py, m, $writer), keys($keys));
     };
 }
 
 #[macro_export]
 macro_rules! sleep {
     ($millis: expr) => {};
+}
+
+#[macro_export]
+macro_rules! assert_eq_events {
+    ($left:expr, $right:expr) => {
+        assert_eq!($left.to_string(), $right.to_string());
+    };
 }

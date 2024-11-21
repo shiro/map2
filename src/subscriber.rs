@@ -72,6 +72,19 @@ impl SubscriberHashmapExt for HashMap<Uuid, Arc<dyn LinkDst>> {
     }
 }
 
+// pub trait InputEvVecExt {
+//     fn send_all<Next: IntoIterator<Item = dyn LinkDst>>(self, next: &Next);
+// }
+//
+// impl InputEvVecExt for Vec<evdev_rs::InputEvent> {
+//     fn send_all<Next: IntoIterator<Item = dyn LinkDst>>(self, next: &Vec<Arc<dyn LinkDst>>) {
+//         for ev in self {
+//             // TODO handle err
+//             let _ = next.send_all(InputEvent::Raw(ev));
+//         }
+//     }
+// }
+
 pub trait SubscriberVecExt {
     fn send_all(&self, ev: InputEvent);
 }

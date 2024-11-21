@@ -1,6 +1,6 @@
 use super::*;
 use crate::mapper::mapping_functions::*;
-use crate::mapper::RuntimeKeyAction;
+use crate::mapper::RuntimeKeyActionDepr;
 use crate::python::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -92,57 +92,57 @@ impl ChordMapper {
         Ok(_self)
     }
 
-    pub fn map(&mut self, py: Python, from: Vec<String>, to: PyObject) -> PyResult<()> {
-        let mut state = self.state.blocking_lock();
-        // if from.len() > 32 {
-        //     return Err(PyRuntimeError::new_err(
-        //         "'from' side cannot be longer than 32 character",
-        //     ));
-        // }
-
-        let mut from_parsed =
-            from.into_iter().map(|x| parse_key(&x, Some(&state.transformer))).collect::<Result<Vec<_>>>().map_err(
-                |err| {
-                    PyRuntimeError::new_err(format!(
-                        "mapping error on the 'from' side:\n{}",
-                        ApplicationError::KeyParse(err.to_string()),
-                    ))
-                },
-            )?;
-
-        let to = if to.bind(py).is_callable() {
-            RuntimeAction::PythonCallback(Default::default(), Arc::new(to))
-        } else {
-            let to = to.extract::<String>(py).map_err(|err| {
-                PyRuntimeError::new_err(format!(
-                    "mapping error on the 'to' side:\n{}",
-                    ApplicationError::InvalidInputType { type_: "String".to_string() }
-                ))
-            })?;
-            let to = parse_key_sequence(&to, Some(&state.transformer)).map_err(|err| {
-                PyRuntimeError::new_err(format!(
-                    "mapping error on the 'to' side:\n{}",
-                    ApplicationError::KeySequenceParse(err.to_string()),
-                ))
-            })?;
-
-            let mut to: Vec<RuntimeKeyAction> =
-                to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
-            RuntimeAction::ActionSequence(to)
-        };
-
-        let mut from_parsed = from_parsed.clone();
-
-        // mark chorded keys
-        state.chorded_keys.extend(from_parsed.iter().cloned());
-
-        // insert all combinations
-        state.mappings.insert(from_parsed.clone(), to.clone());
-        from_parsed.reverse();
-        state.mappings.insert(from_parsed, to);
-
-        Ok(())
-    }
+    // pub fn map(&mut self, py: Python, from: Vec<String>, to: PyObject) -> PyResult<()> {
+    //     let mut state = self.state.blocking_lock();
+    //     // if from.len() > 32 {
+    //     //     return Err(PyRuntimeError::new_err(
+    //     //         "'from' side cannot be longer than 32 character",
+    //     //     ));
+    //     // }
+    //
+    //     let mut from_parsed =
+    //         from.into_iter().map(|x| parse_key(&x, Some(&state.transformer))).collect::<Result<Vec<_>>>().map_err(
+    //             |err| {
+    //                 PyRuntimeError::new_err(format!(
+    //                     "mapping error on the 'from' side:\n{}",
+    //                     ApplicationError::KeyParse(err.to_string()),
+    //                 ))
+    //             },
+    //         )?;
+    //
+    //     let to = if to.bind(py).is_callable() {
+    //         RuntimeAction::PythonCallback(Default::default(), Arc::new(to))
+    //     } else {
+    //         let to = to.extract::<String>(py).map_err(|err| {
+    //             PyRuntimeError::new_err(format!(
+    //                 "mapping error on the 'to' side:\n{}",
+    //                 ApplicationError::InvalidInputType { type_: "String".to_string() }
+    //             ))
+    //         })?;
+    //         let to = parse_key_sequence(&to, Some(&state.transformer)).map_err(|err| {
+    //             PyRuntimeError::new_err(format!(
+    //                 "mapping error on the 'to' side:\n{}",
+    //                 ApplicationError::KeySequenceParse(err.to_string()),
+    //             ))
+    //         })?;
+    //
+    //         let mut to: Vec<RuntimeKeyActionDepr> =
+    //             to.to_key_actions().into_iter().map(|action| RuntimeKeyActionDepr::KeyAction(action)).collect();
+    //         RuntimeAction::ActionSequence(to)
+    //     };
+    //
+    //     let mut from_parsed = from_parsed.clone();
+    //
+    //     // mark chorded keys
+    //     state.chorded_keys.extend(from_parsed.iter().cloned());
+    //
+    //     // insert all combinations
+    //     state.mappings.insert(from_parsed.clone(), to.clone());
+    //     from_parsed.reverse();
+    //     state.mappings.insert(from_parsed, to);
+    //
+    //     Ok(())
+    // }
 
     pub fn snapshot(&self, existing: Option<&ChordMapperSnapshot>) -> PyResult<Option<ChordMapperSnapshot>> {
         let mut state = self.state.blocking_lock();
@@ -424,43 +424,43 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
         match action {
             RuntimeAction::ActionSequence(seq) => {
-                for action in seq {
-                    match action {
-                        RuntimeKeyAction::KeyAction(key_action) => {
-                            state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
-                        }
-                        RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                            let new_events =
-                                release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
-                            if !state.next.is_empty() {
-                                for ev in new_events {
-                                    state.next.send_all(InputEvent::Raw(ev));
-                                }
-                            }
-                        }
-                    }
-                }
+                // for action in seq {
+                //     match action {
+                //         RuntimeKeyActionDepr::KeyAction(key_action) => {
+                //             state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
+                //         }
+                //         RuntimeKeyActionDepr::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
+                //             let new_events =
+                //                 release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
+                //             if !state.next.is_empty() {
+                //                 for ev in new_events {
+                //                     state.next.send_all(InputEvent::Raw(ev));
+                //                 }
+                //             }
+                //         }
+                //     }
+                // }
             }
-            RuntimeAction::PythonCallback(from_modifiers, handler) => {
-                if !state.next.is_empty() {
-                    // always release all trigger mods before running the callback
-                    let new_events = release_restore_modifiers(
-                        &state.modifiers,
-                        &from_modifiers,
-                        &KeyModifierFlags::new(),
-                        &TYPE_UP,
-                    );
-                    for ev in new_events {
-                        state.next.send_all(InputEvent::Raw(ev));
-                    }
-                }
-
-                let handler = handler.clone();
-                let transformer = state.transformer.clone();
-                let next = state.next.values().cloned().collect();
-                drop(state);
-                drop(_state);
-                run_python_handler(handler, None, ev.clone(), transformer, next).await;
+            RuntimeAction::PythonCallback(handler) => {
+                // if !state.next.is_empty() {
+                //     // always release all trigger mods before running the callback
+                //     let new_events = release_restore_modifiers(
+                //         &state.modifiers,
+                //         &from_modifiers,
+                //         &KeyModifierFlags::new(),
+                //         &TYPE_UP,
+                //     );
+                //     for ev in new_events {
+                //         state.next.send_all(InputEvent::Raw(ev));
+                //     }
+                // }
+                //
+                // let handler = handler.clone();
+                // let transformer = state.transformer.clone();
+                // let next = state.next.values().cloned().collect();
+                // drop(state);
+                // drop(_state);
+                // run_python_handler(handler, None, ev.clone(), transformer, next).await;
             }
             RuntimeAction::NOP => {}
         }

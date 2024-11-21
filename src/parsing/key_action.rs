@@ -11,13 +11,31 @@ pub enum ParsedKeyAction {
 }
 
 pub trait ParsedKeyActionVecExt {
-    fn to_key_actions(self) -> Vec<KeyAction>;
     fn to_input_ev(self) -> Vec<EvdevInputEvent>;
+    fn to_key_actions(self) -> Vec<KeyAction>;
+    fn to_key_actions_with_mods(self) -> Vec<KeyActionWithMods>;
 }
 
 impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
+    fn to_key_actions_with_mods(self) -> Vec<KeyActionWithMods> {
+        self.into_iter().fold(vec![], |mut acc, v| match v {
+            ParsedKeyAction::KeyAction(action) => {
+                acc.push(action);
+                acc
+            }
+            ParsedKeyAction::KeyClickAction(action) => {
+                acc.push(action.to_key_action_with_mods(1));
+                acc.push(action.to_key_action_with_mods(0));
+                acc
+            }
+            ParsedKeyAction::Action(action) => {
+                acc.push(action.to_key_action_with_mods(KeyModifierFlags::default()));
+                acc
+            }
+        })
+    }
+
     fn to_key_actions(self) -> Vec<KeyAction> {
-        // TODO keep track of modifier keys and revert to a sane state after every action
         self.into_iter().fold(vec![], |mut acc, v| match v {
             ParsedKeyAction::KeyAction(action) => {
                 if action.modifiers.left_ctrl {
@@ -54,21 +72,24 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
                 acc
             }
             ParsedKeyAction::KeyClickAction(action) => {
-                if action.modifiers.left_ctrl {
-                    acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN));
-                }
-                if action.modifiers.left_shift {
-                    acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN));
-                }
-                if action.modifiers.left_alt {
-                    acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN));
-                }
-                if action.modifiers.right_alt {
-                    acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_DOWN));
-                }
-                if action.modifiers.left_meta {
-                    acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN));
-                }
+                // if action.modifiers.left_ctrl {
+                //     acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN));
+                // }
+                // if action.modifiers.left_shift {
+                //     acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN));
+                // }
+                // if action.modifiers.left_alt {
+                //     acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN));
+                // }
+                // if action.modifiers.right_alt {
+                //     acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_DOWN));
+                // }
+                // if action.modifiers.left_meta {
+                //     acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN));
+                // }
+
+                acc.extend(release_restore_modifiers(&KeyModifierFlags::default(), &action.modifiers));
+
                 acc.push(KeyAction::new(action.key, TYPE_DOWN));
                 acc.push(KeyAction::new(action.key, TYPE_UP));
                 if action.modifiers.left_ctrl {

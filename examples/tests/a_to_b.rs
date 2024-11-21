@@ -3,20 +3,13 @@ use std::time::Duration;
 
 use crate::*;
 
-#[test_main]
-async fn a_to_b() -> PyResult<()> {
-    Python::with_gil(|py| -> PyResult<()> {
-        let m = &pytests::include_python!();
+io_test!("simple1", "a", "b");
+io_test!("simple2", "b", "b");
 
-        reader_send_all(py, m, "reader", &keys("a"));
+//
 
-        py.allow_threads(|| {
-            thread::sleep(Duration::from_millis(25));
-        });
+io_test!("cover1", "i{meta down}q{meta up} is working", "i{meta}{t down}{meta}{t up}{meta} is working");
+// io_test!("cover1", "i{meta down}q{meta up} is working", "i{meta}{t{meta} is working");
 
-        assert_eq!(writer_read_all(py, m, "writer"), keys("b"),);
-
-        Ok(())
-    })?;
-    Ok(())
-}
+// io_test!("cover1", "i{#q} is working", "i{leftmeta}t{leftmeta} is working");
+// io_test!("cover2", "i{#q down}{#q up} is working", "it is working");

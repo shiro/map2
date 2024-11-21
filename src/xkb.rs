@@ -14,7 +14,7 @@ use crate::{encoding, Key};
 #[derive(Clone)]
 pub struct XKBTransformer {
     utf_to_raw_map: HashMap<Keysym, Vec<u32>>,
-    raw_to_utf_map: HashMap<(EV_KEY, KeyModifierState), String>,
+    raw_to_utf_map: HashMap<(EV_KEY, u32), String>,
 }
 
 impl XKBTransformer {
@@ -81,27 +81,27 @@ impl XKBTransformer {
 
                 if let Some(ev_key) = int_to_ev_key(code.raw() - 8) {
                     if let Some(name) = char::from_u32(xkb_state.key_get_utf32(code)) {
-                        let mut state = KeyModifierState::new();
+                        let mut state = KeyModifierFlags::new();
 
                         for &(name, _) in mods.iter() {
                             match *name {
                                 "LEFT_SHIFT" => {
-                                    state.left_shift = true;
+                                    state.left_shift();
                                 }
                                 "RIGHT_SHIFT" => {
-                                    state.right_shift = true;
+                                    state.right_shift();
                                 }
                                 "LEFT_ALT" => {
-                                    state.left_alt = true;
+                                    state.left_alt();
                                 }
                                 "RIGHT_ALT" => {
-                                    state.right_alt = true;
+                                    state.right_alt();
                                 }
                                 _ => {}
                             }
                         }
 
-                        match raw_to_utf_map.entry((ev_key, state)) {
+                        match raw_to_utf_map.entry((ev_key, state.hash())) {
                             Entry::Vacant(entry) => {
                                 entry.insert(name.to_string());
                             }
@@ -140,8 +140,13 @@ impl XKBTransformer {
             .ok_or_else(|| anyhow!("failed to convert utf to raw"))
     }
 
-    pub fn raw_to_utf(&self, key: &EV_KEY, state: &KeyModifierState) -> Option<String> {
-        self.raw_to_utf_map.get(&(*key, *state)).cloned().and_then(|x| {
+    pub fn raw_to_utf(&self, key: &EV_KEY, mut state: KeyModifierFlags) -> Option<String> {
+        // currently only uses some mods to reduce enumeration complexity
+        state.left_ctrl = false;
+        state.right_ctrl = false;
+        state.left_meta = false;
+        state.right_meta = false;
+        self.raw_to_utf_map.get(&(*key, state.hash())).cloned().and_then(|x| {
             if x.chars().next() == Some('\0') {
                 None
             } else {

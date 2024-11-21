@@ -1,7 +1,7 @@
 use super::suffix_tree::SuffixTree;
 use super::*;
 use crate::mapper::mapping_functions::*;
-use crate::mapper::RuntimeKeyAction;
+use crate::mapper::RuntimeKeyActionDepr;
 use crate::python::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -25,7 +25,7 @@ struct State {
     #[new(default)]
     mappings: Mappings,
     #[new(default)]
-    modifiers: Arc<KeyModifierState>,
+    modifiers: KeyModifierFlags,
     #[new(default)]
     window: Vec<char>,
 }
@@ -107,7 +107,7 @@ impl TextMapper {
             .ok_or_else(|| PyRuntimeError::new_err("invalid key sequence"))?;
 
         let to = if to.bind(py).is_callable() {
-            RuntimeAction::PythonCallback(Default::default(), Arc::new(to))
+            RuntimeAction::PythonCallback(Arc::new(to))
         } else {
             let to = to.extract::<String>(py).map_err(|err| {
                 PyRuntimeError::new_err(format!(
@@ -122,10 +122,7 @@ impl TextMapper {
                 ))
             })?;
 
-            let mut to: Vec<RuntimeKeyAction> =
-                to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
-
-            RuntimeAction::ActionSequence(to)
+            RuntimeAction::ActionSequence(to.to_key_actions_with_mods())
         };
 
         state.mappings.insert(from, to);
@@ -278,16 +275,19 @@ pub struct TextMapperSnapshot {
     mappings: Mappings,
 }
 
-fn _map(from: &KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> Vec<RuntimeKeyAction> {
-    let mut seq: Vec<RuntimeKeyAction> =
-        to.to_key_actions().into_iter().map(|action| RuntimeKeyAction::KeyAction(action)).collect();
-    seq.insert(0, RuntimeKeyAction::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP));
+fn _map(from: &KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> Vec<RuntimeKeyActionDepr> {
+    let mut seq: Vec<RuntimeKeyActionDepr> =
+        to.to_key_actions().into_iter().map(|action| RuntimeKeyActionDepr::KeyAction(action)).collect();
+    seq.insert(
+        0,
+        RuntimeKeyActionDepr::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP),
+    );
     seq
 }
 
 async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
-    let mut _state = _state.lock().await;
-    let mut state = &mut *_state;
+    let mut state = _state.lock().await;
+    // let mut state = &mut *_state;
     if !state.next.is_empty() {
         state.next.send_all(raw_ev.clone());
     }
@@ -305,7 +305,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
         // key event
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
             if ev.value == 0 {
-                let key = state.transformer.raw_to_utf(&key, &state.modifiers);
+                let key = state.transformer.raw_to_utf(&key, state.modifiers);
 
                 if let Some(key) = key {
                     state.window.push(key.chars().next().unwrap());
@@ -319,7 +319,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     for i in (0..state.window.len()).rev() {
                         let search: String = state.window.iter().skip(i).collect();
                         if let Some(x) = state.mappings.get(&search) {
-                            hit = Some((x, search.len()));
+                            hit = Some((x.clone(), search.len()));
                         }
                     }
 
@@ -335,49 +335,22 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
                         match to {
                             RuntimeAction::ActionSequence(seq) => {
-                                for action in seq {
-                                    match action {
-                                        RuntimeKeyAction::KeyAction(key_action) => {
-                                            state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
-                                        }
-                                        RuntimeKeyAction::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-                                            if !state.next.is_empty() {
-                                                let new_events = release_restore_modifiers(
-                                                    &state.modifiers,
-                                                    &from_flags,
-                                                    &to_flags,
-                                                    &to_type,
-                                                );
-                                                for ev in new_events {
-                                                    state.next.send_all(InputEvent::Raw(ev));
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                handle_seq(&seq, &state.modifiers, &state.next);
                             }
-                            RuntimeAction::PythonCallback(from_modifiers, handler) => {
-                                if !state.next.is_empty() {
-                                    // always release all trigger mods before running the callback
-                                    let new_events = release_restore_modifiers(
-                                        &state.modifiers,
-                                        &from_modifiers,
-                                        &KeyModifierFlags::new(),
-                                        &TYPE_UP,
-                                    );
-                                    for ev in new_events {
-                                        state.next.send_all(InputEvent::Raw(ev));
-                                    }
-                                }
+                            RuntimeAction::PythonCallback(handler) => {
                                 // delay the callback until the backspace events are processed
                                 tokio::time::sleep(Duration::from_millis(10 * from_len as u64)).await;
 
-                                let handler = handler.clone();
-                                let transformer = state.transformer.clone();
-                                let next = state.next.values().cloned().collect();
-                                drop(state);
-                                drop(_state);
-                                run_python_handler(handler, None, ev, transformer, next).await;
+                                handle_callback(
+                                    &ev,
+                                    handler.clone(),
+                                    None,
+                                    state.transformer.clone(),
+                                    &state.modifiers.clone(),
+                                    state.next.values().cloned().collect(),
+                                    state,
+                                )
+                                .await;
                             }
                             RuntimeAction::NOP => {}
                         }
@@ -388,7 +361,8 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 }
             }
 
-            event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
+            // event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
+            state.modifiers.update_from_action(&KeyAction::from_input_ev(&ev));
         }
         _ => {}
     }

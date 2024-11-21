@@ -1,4 +1,5 @@
 use evdev_rs::enums::EV_KEY;
+use tokio::sync::MutexGuard;
 
 use crate::python::*;
 use crate::*;
@@ -89,7 +90,7 @@ pub async fn run_python_handler(
 
 pub fn python_callback_args(
     ev: &EventCode,
-    modifiers: &KeyModifierState,
+    modifiers: &KeyModifierFlags,
     value: i32,
     transformer: &XKBTransformer,
 ) -> Vec<PythonArgument> {
@@ -99,7 +100,7 @@ pub fn python_callback_args(
                 KEY_SPACE => "space".to_string(),
                 KEY_TAB => "tab".to_string(),
                 KEY_ENTER => "enter".to_string(),
-                _ => transformer.raw_to_utf(key, modifiers).unwrap_or_else(|| {
+                _ => transformer.raw_to_utf(key, *modifiers).unwrap_or_else(|| {
                     let name = format!("{key:?}").to_string().to_lowercase();
                     name.strip_prefix("key_").unwrap_or(&name).to_string()
                 }),
@@ -126,4 +127,55 @@ pub fn python_callback_args(
     };
 
     vec![PythonArgument::String(name), value]
+}
+
+pub fn handle_seq<Next: SubscriberHashmapExt>(seq: &Vec<KeyActionWithMods>, _flags: &KeyModifierFlags, next: &Next) {
+    let mut flags = _flags.clone();
+    // let mut prev = None;
+    for action in seq {
+        for action in release_restore_modifiers(&flags, &action.modifiers) {
+            let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+        }
+
+        // only restore modifiers for click events
+        // if let Some(prev) = prev
+        //     && prev.key == action.key
+        //     && prev.modifiers == action.modifiers
+        //     && prev.value == 1
+        //     && aciton.value == 0
+        // {
+        flags = action.modifiers;
+        // }
+
+        // prev = Some(action);
+        let action = action.to_key_action();
+        let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+    }
+
+    for action in release_restore_modifiers(&flags, _flags) {
+        let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+    }
+}
+
+pub async fn handle_callback<'a, State>(
+    ev: &EvdevInputEvent,
+    handler: Arc<PyObject>,
+    args: Option<Vec<PythonArgument>>,
+    transformer: Arc<XKBTransformer>,
+    modifiers: &KeyModifierFlags,
+    next: Vec<Arc<dyn LinkDst>>,
+    state: MutexGuard<'a, State>,
+) {
+    drop(state);
+    // release all trigger mods before running the callback
+    if !next.is_empty() {
+        let new_events = release_restore_modifiers(&modifiers, &KeyModifierFlags::default());
+        new_events.iter().cloned().for_each(|ev| next.send_all(InputEvent::Raw(ev.to_input_ev())));
+    }
+    run_python_handler(handler.clone(), args, ev.clone(), transformer, next.clone()).await;
+    // restore all trigger mods after running the callback
+    if !next.is_empty() {
+        let new_events = release_restore_modifiers(&KeyModifierFlags::default(), &modifiers);
+        new_events.iter().cloned().for_each(|ev| next.send_all(InputEvent::Raw(ev.to_input_ev())));
+    }
 }

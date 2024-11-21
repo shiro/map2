@@ -1371,6 +1371,9 @@ dependencies = [
 [[package]]
 name = "pytests"
 version = "1.0.0"
+dependencies = [
+ "syn 2.0.87",
+]
 
 [[package]]
 name = "pythonize"

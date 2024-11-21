@@ -97,7 +97,7 @@ impl Reader {
             state,
             transformer,
             link,
-            // #[cfg(not(feature = "integration"))]
+            #[cfg(not(feature = "integration"))]
             reader_exit_tx: Some(reader_exit_tx),
             // #[cfg(not(feature = "integration"))]
             // reader_thread_handle,
@@ -160,6 +160,7 @@ impl Reader {
 
 impl Drop for Reader {
     fn drop(&mut self) {
+        #[cfg(not(feature = "integration"))]
         let _ = self.reader_exit_tx.take().map(|v| {
             v.send(());
         });

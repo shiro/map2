@@ -92,6 +92,18 @@ impl KeyModifierFlags {
     pub fn right_meta(&mut self) {
         self.right_meta = true;
     }
+    pub fn is_ctrl(&mut self) -> bool {
+        self.left_ctrl || self.right_ctrl
+    }
+    pub fn is_shift(&mut self) -> bool {
+        self.left_shift || self.right_shift
+    }
+    pub fn is_alt(&mut self) -> bool {
+        self.left_alt || self.right_alt
+    }
+    pub fn is_meta(&mut self) -> bool {
+        self.left_meta || self.right_meta
+    }
     pub fn apply_from(&mut self, other: &KeyModifierFlags) {
         if other.left_ctrl {
             self.left_ctrl();
@@ -118,6 +130,43 @@ impl KeyModifierFlags {
             self.right_meta();
         }
     }
+    pub fn update_from_action(&mut self, action: &KeyAction) {
+        let value = action.value == 1;
+        match action.key.event_code {
+            EventCode::EV_KEY(key) => match key {
+                KEY_LEFTCTRL => self.left_ctrl = value,
+                KEY_RIGHTCTRL => self.right_ctrl = value,
+                KEY_LEFTSHIFT => self.left_shift = value,
+                KEY_RIGHTSHIFT => self.right_shift = value,
+                KEY_LEFTALT => self.left_alt = value,
+                KEY_RIGHTALT => self.right_alt = value,
+                KEY_LEFTMETA => self.left_meta = value,
+                KEY_RIGHTMETA => self.right_meta = value,
+                _ => {}
+            },
+            _ => unreachable!(),
+        };
+    }
+    pub fn hash(&self) -> u32 {
+        let mut hash = 0;
+        if self.left_ctrl || self.right_ctrl {
+            hash = hash | (1 << 0);
+        }
+        if self.left_shift || self.right_shift {
+            hash = hash | (1 << 1);
+        }
+        if self.left_alt || self.right_alt {
+            hash = hash | (1 << 2);
+        }
+        if self.left_meta || self.right_meta {
+            hash = hash | (1 << 3);
+        }
+        hash
+    }
+}
+
+pub fn diff_modifiers_to_key_actions(from: &KeyModifierFlags, to: &KeyModifierFlags) -> Vec<KeyAction> {
+    unimplemented!()
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
@@ -194,6 +243,9 @@ impl KeyActionWithMods {
     pub fn new(key: Key, value: i32, modifiers: KeyModifierFlags) -> Self {
         KeyActionWithMods { key, value, modifiers }
     }
+    pub fn to_key_action(self) -> KeyAction {
+        KeyAction::new(self.key, self.value)
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -209,7 +261,7 @@ impl KeyClickActionWithMods {
     pub fn new_with_mods(key: Key, modifiers: KeyModifierFlags) -> Self {
         KeyClickActionWithMods { key, modifiers }
     }
-    pub fn to_key_action(self, value: i32) -> KeyActionWithMods {
+    pub fn to_key_action_with_mods(self, value: i32) -> KeyActionWithMods {
         KeyActionWithMods::new(self.key, value, self.modifiers)
     }
 }

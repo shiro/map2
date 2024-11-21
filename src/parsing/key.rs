@@ -10,29 +10,29 @@ pub fn key_flags(input: &str) -> ParseResult<&str, KeyModifierFlags> {
         for v in val {
             match v {
                 '!' => {
-                    if !flags.alt {
-                        flags.alt();
+                    if !flags.left_alt {
+                        flags.left_alt();
                     } else {
                         return Err(make_generic_nom_err_new(input));
                     }
                 }
                 '^' => {
-                    if !flags.ctrl {
-                        flags.ctrl();
+                    if !flags.left_ctrl {
+                        flags.left_ctrl();
                     } else {
                         return Err(make_generic_nom_err_new(input));
                     }
                 }
                 '+' => {
-                    if !flags.shift {
-                        flags.shift();
+                    if !flags.left_shift {
+                        flags.left_shift();
                     } else {
                         return Err(make_generic_nom_err_new(input));
                     }
                 }
                 '#' => {
-                    if !flags.meta {
-                        flags.meta();
+                    if !flags.left_meta {
+                        flags.left_meta();
                     } else {
                         return Err(make_generic_nom_err_new(input));
                     }
@@ -95,16 +95,16 @@ fn resolve_key_utf8(key: &str, transformer: &XKBTransformer) -> Result<(Key, Key
     for ev in seq.iter() {
         match ev {
             Key { event_code: EventCode::EV_KEY(KEY_LEFTALT) } => {
-                flags.alt();
+                flags.left_alt();
             }
             Key { event_code: EventCode::EV_KEY(KEY_RIGHTALT) } => {
                 flags.right_alt();
             }
             Key { event_code: EventCode::EV_KEY(KEY_LEFTSHIFT) } => {
-                flags.shift();
+                flags.left_shift();
             }
             Key { event_code: EventCode::EV_KEY(KEY_RIGHTSHIFT) } => {
-                flags.shift();
+                flags.left_shift();
             }
             _ => {
                 unreachable!("unhandled modifier")
@@ -128,26 +128,26 @@ mod tests {
 
     #[test]
     fn test_key_flags() {
-        assert_eq!(key_flags("!"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.alt())));
-        assert_eq!(key_flags("^"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.ctrl())));
-        assert_eq!(key_flags("+"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.shift())));
-        assert_eq!(key_flags("#"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.meta())));
+        assert_eq!(key_flags("!"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.left_alt())));
+        assert_eq!(key_flags("^"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.left_ctrl())));
+        assert_eq!(key_flags("+"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.left_shift())));
+        assert_eq!(key_flags("#"), nom_ok(KeyModifierFlags::new().tap_mut(|v| v.left_meta())));
 
         assert_eq!(
             key_flags("!#"),
             nom_ok(KeyModifierFlags::new().tap_mut(|v| {
-                v.alt();
-                v.meta()
+                v.left_alt();
+                v.left_meta()
             }))
         );
         assert_eq!(
             key_flags("#!"),
             nom_ok(KeyModifierFlags::new().tap_mut(|v| {
-                v.alt();
-                v.meta();
+                v.left_alt();
+                v.left_meta();
             }))
         );
-        assert_eq!(key_flags("#a!"), nom_ok_rest("a!", KeyModifierFlags::new().tap_mut(|v| v.meta())));
+        assert_eq!(key_flags("#a!"), nom_ok_rest("a!", KeyModifierFlags::new().tap_mut(|v| v.left_meta())));
     }
 
     #[test]
@@ -157,15 +157,15 @@ mod tests {
 
         assert_eq!(
             key_utf("A"),
-            nom_ok((Key::from_str("KEY_A").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.shift())))
+            nom_ok((Key::from_str("KEY_A").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.left_shift())))
         );
 
         assert_eq!(
             key_utf(":"),
-            nom_ok((Key::from_str("semicolon").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.shift())))
+            nom_ok((Key::from_str("semicolon").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.left_shift())))
         );
 
-        assert_eq!(key_utf("^"), nom_ok((Key::from_str("6").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.shift()))));
+        assert_eq!(key_utf("^"), nom_ok((Key::from_str("6").unwrap(), KeyModifierFlags::new().tap_mut(|x| x.left_shift()))));
     }
 
     #[test]
