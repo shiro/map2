@@ -55,7 +55,7 @@ async fn map_to_function() -> PyResult<()> {
         for _ in 0..("Something").len() {
             output.push_str("{backspace}");
         }
-        assert_keys!(py, m, WRITER, &output);
+        assert_eq_events!(writer_read_all(py, m, WRITER), keys(&output));
 
         sleep(py, 100);
         let counter = m.getattr("counter").unwrap().extract::<i32>().unwrap();
@@ -78,7 +78,7 @@ async fn capital_leters() -> PyResult<()> {
             output.push_str("{backspace}");
         }
         output.push_str("lAsErS");
-        assert_keys!(py, m, WRITER, &output);
+        assert_eq_events!(writer_read_all(py, m, WRITER), keys(&output));
 
         Ok(())
     })?;

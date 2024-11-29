@@ -1,7 +1,6 @@
 use super::suffix_tree::SuffixTree;
 use super::*;
 use crate::mapper::mapping_functions::*;
-use crate::mapper::RuntimeKeyActionDepr;
 use crate::python::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -275,16 +274,6 @@ pub struct TextMapperSnapshot {
     mappings: Mappings,
 }
 
-fn _map(from: &KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> Vec<RuntimeKeyActionDepr> {
-    let mut seq: Vec<RuntimeKeyActionDepr> =
-        to.to_key_actions().into_iter().map(|action| RuntimeKeyActionDepr::KeyAction(action)).collect();
-    seq.insert(
-        0,
-        RuntimeKeyActionDepr::ReleaseRestoreModifiers(from.modifiers.clone(), KeyModifierFlags::new(), TYPE_UP),
-    );
-    seq
-}
-
 async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
     let mut state = _state.lock().await;
     // let mut state = &mut *_state;
@@ -335,7 +324,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
                         match to {
                             RuntimeAction::ActionSequence(seq) => {
-                                handle_seq(&seq, &state.modifiers, &state.next);
+                                handle_seq2(&seq, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
                             }
                             RuntimeAction::PythonCallback(handler) => {
                                 // delay the callback until the backspace events are processed

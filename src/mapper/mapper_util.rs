@@ -129,8 +129,13 @@ pub fn python_callback_args(
     vec![PythonArgument::String(name), value]
 }
 
-pub fn handle_seq<Next: SubscriberHashmapExt>(seq: &Vec<KeyActionWithMods>, _flags: &KeyModifierFlags, next: &Next) {
-    let mut flags = _flags.clone();
+pub fn handle_seq<Next: SubscriberHashmapExt>(
+    seq: &Vec<KeyActionWithMods>,
+    pressed_modifiers: &KeyModifierFlags,
+    next: &Next,
+    restore_modifiers: bool,
+) {
+    let mut flags = pressed_modifiers.clone();
     // let mut prev = None;
     for action in seq {
         for action in release_restore_modifiers(&flags, &action.modifiers) {
@@ -152,8 +157,57 @@ pub fn handle_seq<Next: SubscriberHashmapExt>(seq: &Vec<KeyActionWithMods>, _fla
         let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
     }
 
-    for action in release_restore_modifiers(&flags, _flags) {
+    if restore_modifiers {
+        for action in release_restore_modifiers(&flags, pressed_modifiers) {
+            let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+        }
+    }
+}
+
+#[derive(Eq, PartialEq)]
+pub enum SeqModifierRestoreMode {
+    Default,
+    SkipPre,
+    SkipPost,
+    SkipPrePost,
+}
+
+impl Default for SeqModifierRestoreMode {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+pub fn handle_seq2<Next: SubscriberHashmapExt>(
+    seq: &Vec<KeyActionWithMods>,
+    pressed_modifiers: &KeyModifierFlags,
+    next: &Next,
+    modifier_restore_mode: SeqModifierRestoreMode,
+) {
+    let mut flags = pressed_modifiers.clone();
+    for (i, action) in seq.iter().enumerate() {
+        // adjust mods between prefvious and current key
+        if i != 0
+            || (modifier_restore_mode != SeqModifierRestoreMode::SkipPre
+                && modifier_restore_mode != SeqModifierRestoreMode::SkipPrePost)
+        {
+            for action in release_restore_modifiers(&flags, &action.modifiers) {
+                let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+            }
+        }
+
+        flags = action.modifiers;
+        let action = action.to_key_action();
         let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+    }
+
+    // restore mods to original state
+    if modifier_restore_mode != SeqModifierRestoreMode::SkipPost
+        && modifier_restore_mode != SeqModifierRestoreMode::SkipPrePost
+    {
+        for action in release_restore_modifiers(&flags, pressed_modifiers) {
+            let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+        }
     }
 }
 
@@ -177,5 +231,87 @@ pub async fn handle_callback<'a, State>(
     if !next.is_empty() {
         let new_events = release_restore_modifiers(&KeyModifierFlags::default(), &modifiers);
         new_events.iter().cloned().for_each(|ev| next.send_all(InputEvent::Raw(ev.to_input_ev())));
+    }
+}
+
+pub fn get_mode(mappings: &Mappings, from: &KeyActionWithMods, seq: &Vec<KeyActionWithMods>) -> SeqModifierRestoreMode {
+    enum MatchType<'a> {
+        Seq(&'a Vec<KeyActionWithMods>),
+        /// mapping does not exist - `from` key maps to itself (mostly for repeat)
+        Identity,
+        /// mapping exists, but is python callback, nop, etc.
+        None,
+    };
+
+    let mut mapping_up;
+    let mut mapping_down;
+    let mut mapping_repeat;
+
+    match from.value {
+        0 => {
+            mapping_up = MatchType::Seq(seq);
+            mapping_down = match mappings.get(&from.clone().tap_mut(|v| v.value = 1)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => return SeqModifierRestoreMode::Default,
+            };
+            mapping_repeat = match mappings.get(&from.clone().tap_mut(|v| v.value = 2)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => MatchType::Identity,
+            };
+        }
+        1 => {
+            mapping_up = match mappings.get(&from.clone().tap_mut(|v| v.value = 0)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => return SeqModifierRestoreMode::Default,
+            };
+            mapping_down = MatchType::Seq(seq);
+            mapping_repeat = match mappings.get(&from.clone().tap_mut(|v| v.value = 2)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => MatchType::Identity,
+            };
+        }
+        2 => {
+            mapping_up = match mappings.get(&from.clone().tap_mut(|v| v.value = 0)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => return SeqModifierRestoreMode::Default,
+            };
+            mapping_down = match mappings.get(&from.clone().tap_mut(|v| v.value = 1)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => return SeqModifierRestoreMode::Default,
+            };
+            mapping_repeat = MatchType::Seq(seq);
+        }
+        _ => unreachable!(),
+    }
+
+    let compatible = match (mapping_up, mapping_down, mapping_repeat) {
+        (MatchType::Seq(up), MatchType::Seq(down), MatchType::Seq(repeat)) => {
+            down.last().unwrap().modifiers == repeat.first().unwrap().modifiers
+                && repeat.last().unwrap().modifiers == up.first().unwrap().modifiers
+        }
+        (MatchType::Seq(up), MatchType::Seq(down), MatchType::Identity) => {
+            down.last().unwrap().modifiers == from.modifiers && from.modifiers == up.last().unwrap().modifiers
+        }
+        (MatchType::Seq(up), MatchType::Seq(down), MatchType::None) => {
+            down.last().unwrap().modifiers == up.first().unwrap().modifiers
+        }
+        (_, _, _) => false,
+    };
+
+    if !compatible {
+        return SeqModifierRestoreMode::Default;
+    }
+
+    match from.value {
+        0 => SeqModifierRestoreMode::SkipPre,
+        1 => SeqModifierRestoreMode::SkipPost,
+        2 => SeqModifierRestoreMode::SkipPrePost,
+        _ => unreachable!(),
     }
 }

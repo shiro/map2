@@ -3,9 +3,9 @@ use pyo3::prelude::*;
 use crate::*;
 
 #[derive(Clone, Debug)]
-pub enum RuntimeKeyActionDepr {
-    KeyAction(KeyAction),
-    ReleaseRestoreModifiers(KeyModifierFlags, KeyModifierFlags, i32),
+pub enum RuntimeKeyActionSequenceAction {
+    KeyAction(KeyActionWithMods),
+    SyncModifiers,
 }
 
 #[derive(Clone, Debug)]
@@ -27,14 +27,14 @@ pub fn map_action_to_click(from: &KeyActionWithMods, to: &KeyClickActionWithMods
     (
         from.clone(),
         RuntimeAction::ActionSequence(vec![
-            KeyActionWithMods::new(to.key, TYPE_DOWN, Default::default()),
-            KeyActionWithMods::new(to.key, TYPE_UP, Default::default()),
+            KeyActionWithMods::new(to.key, TYPE_DOWN, to.modifiers),
+            KeyActionWithMods::new(to.key, TYPE_UP, to.modifiers),
         ]),
     )
 }
 
 pub fn map_action_to_action(from: &KeyActionWithMods, to: &KeyActionWithMods) -> Mapping {
-    (from.clone(), RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, to.value, Default::default())]))
+    (from.clone(), RuntimeAction::ActionSequence(vec![*to]))
 }
 
 pub fn map_click_to_seq(from: KeyClickActionWithMods, to: Vec<ParsedKeyAction>) -> [Mapping; 3] {
@@ -57,15 +57,15 @@ pub fn map_click_to_click(from: &KeyClickActionWithMods, to: &KeyClickActionWith
     [
         (
             KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() },
-            RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, TYPE_DOWN, Default::default())]),
+            RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, TYPE_DOWN, to.modifiers)]),
         ),
         (
             KeyActionWithMods { key: from.key, value: TYPE_REPEAT, modifiers: from.modifiers.clone() },
-            RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, TYPE_REPEAT, Default::default())]),
+            RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, TYPE_REPEAT, to.modifiers)]),
         ),
         (
             KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() },
-            RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, TYPE_UP, Default::default())]),
+            RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, TYPE_UP, to.modifiers)]),
         ),
     ]
 }
@@ -74,7 +74,7 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     [
         (
             KeyActionWithMods { key: from.key, value: TYPE_DOWN, modifiers: from.modifiers.clone() },
-            RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, TYPE_DOWN, Default::default())]),
+            RuntimeAction::ActionSequence(vec![KeyActionWithMods::new(to.key, TYPE_DOWN, to.modifiers)]),
         ),
         // stub up and repeat, click only triggers action on down press
         (KeyActionWithMods { key: from.key, value: TYPE_UP, modifiers: from.modifiers.clone() }, RuntimeAction::NOP),
@@ -88,20 +88,24 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
 pub fn release_restore_modifiers(from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags) -> Vec<KeyAction> {
     let mut output_events = vec![];
 
-    for (from, to, key) in [
-        (from_flags.left_ctrl, to_flags.left_ctrl, KEY_LEFTCTRL),
-        (from_flags.right_ctrl, to_flags.right_ctrl, KEY_RIGHTCTRL),
-        (from_flags.left_shift, to_flags.left_shift, KEY_LEFTSHIFT),
-        (from_flags.right_shift, to_flags.right_shift, KEY_RIGHTSHIFT),
-        (from_flags.left_alt, to_flags.left_alt, KEY_LEFTALT),
-        (from_flags.right_alt, to_flags.right_alt, KEY_RIGHTALT),
-        (from_flags.left_meta, to_flags.left_meta, KEY_LEFTMETA),
-        (from_flags.right_meta, to_flags.right_meta, KEY_RIGHTMETA),
-    ] {
-        match (from, to) {
-            (false, true) => output_events.push(KeyAction { key: key.into(), value: 1 }),
-            (true, false) => output_events.push(KeyAction { key: key.into(), value: 0 }),
-            _ => {}
+    // first release, then press
+    for value in [0, 1] {
+        for (from, to, key) in [
+            (from_flags.left_ctrl, to_flags.left_ctrl, KEY_LEFTCTRL),
+            (from_flags.right_ctrl, to_flags.right_ctrl, KEY_RIGHTCTRL),
+            (from_flags.left_shift, to_flags.left_shift, KEY_LEFTSHIFT),
+            (from_flags.right_shift, to_flags.right_shift, KEY_RIGHTSHIFT),
+            (from_flags.left_alt, to_flags.left_alt, KEY_LEFTALT),
+            (from_flags.right_alt, to_flags.right_alt, KEY_RIGHTALT),
+            (from_flags.left_meta, to_flags.left_meta, KEY_LEFTMETA),
+            (from_flags.right_meta, to_flags.right_meta, KEY_RIGHTMETA),
+        ] {
+            if value == 0 && from && !to {
+                output_events.push(KeyAction { key: key.into(), value });
+            }
+            if value == 1 && !from && to {
+                output_events.push(KeyAction { key: key.into(), value });
+            }
         }
     }
 

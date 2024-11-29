@@ -113,6 +113,7 @@ impl EvdevInputEventExt for Vec<EvdevInputEvent> {
                         let name = format!("{key:?}").to_string().to_lowercase();
                         name.strip_prefix("key_").unwrap_or(&name).to_string()
                     }
+                    evdev_rs::enums::EventCode::EV_SYN(_) => return "".to_string(),
                     _ => format!("{:?}", v.event_code).to_lowercase(),
                 };
 

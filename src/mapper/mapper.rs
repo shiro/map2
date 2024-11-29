@@ -1,7 +1,7 @@
 use self::event_loop::PythonArgument;
 use super::*;
 use crate::mapper::mapping_functions::*;
-use crate::mapper::{RuntimeAction, RuntimeKeyActionDepr};
+use crate::mapper::RuntimeAction;
 use crate::python::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -474,7 +474,8 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             if let Some(runtime_action) = state.mappings.get(&from_key_action) {
                 match runtime_action {
                     RuntimeAction::ActionSequence(seq) => {
-                        handle_seq(seq, &state.modifiers, &state.next);
+                        let mode = get_mode(&state.mappings, &from_key_action, seq);
+                        handle_seq2(seq, &state.modifiers, &state.next, mode);
                     }
                     RuntimeAction::PythonCallback(handler) => {
                         handle_callback(

@@ -50,7 +50,7 @@ intervals = {}
 
 
 def mouse_ctrl(key, state, axis, multiplier):
-    def inner_fn():
+    def inner_fn(*args):
         # on key release, remove and cancel the corresponding interval
         if state == 0:
             if key in intervals:

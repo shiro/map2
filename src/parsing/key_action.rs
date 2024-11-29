@@ -72,41 +72,13 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
                 acc
             }
             ParsedKeyAction::KeyClickAction(action) => {
-                // if action.modifiers.left_ctrl {
-                //     acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_DOWN));
-                // }
-                // if action.modifiers.left_shift {
-                //     acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_DOWN));
-                // }
-                // if action.modifiers.left_alt {
-                //     acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_DOWN));
-                // }
-                // if action.modifiers.right_alt {
-                //     acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_DOWN));
-                // }
-                // if action.modifiers.left_meta {
-                //     acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_DOWN));
-                // }
-
                 acc.extend(release_restore_modifiers(&KeyModifierFlags::default(), &action.modifiers));
 
                 acc.push(KeyAction::new(action.key, TYPE_DOWN));
                 acc.push(KeyAction::new(action.key, TYPE_UP));
-                if action.modifiers.left_ctrl {
-                    acc.push(KeyAction::new(KEY_LEFTCTRL.into(), TYPE_UP));
-                }
-                if action.modifiers.left_shift {
-                    acc.push(KeyAction::new(KEY_LEFTSHIFT.into(), TYPE_UP));
-                }
-                if action.modifiers.left_alt {
-                    acc.push(KeyAction::new(KEY_LEFTALT.into(), TYPE_UP));
-                }
-                if action.modifiers.right_alt {
-                    acc.push(KeyAction::new(KEY_RIGHTALT.into(), TYPE_UP));
-                }
-                if action.modifiers.left_meta {
-                    acc.push(KeyAction::new(KEY_LEFTMETA.into(), TYPE_UP));
-                }
+
+                acc.extend(release_restore_modifiers(&action.modifiers, &KeyModifierFlags::default()));
+
                 acc
             }
             ParsedKeyAction::Action(action) => {
