@@ -1,6 +1,7 @@
 use crate::python::*;
 use crate::window::window_base::{ActiveWindowInfo, WindowControlMessage, WindowHandler};
 use crate::*;
+use tokio::sync::oneshot;
 
 use anyhow::Result;
 use x11rb::connection::Connection;
@@ -12,7 +13,7 @@ use x11rb::x11_utils::TryParse;
 
 pub fn x11_window_handler() -> WindowHandler {
     Box::new(
-        |exit_rx: oneshot::Receiver<()>,
+        |mut exit_rx: oneshot::Receiver<()>,
          mut subscription_rx: tokio::sync::mpsc::Receiver<WindowControlMessage>|
          -> Result<()> {
             let x11_state = Arc::new(x11_initialize().unwrap());

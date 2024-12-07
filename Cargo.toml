@@ -40,12 +40,13 @@ xdg = "2.2.0"
 atty = "0.2"
 indoc = "1.0"
 futures-intrusive = "0.4.0"
-pyo3 = { version = "0.22" }
-pyo3-async-runtimes = { version = "0.22", features = [
+pyo3 = { version = "0.23.3" }
+pyo3-async-runtimes = { version = "0.23", features = [
   "attributes",
   "tokio-runtime",
   "testing",
 ] }
+pythonize = { version = "0.23.0" }
 oneshot = "0.1.6"
 signal-hook = "0.3.17"
 uuid = { version = "1.5.0", features = ["v4"] }
@@ -57,7 +58,6 @@ thiserror = "1.0.50"
 derive-new = "0.7.0"
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = { version = "1.0.108" }
-pythonize = { version = "0.22.0" }
 
 # wayland
 wayland-client = "0.31.1"

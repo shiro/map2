@@ -9,6 +9,7 @@ use hyprland::event_listener::{AsyncEventListener, EventListener};
 use hyprland::shared::HyprDataActive;
 use hyprland::shared::{HyprData, HyprDataActiveOptional};
 use std::panic::catch_unwind;
+use tokio::sync::oneshot;
 
 pub fn hyprland_window_handler() -> WindowHandler {
     Box::new(

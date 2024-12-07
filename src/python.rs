@@ -1,5 +1,4 @@
 pub use pyo3::exceptions::PyRuntimeError;
-pub use pyo3::impl_::wrap::OkWrap;
 pub use pyo3::prelude::*;
 pub use pyo3::types::PyDict;
 pub use pyo3::Bound as PyBound;
