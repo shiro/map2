@@ -36,12 +36,12 @@ mod integration_tests {
 }
 
 pub fn writer_read(py: Python, module: &PyBound<PyModule>, name: &str) -> Option<EvdevInputEvent> {
-    let target = module.getattr(name).unwrap().to_object(py);
+    let target = module.getattr(name).unwrap().into_pyobject(py).unwrap();
 
     target
-        .call_method0(py, "__test__read_ev")
+        .call_method0("__test__read_ev")
         .unwrap()
-        .extract::<Option<String>>(py)
+        .extract::<Option<String>>()
         .unwrap()
         .and_then(|x| serde_json::from_str(&x).unwrap())
 }
@@ -61,10 +61,10 @@ pub fn writer_read_all(py: Python, module: &PyBound<PyModule>, name: &str) -> Ve
 }
 
 pub fn reader_send(py: Python, module: &PyBound<PyModule>, name: &str, ev: &EvdevInputEvent) {
-    let target = module.getattr(name).unwrap().to_object(py);
+    let target = module.getattr(name).unwrap().into_pyobject(py).unwrap();
     let ev = serde_json::to_string(ev).unwrap();
 
-    target.call_method_bound(py, "__test__write_ev", (ev,), None).unwrap();
+    target.call_method("__test__write_ev", (ev,), None).unwrap();
 }
 
 pub fn sleep(py: Python, millis: u64) {
@@ -88,11 +88,11 @@ macro_rules! assert_empty {
 }
 
 pub fn reader_send_all(py: Python, module: &PyBound<PyModule>, name: &str, ev_list: &Vec<EvdevInputEvent>) {
-    let target = module.getattr(name).unwrap().to_object(py);
+    let target = module.getattr(name).unwrap().into_pyobject(py).unwrap();
 
     for ev in ev_list.iter() {
         let ev = serde_json::to_string(ev).unwrap();
-        target.call_method_bound(py, "__test__write_ev", (ev,), None).unwrap();
+        target.call_method("__test__write_ev", (ev,), None).unwrap();
     }
 }
 

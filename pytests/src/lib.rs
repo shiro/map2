@@ -15,7 +15,9 @@ pub fn include_python(_item: TokenStream) -> TokenStream {
     let py_filename =
         format!("{}.py", source.path().file_stem().map(|v| v.to_string_lossy().to_string()).unwrap_or("".to_string()));
 
-    format!("PyModule::from_code_bound(py, include_str!(\"../{py_filename}\"), \"\", \"\")?").parse().unwrap()
+    format!("PyModule::from_code(py, pyo3::ffi::c_str!(include_str!(\"../{py_filename}\")), pyo3::ffi::c_str!(\"\"), pyo3::ffi::c_str!(\"\"))?")
+        .parse()
+        .unwrap()
 }
 
 #[proc_macro]
