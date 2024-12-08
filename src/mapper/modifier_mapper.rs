@@ -33,6 +33,8 @@ struct State {
     #[new(default)]
     down_keys: HashSet<EV_KEY>,
     #[new(default)]
+    ignored_keys: HashSet<EV_KEY>,
+    #[new(default)]
     click_action: Option<RuntimeAction>,
     #[new(default)]
     fallback_handler: Option<Arc<PyObject>>,
@@ -464,6 +466,10 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     // release all other held keys
                     // TODO order
                     for key_raw in state.down_keys.clone().iter() {
+                        if state.ignored_keys.contains(key_raw) {
+                            continue;
+                        }
+
                         let key = Key::from(key_raw.clone());
                         let mut from_key_action =
                             KeyActionWithMods { key: key.clone(), value: 1, modifiers: state.modifiers };
@@ -580,6 +586,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 }
                 1 => {
                     state.active = true;
+
                     let mut from_key_action =
                         KeyActionWithMods { key: state.key.clone(), value: 1, modifiers: KeyModifierFlags::new() };
 
@@ -620,14 +627,26 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
         _ => {}
     };
 
-    if !state.active {
-        state.next.send_all(raw_ev);
-        return;
-    }
-
     match ev {
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-            state.surpressed = true;
+            // don't process keys pressed and held before the mod was pressed
+            if !state.active {
+                state.ignored_keys.insert(key.clone());
+                state.next.send_all(raw_ev);
+                return;
+            }
+            if state.ignored_keys.contains(key) {
+                if *value == 0 {
+                    state.ignored_keys.remove(key);
+                }
+                state.next.send_all(raw_ev);
+                return;
+            }
+
+            if *value == 1 {
+                state.surpressed = true;
+            }
+
             let event_code = EventCode::EV_KEY(*key);
 
             if *value == 1 {
@@ -720,80 +739,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
     state.next.send_all(raw_ev);
 }
 
-// fn handle_action(state: &State, key: &EV_KEY, value: i32, runtime_action: &RuntimeAction) -> Option<Arc<PyObject>> {
-//     match runtime_action {
-//         RuntimeAction::ActionSequence(seq) => {
-//             // for action in seq {
-//             //     match action {
-//             //         RuntimeKeyActionDepr::KeyAction(key_action) => {
-//             //             let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
-//             //         }
-//             //         RuntimeKeyActionDepr::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-//             //             let new_events = release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
-//             //             for ev in new_events {
-//             //                 state.next.send_all(InputEvent::Raw(ev));
-//             //             }
-//             //         }
-//             //     }
-//             // }
-//         }
-//         RuntimeAction::PythonCallback(handler) => {
-//             // if !state.next.is_empty() {
-//             //     // always release all trigger mods before running the callback
-//             //     let new_events =
-//             //         release_restore_modifiers(&state.modifiers, &from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
-//             //     new_events.iter().cloned().for_each(|ev| state.next.send_all(InputEvent::Raw(ev)));
-//             // }
-//             //
-//             // return Some(handler.clone());
-//         }
-//         _ => {}
-//     };
-//     None
-// }
-
-// async fn handle_action2<'a>(
-//     ev: &EvdevInputEvent,
-//     _state: Arc<Mutex<State>>,
-//     mut state: MutexGuard<'a, State>,
-//     runtime_action: &RuntimeAction,
-// ) {
-//     match runtime_action {
-//         RuntimeAction::ActionSequence(seq) => {
-//             for action in seq {
-//                 match action {
-//                     RuntimeKeyActionDepr::KeyAction(key_action) => {
-//                         let _ = state.next.send_all(InputEvent::Raw(key_action.to_input_ev()));
-//                     }
-//                     RuntimeKeyActionDepr::ReleaseRestoreModifiers(from_flags, to_flags, to_type) => {
-//                         let new_events = release_restore_modifiers(&state.modifiers, &from_flags, &to_flags, &to_type);
-//                         for ev in new_events {
-//                             state.next.send_all(InputEvent::Raw(ev));
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//         RuntimeAction::PythonCallback(from_modifiers, handler) => {
-//             if !state.next.is_empty() {
-//                 // always release all trigger mods before running the callback
-//                 let new_events =
-//                     release_restore_modifiers(&state.modifiers, &from_modifiers, &KeyModifierFlags::new(), &TYPE_UP);
-//                 new_events.iter().cloned().for_each(|ev| state.next.send_all(InputEvent::Raw(ev)));
-//             }
-//
-//             let args = Some(python_callback_args(&ev.event_code, &state.modifiers, ev.value, &state.transformer));
-//             let transformer = state.transformer.clone();
-//             let next = state.next.values().cloned().collect();
-//             drop(state);
-//             run_python_handler(handler.clone(), args, ev.clone(), transformer, next).await;
-//             state = _state.lock().await;
-//             return;
-//         }
-//         _ => {}
-//     };
-// }
-//
 async fn handle_action_python_callback<'a>(
     ev: &EvdevInputEvent,
     mut state: MutexGuard<'a, State>,
@@ -805,9 +750,3 @@ async fn handle_action_python_callback<'a>(
     drop(state);
     run_python_handler(handler.clone(), args, ev.clone(), transformer, next).await;
 }
-
-// async fn handle_action_seq<'a>(ev: &EvdevInputEvent, seq: &Vec<KeyAction>, state: &State) {
-//     for action in seq {
-//         let _ = state.next.send_all(InputEvent::Raw(action.to_input_ev()));
-//     }
-// }
