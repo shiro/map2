@@ -13,3 +13,9 @@ io_test!("cover5", "{b down}{capslock down}{b up}{capslock up}", "b{capslock}");
 io_test!("cover6", "{b down}{capslock down}{b repeat}{b up}{capslock up}", "{b down}{b repeat}{b up}{capslock}");
 
 io_test!("cover7", "a{capslock down}a{capslock up}", "ab");
+io_test!("cover8", "{capslock down}a{capslock up}{capslock down}a{capslock up}{capslock down}a{capslock up}", "bbb");
+io_test!(
+    "cover9",
+    "{capslock down}{a down}{capslock up}{a up}{capslock down}{a down}{capslock up}{a up}",
+    "b{a up}b{a up}"
+);

@@ -194,6 +194,32 @@ impl ModifierMapper {
         Ok(())
     }
 
+    pub fn nop(&mut self, from: String) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
+        let from = parse_key_action_with_mods(&from, Some(&state.transformer)).map_err(|err| {
+            PyRuntimeError::new_err(format!(
+                "mapping error on the 'from' side:\n{}",
+                ApplicationError::KeyParse(err.to_string()),
+            ))
+        })?;
+
+        match from {
+            ParsedKeyAction::KeyAction(from) => {
+                state.mappings.insert(from, RuntimeAction::NOP);
+            }
+            ParsedKeyAction::KeyClickAction(from) => {
+                for value in 0..=2 {
+                    let from = KeyActionWithMods::new(from.key, value, from.modifiers);
+                    state.mappings.insert(from, RuntimeAction::NOP);
+                }
+            }
+            ParsedKeyAction::Action(_) => {
+                return Err(ApplicationError::NonButton.into_py());
+            }
+        }
+        Ok(())
+    }
+
     pub fn snapshot(
         &self,
         py: Python,
@@ -507,6 +533,21 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                                 }
                                 _ => {}
                             };
+                            continue;
+                        }
+
+                        if let Some(handler) = state.fallback_handler.as_ref() {
+                            handle_callback(
+                                &ev,
+                                handler.clone(),
+                                Some(python_callback_args(&key.event_code, &Default::default(), 0, &state.transformer)),
+                                state.transformer.clone(),
+                                &state.modifiers.clone(),
+                                state.next.values().cloned().collect(),
+                                state,
+                            )
+                            .await;
+                            return;
                         }
                     }
 
@@ -648,7 +689,9 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 return;
             }
             if !state.active {
-                state.ignored_keys.insert(key.clone());
+                if *value == 1 {
+                    state.ignored_keys.insert(key.clone());
+                }
                 state.next.send_all(raw_ev);
                 return;
             }

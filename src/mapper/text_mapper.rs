@@ -138,7 +138,7 @@ impl TextMapper {
         Some(TextMapperSnapshot { mappings: state.mappings.clone() })
     }
 
-    pub fn link_to(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
+    pub fn link_to(&self, target: &PyBound<PyAny>) -> PyResult<()> {
         let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
         target.link_from(self.link.clone());
         self.link.link_to(target);
@@ -185,6 +185,23 @@ impl TextMapper {
     pub fn unlink_all(&mut self) {
         self.unlink_from_all();
         self.unlink_to_all();
+    }
+
+    pub fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
+
+        let target_src =
+            node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source+destination node"))?;
+        let target_dst =
+            node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a source+destination node"))?;
+
+        for (_, node) in state.next.drain() {
+            target_src.link_to(node);
+        }
+        drop(state);
+        self.link_to(target);
+
+        Ok(())
     }
 
     pub fn name(&self) -> String {
