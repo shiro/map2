@@ -629,12 +629,17 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
     match ev {
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-            // don't process keys pressed and held before the mod was pressed
-            if !state.active {
-                state.ignored_keys.insert(key.clone());
-                state.next.send_all(raw_ev);
-                return;
+            let event_code = EventCode::EV_KEY(*key);
+
+            if *value == 1 {
+                state.surpressed = true;
+                state.down_keys.insert(key.clone());
             }
+            if *value == 0 {
+                state.down_keys.remove(key);
+            }
+
+            // don't process keys pressed and held before the mod was pressed
             if state.ignored_keys.contains(key) {
                 if *value == 0 {
                     state.ignored_keys.remove(key);
@@ -642,18 +647,10 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 state.next.send_all(raw_ev);
                 return;
             }
-
-            if *value == 1 {
-                state.surpressed = true;
-            }
-
-            let event_code = EventCode::EV_KEY(*key);
-
-            if *value == 1 {
-                state.down_keys.insert(key.clone());
-            }
-            if *value == 0 {
-                state.down_keys.remove(key);
+            if !state.active {
+                state.ignored_keys.insert(key.clone());
+                state.next.send_all(raw_ev);
+                return;
             }
 
             let from_key_action = KeyActionWithMods {
@@ -662,34 +659,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 modifiers: state.modifiers,
             };
 
-            if state.mappings.get(&from_key_action).is_some() {
-                // TODO here
-                // let mut from_key_action =
-                //     KeyActionWithMods { key: state.key.clone(), value: 0, modifiers: state.modifiers };
-                //
-                // if let Some(runtime_action) = state.mappings.get(&from_key_action) {
-                //     match runtime_action {
-                //         RuntimeAction::ActionSequence(seq) => {
-                //             handle_seq(seq, &state.modifiers, &state.next);
-                //         }
-                //         RuntimeAction::PythonCallback(handler) => {
-                //             handle_callback(
-                //                 &ev,
-                //                 handler.clone(),
-                //                 Some(python_callback_args(&event_code, &state.modifiers, *value, &state.transformer)),
-                //                 state.transformer.clone(),
-                //                 &state.modifiers.clone(),
-                //                 state.next.values().cloned().collect(),
-                //                 state,
-                //             )
-                //             .await;
-                //             return;
-                //         }
-                //         _ => {}
-                //     };
-                // }
-                // untill here
-            }
             if let Some(runtime_action) = state.mappings.get(&from_key_action) {
                 // handle mapping if it exists
                 match runtime_action {
