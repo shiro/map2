@@ -310,9 +310,9 @@ impl Mapper {
                 state.mappings.insert(from, RuntimeAction::PythonCallback(to));
             }
             ParsedKeyAction::KeyClickAction(from) => {
-                state.mappings.insert(from.to_key_action_with_mods(1), RuntimeAction::PythonCallback(to));
-                state.mappings.insert(from.to_key_action_with_mods(0), RuntimeAction::NOP);
-                state.mappings.insert(from.to_key_action_with_mods(2), RuntimeAction::NOP);
+                state.mappings.insert(from.to_key_action_with_mods(1), RuntimeAction::PythonCallback(to.clone()));
+                state.mappings.insert(from.to_key_action_with_mods(0), RuntimeAction::PythonCallback(to.clone()));
+                state.mappings.insert(from.to_key_action_with_mods(2), RuntimeAction::PythonCallback(to));
             }
             ParsedKeyAction::Action(_) => {
                 return Err(ApplicationError::NonButton.into());

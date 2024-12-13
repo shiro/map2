@@ -325,9 +325,9 @@ impl ModifierMapper {
                 state.mappings.insert(from, RuntimeAction::PythonCallback(to));
             }
             ParsedKeyAction::KeyClickAction(from) => {
-                state.mappings.insert(from.to_key_action_with_mods(1), RuntimeAction::PythonCallback(to));
-                state.mappings.insert(from.to_key_action_with_mods(0), RuntimeAction::NOP);
-                state.mappings.insert(from.to_key_action_with_mods(2), RuntimeAction::NOP);
+                state.mappings.insert(from.to_key_action_with_mods(1), RuntimeAction::PythonCallback(to.clone()));
+                state.mappings.insert(from.to_key_action_with_mods(0), RuntimeAction::PythonCallback(to.clone()));
+                state.mappings.insert(from.to_key_action_with_mods(2), RuntimeAction::PythonCallback(to));
             }
             ParsedKeyAction::Action(_) => {
                 return Err(ApplicationError::NonButton.into());
@@ -491,6 +491,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
                     // release all other held keys
                     // TODO order
+                    // TODO skip modifier keys?
                     for key_raw in state.down_keys.clone().iter() {
                         if state.ignored_keys.contains(key_raw) {
                             continue;
@@ -518,9 +519,9 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                                         &ev,
                                         handler.clone(),
                                         Some(python_callback_args(
-                                            &event_code,
+                                            &key.event_code,
                                             &state.modifiers,
-                                            *value,
+                                            0,
                                             &state.transformer,
                                         )),
                                         state.transformer.clone(),
