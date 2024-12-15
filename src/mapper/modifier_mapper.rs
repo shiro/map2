@@ -30,10 +30,12 @@ struct State {
     active: bool,
     #[new(default)]
     surpressed: bool,
+    // keys pressed down before the mod was pressed
     #[new(default)]
-    down_keys: HashSet<EV_KEY>,
+    unmodded_keys: HashSet<EV_KEY>,
+    // keys pressed down after the mod was pressed
     #[new(default)]
-    ignored_keys: HashSet<EV_KEY>,
+    modded_keys: HashSet<EV_KEY>,
     #[new(default)]
     click_action: Option<RuntimeAction>,
     #[new(default)]
@@ -489,69 +491,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 0 => {
                     state.active = false;
 
-                    // release all other held keys
-                    // TODO order
-                    // TODO skip modifier keys?
-                    for key_raw in state.down_keys.clone().iter() {
-                        if state.ignored_keys.contains(key_raw) {
-                            continue;
-                        }
-
-                        let key = Key::from(key_raw.clone());
-                        let mut from_key_action =
-                            KeyActionWithMods { key: key.clone(), value: 1, modifiers: state.modifiers };
-
-                        // skip unrelated
-                        if state.mappings.get(&from_key_action).is_none() {
-                            continue;
-                        }
-
-                        // trigger up action on mapped key
-                        from_key_action.value = 0;
-                        if let Some(runtime_action) = state.mappings.get(&from_key_action) {
-                            match runtime_action {
-                                RuntimeAction::ActionSequence(seq) => {
-                                    let mode = get_mode(&state.mappings, &from_key_action, seq);
-                                    handle_seq2(seq, &state.modifiers, &state.next, mode);
-                                }
-                                RuntimeAction::PythonCallback(handler) => {
-                                    handle_callback(
-                                        &ev,
-                                        handler.clone(),
-                                        Some(python_callback_args(
-                                            &key.event_code,
-                                            &state.modifiers,
-                                            0,
-                                            &state.transformer,
-                                        )),
-                                        state.transformer.clone(),
-                                        &state.modifiers.clone(),
-                                        state.next.values().cloned().collect(),
-                                        state,
-                                    )
-                                    .await;
-                                    state = _state.lock().await;
-                                }
-                                _ => {}
-                            };
-                            continue;
-                        }
-
-                        if let Some(handler) = state.fallback_handler.as_ref() {
-                            handle_callback(
-                                &ev,
-                                handler.clone(),
-                                Some(python_callback_args(&key.event_code, &Default::default(), 0, &state.transformer)),
-                                state.transformer.clone(),
-                                &state.modifiers.clone(),
-                                state.next.values().cloned().collect(),
-                                state,
-                            )
-                            .await;
-                            return;
-                        }
-                    }
-
                     // up action on modifier
                     let mut from_key_action =
                         KeyActionWithMods { key: state.key.clone(), value: 0, modifiers: KeyModifierFlags::new() };
@@ -617,17 +556,10 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                             state.next.send_all(InputEvent::Raw(state.key.to_input_ev(0)));
                         }
                     }
-
-                    // enabling this is more correct, but annoying
-                    // press down other held keys after modifier is released
-                    // for key in state.down_keys.iter() {
-                    //     let key = Key::from(key.clone());
-                    //     state.next.send_all(InputEvent::Raw(key.to_input_ev(1)));
-                    // }
-                    state.down_keys.clear();
                 }
                 1 => {
                     state.active = true;
+                    state.surpressed = false;
 
                     let mut from_key_action =
                         KeyActionWithMods { key: state.key.clone(), value: 1, modifiers: KeyModifierFlags::new() };
@@ -673,28 +605,39 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
             let event_code = EventCode::EV_KEY(*key);
 
-            if *value == 1 {
-                state.surpressed = true;
-                state.down_keys.insert(key.clone());
-            }
-            if *value == 0 {
-                state.down_keys.remove(key);
-            }
-
-            // don't process keys pressed and held before the mod was pressed
-            if state.ignored_keys.contains(key) {
-                if *value == 0 {
-                    state.ignored_keys.remove(key);
+            if state.active {
+                // if marked as "not modded" from before, pass through
+                if state.unmodded_keys.contains(key) {
+                    if *value == 0 {
+                        state.unmodded_keys.remove(key);
+                    }
+                    state.next.send_all(raw_ev);
+                    return;
+                } else {
+                    if *value == 0 {
+                        state.modded_keys.remove(key);
+                    }
+                    if *value == 1 {
+                        state.modded_keys.insert(key.clone());
+                        state.surpressed = true;
+                    }
                 }
-                state.next.send_all(raw_ev);
-                return;
-            }
-            if !state.active {
-                if *value == 1 {
-                    state.ignored_keys.insert(key.clone());
+            } else {
+                // if still modded from before, use mappings
+                if state.modded_keys.contains(key) {
+                    if *value == 0 {
+                        state.modded_keys.remove(key);
+                    }
+                } else {
+                    if *value == 0 {
+                        state.unmodded_keys.remove(key);
+                    }
+                    if *value == 1 {
+                        state.unmodded_keys.insert(key.clone());
+                    }
+                    state.next.send_all(raw_ev);
+                    return;
                 }
-                state.next.send_all(raw_ev);
-                return;
             }
 
             let from_key_action = KeyActionWithMods {
@@ -729,7 +672,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 return;
             }
 
-            // event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
             state.modifiers.update_from_action(&KeyAction::from_input_ev(&ev));
 
             if let Some(handler) = state.fallback_handler.as_ref() {
