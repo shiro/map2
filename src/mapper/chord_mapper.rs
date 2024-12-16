@@ -351,10 +351,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 }
                 TYPE_UP => {
                     state.pressed_keys.remove(&_key);
-                    if state.next.is_empty() {
-                        return;
-                    };
-
                     state.interval.take().map(|task| task.abort());
 
                     if let Some(pos) = state.stack.iter().position(|x| x == &_key) {
@@ -411,6 +407,17 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 handle_seq2(&seq, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
             }
             RuntimeAction::PythonCallback(handler) => {
+                // TODO pass stack as first arg
+                // let args = Some(PythonArgument::String(
+                //     match value {
+                //         0 => "up",
+                //         1 => "down",
+                //         2 => "repeat",
+                //         _ => unreachable!(),
+                //     }
+                //     .to_string(),
+                // ));
+
                 handle_callback(
                     &ev,
                     handler.clone(),
@@ -432,7 +439,7 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             // no match, send all buffered keys from stack
             for k in state.stack.iter() {
                 state.next.send_all(InputEvent::Raw(k.to_input_ev(1)));
-                state.next.send_all(InputEvent::Raw(k.to_input_ev(0)));
+                // state.next.send_all(InputEvent::Raw(k.to_input_ev(0)));
             }
         }
         state.stack.clear();
