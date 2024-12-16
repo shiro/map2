@@ -26,6 +26,7 @@ struct State {
     chorded_keys: HashSet<Key>,
     #[new(default)]
     modifiers: KeyModifierFlags,
+    // all keys on the stack are included in mappings and are currently pressed
     #[new(default)]
     stack: Vec<Key>,
     #[new(default)]
@@ -322,6 +323,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
                     if should_handle {
                         state.stack.push(_key.clone());
+                        state.interval.take().map(|task| task.abort());
 
                         if state.stack.len() == 2 {
                             drop(state);
@@ -334,9 +336,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                             }));
                         }
                     } else {
-                        if let Some(task) = state.interval.take() {
-                            task.abort();
-                        };
+                        state.interval.take().map(|task| task.abort());
 
                         let state = &mut *state;
                         for k in state.stack.iter() {
@@ -355,9 +355,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         return;
                     };
 
-                    if let Some(task) = state.interval.take() {
-                        task.abort();
-                    };
+                    state.interval.take().map(|task| task.abort());
 
                     if let Some(pos) = state.stack.iter().position(|x| x == &_key) {
                         state.stack.remove(pos);
@@ -403,10 +401,6 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
         InputEvent::Raw(ev) => ev,
     };
 
-    if let Some(task) = state.interval.take() {
-        task.abort();
-    };
-
     if let Some(action) = state.mappings.get(&state.stack).cloned() {
         for k in state.stack.clone().into_iter() {
             state.ignored_keys.insert(k);
@@ -431,10 +425,6 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             RuntimeAction::NOP => {}
         }
     } else {
-        if state.next.is_empty() {
-            return;
-        };
-
         // only one key on the stack
         if state.stack.len() == 1 && state.stack[0].event_code == ev.event_code {
             state.next.send_all(InputEvent::Raw(ev.clone()));
