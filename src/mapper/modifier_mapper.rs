@@ -672,13 +672,14 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 return;
             }
 
+            let args = Some(python_callback_args(&event_code, &state.modifiers, *value, &state.transformer));
             state.modifiers.update_from_action(&KeyAction::from_input_ev(&ev));
 
             if let Some(handler) = state.fallback_handler.as_ref() {
                 handle_callback(
                     &ev,
                     handler.clone(),
-                    Some(python_callback_args(&event_code, &state.modifiers, *value, &state.transformer)),
+                    args,
                     state.transformer.clone(),
                     &state.modifiers.clone(),
                     state.next.values().cloned().collect(),

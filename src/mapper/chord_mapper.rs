@@ -334,17 +334,9 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                             }));
                         }
                     } else {
-                        if state.next.is_empty() {
-                            return;
-                        };
-
                         if let Some(task) = state.interval.take() {
                             task.abort();
                         };
-
-                        fn foo(v: &mut State) -> (&Vec<Key>, &mut HashSet<Key>) {
-                            (&v.stack, &mut v.ignored_keys)
-                        }
 
                         let state = &mut *state;
                         for k in state.stack.iter() {
@@ -379,7 +371,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                             state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
                             state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
                         }
-
                         state.stack.clear();
 
                         if !state.ignored_keys.remove(&_key) {
@@ -397,9 +388,12 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 }
                 _ => unreachable!(),
             };
+            return;
         }
         _ => {}
     }
+
+    state.next.send_all(raw_ev);
 }
 
 // fired after the chord timeout has passed, submits the keys held on the stack
@@ -423,25 +417,6 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 handle_seq2(&seq, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
             }
             RuntimeAction::PythonCallback(handler) => {
-                // if !state.next.is_empty() {
-                //     // always release all trigger mods before running the callback
-                //     let new_events = release_restore_modifiers(
-                //         &state.modifiers,
-                //         &from_modifiers,
-                //         &KeyModifierFlags::new(),
-                //         &TYPE_UP,
-                //     );
-                //     for ev in new_events {
-                //         state.next.send_all(InputEvent::Raw(ev));
-                //     }
-                // }
-                //
-                // let handler = handler.clone();
-                // let transformer = state.transformer.clone();
-                // let next = state.next.values().cloned().collect();
-                // drop(state);
-                // drop(_state);
-                // run_python_handler(handler, None, ev.clone(), transformer, next).await;
                 handle_callback(
                     &ev,
                     handler.clone(),

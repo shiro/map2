@@ -299,6 +299,17 @@ impl Mapper {
         }
         Ok(())
     }
+
+    pub fn send_after(&mut self, val: String) -> PyResult<()> {
+        let mut state = self.state.blocking_lock();
+        let actions = parse_key_sequence(val.as_str(), Some(&state.transformer))
+            .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
+            .to_key_actions();
+        for action in actions {
+            state.next.send_all(InputEvent::Raw(action.to_input_ev()));
+        }
+        Ok(())
+    }
 }
 
 impl Mapper {
@@ -500,12 +511,12 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 return;
             }
 
+            let args =
+                Some(python_callback_args(&EventCode::EV_KEY(*key), &state.modifiers, *value, &state.transformer));
+
             state.modifiers.update_from_action(&KeyAction::from_input_ev(&ev));
 
             if let Some(handler) = state.fallback_handler.as_ref() {
-                let args =
-                    Some(python_callback_args(&EventCode::EV_KEY(*key), &state.modifiers, *value, &state.transformer));
-
                 let handler = handler.clone();
                 let transformer = state.transformer.clone();
                 let next = state.next.values().cloned().collect();
