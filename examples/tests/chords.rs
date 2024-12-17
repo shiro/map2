@@ -18,10 +18,10 @@ io_test2!(
     "sleep 10",
     "input {z down}",
     "sleep 10",
-    "output a{z down}",
+    "output {a down}{z down}",
     "input {a up}{z up}",
     "sleep 10",
-    "output {z up}"
+    "output {a up}{z up}"
 );
 
 io_test2!("simple_chord1", "input {a down}{b down}{a up}{b up}", "sleep 55", "output c");

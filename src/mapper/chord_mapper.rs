@@ -341,8 +341,8 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         let state = &mut *state;
                         for k in state.stack.iter() {
                             state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
-                            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
-                            state.ignored_keys.insert(k.clone());
+                            // state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
+                            // state.ignored_keys.insert(k.clone());
                         }
                         state.stack.clear();
 
