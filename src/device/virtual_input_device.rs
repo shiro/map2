@@ -64,12 +64,10 @@ fn find_fd_with_pattern(fd_path: &PathBuf, udev: &udev::Device, matchers: &Vec<P
 
 pub async fn read_from_device_input_fd_thread_handler(
     device: Device,
-    ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
+    ev_handler: Arc<impl Fn(NativeDeviceEvent) + Send + Sync + 'static>,
     // abort_rx: oneshot::Receiver<()>,
 ) {
     let mut read_buf: io::Result<(ReadStatus, InputEvent)>;
-    // TODO remove id
-    let id = Uuid::new_v4().to_string();
 
     let file = device.file().as_ref().unwrap().as_raw_fd();
     let async_fd = AsyncFd::new(file).unwrap();
@@ -100,7 +98,7 @@ pub async fn read_from_device_input_fd_thread_handler(
                         }
                     }
                     ReadStatus::Success => {
-                        ev_handler(&id, result.1);
+                        ev_handler(NativeDeviceEvent::InputEvent(result.1));
                     }
                 }
             } else {
@@ -136,7 +134,7 @@ enum GrabDeviceError {
 
 fn grab_device(
     fd_path: &Path,
-    ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
+    ev_handler: Arc<impl Fn(NativeDeviceEvent) + Send + Sync + 'static>,
 ) -> Result<tokio::task::AbortHandle, GrabDeviceError> {
     use nix::fcntl::{FcntlArg, OFlag};
 
@@ -176,10 +174,103 @@ type ParsedDeviceMatcher = HashMap<String, Regex>;
 //     attributes: HashMap<String, String>,
 // }
 
+#[pyo3::pyclass]
+pub struct NativeDeviceInfo {
+    #[pyo3(get)]
+    path: String,
+}
+
+pub enum NativeDeviceEvent {
+    InputEvent(EvdevInputEvent),
+    AddDevice(NativeDeviceInfo),
+    RemoveDevice(NativeDeviceInfo),
+}
+
+pub fn watch_udev_inputs(
+    matchers: Vec<DeviceMatcher>,
+    ev_handler: Arc<impl Fn(NativeDeviceEvent) + Send + Sync + 'static>,
+    mut exit_rx: tokio::sync::oneshot::Receiver<()>,
+) -> Result<()> {
+    let parsed_matchers = matchers
+        .into_iter()
+        .map(|x| {
+            Ok(x.into_iter()
+                .map(|(k, v)| {
+                    let regex = Regex::new(&v).unwrap();
+                    Ok((k, regex))
+                })
+                .collect::<Result<HashMap<String, Regex>>>()?)
+        })
+        .collect::<Result<Vec<ParsedDeviceMatcher>>>()
+        .unwrap();
+
+    // devices are monitored and hooked up when added/removed, so we need another thread
+    pyo3_async_runtimes::tokio::get_runtime().spawn(async move {
+        let (fs_ev_tx, mut fs_ev_rx) = tokio::sync::mpsc::channel(32);
+
+        let mut watcher: notify::RecommendedWatcher = notify::recommended_watcher(move |res| {
+            futures::executor::block_on(async {
+                fs_ev_tx.send(res).await.unwrap();
+            })
+        })?;
+        watcher.watch(Path::new("/dev/input"), notify::RecursiveMode::Recursive)?;
+
+        // check all devices
+        for entry in WalkDir::new("/dev/input").into_iter().filter_map(Result::ok).filter(|e| !e.file_type().is_file())
+        {
+            let fd_path = entry.path().to_owned();
+            let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
+
+            if !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
+                continue;
+            }
+
+            ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+        }
+
+        // continuously check if devices are added/removed and handle it
+        tokio::select!(
+            Ok(()) = exit_rx => {
+                return Ok::<_, anyhow::Error>(());
+            },
+            (_) = async {
+                loop {
+                    if let Some(Ok(event)) = fs_ev_rx.recv().await {
+                        match event.kind {
+                            notify::EventKind::Create(_) => {
+                                let fd_path = event.paths.first().unwrap();
+                                let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
+
+                                if !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
+                                    continue;
+                                }
+
+                                ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+                            }
+                            notify::EventKind::Remove(_) => {
+                                let fd_path = event.paths.first().unwrap().to_path_buf();
+                                ev_handler(NativeDeviceEvent::RemoveDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+                            }
+                            _ => {
+                                continue;
+                            }
+                        };
+                    }
+                }
+                // anyhow::Ok(())
+                Ok::<_, anyhow::Error>(())
+            } => {},
+        );
+        Ok(())
+    });
+
+    Ok(())
+}
+
 pub fn grab_udev_inputs(
     // fd_patterns: &[impl AsRef<str>],
     matchers: Vec<DeviceMatcher>,
-    ev_handler: Arc<impl Fn(&str, EvdevInputEvent) + Send + Sync + 'static>,
+    ev_handler: Arc<impl Fn(NativeDeviceEvent) + Send + Sync + 'static>,
     mut exit_rx: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<()> {
     let parsed_matchers = matchers
@@ -240,6 +331,7 @@ pub fn grab_udev_inputs(
             };
 
             device_map.insert(udev.syspath().to_owned(), abort_handle);
+            ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
         }
 
         // continuously check if devices are added/removed and handle it
@@ -265,6 +357,8 @@ pub fn grab_udev_inputs(
 
                                 let abort_handle = grab_device(&fd_path, ev_handler.clone())?;
                                 device_map.insert(udev.syspath().to_owned(), abort_handle).map(|(v)|{v.abort()});
+
+                                ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
                             }
                             notify::EventKind::Remove(_) => {
                                 let fd_path = event.paths.first().unwrap().to_path_buf();
@@ -273,6 +367,7 @@ pub fn grab_udev_inputs(
                                     // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
                                     let _ = abort_handle.abort();
                                 }
+                                ev_handler(NativeDeviceEvent::RemoveDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
                             }
                             _ => {
                                 continue;

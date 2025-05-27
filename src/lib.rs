@@ -39,6 +39,7 @@ pub use mapper::*;
 pub use python::{err_to_py, PyBound};
 use reader::Reader;
 pub use subscriber::*;
+use watcher::Watcher;
 use writer::Writer;
 
 pub use crate::closure_channel::*;
@@ -74,5 +75,6 @@ pub mod mapper;
 pub mod python;
 pub mod reader;
 pub mod virtual_writer;
+pub mod watcher;
 pub mod window;
 pub mod writer;

@@ -153,6 +153,7 @@ fn map2(_py: Python, m: PyBound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(__test, &m)?)?;
 
     m.add_class::<Reader>()?;
+    m.add_class::<Watcher>()?;
 
     m.add_class::<Mapper>()?;
     m.add_class::<TextMapper>()?;

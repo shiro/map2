@@ -310,6 +310,10 @@ impl Mapper {
         }
         Ok(())
     }
+
+    // fn __deepcopy__(&self, _memo: &PyDict) -> Self {
+    //     self.clone()
+    // }
 }
 
 impl Mapper {
