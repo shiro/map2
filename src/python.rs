@@ -3,12 +3,16 @@ pub use pyo3::prelude::*;
 pub use pyo3::types::PyDict;
 pub use pyo3::Bound as PyBound;
 pub use pyo3::PyClass;
+pub use pyo3_stub_gen::derive::{gen_stub_pyclass, gen_stub_pyclass_enum, gen_stub_pyfunction, gen_stub_pymethods};
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use tokio::runtime::Runtime;
 
 use crate::virtual_writer::VirtualWriter;
 use crate::window::Window;
 use crate::*;
+
+// define a function to gather documentation stub information.
+pyo3_stub_gen::define_stub_info_gatherer!(doc_stub_info);
 
 #[pyclass]
 struct PyKey {

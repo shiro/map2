@@ -14,7 +14,7 @@ name = "map2"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-anyhow = "1.0"
+anyhow = "1.0.98"
 clap = "4.5.3"
 evdev-rs = { path = "evdev-rs", features = ["serde"] }
 udev = "0.9.0"
@@ -47,6 +47,9 @@ pyo3-async-runtimes = { version = "0.25.0", features = [
   "testing",
 ] }
 pythonize = { version = "0.25.0" }
+pyo3-stub-gen = "0.10.0"
+# pyo3-stub-gen-derive = "0.10.0"
+# pyo3-stub-gen = { git = "https://github.com/Jij-Inc/pyo3-stub-gen" }
 oneshot = "0.1.6"
 signal-hook = "0.3.17"
 uuid = { version = "1.5.0", features = ["v4"] }

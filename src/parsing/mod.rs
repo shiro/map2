@@ -1,4 +1,4 @@
-use anyhow::*;
+use anyhow::Error;
 use nom::branch::*;
 use nom::bytes::complete::*;
 use nom::character::complete::*;
