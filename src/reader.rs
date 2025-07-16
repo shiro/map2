@@ -1,5 +1,6 @@
 use ::oneshot;
 use device::virtual_input_device::DeviceMatcher;
+use pyo3::IntoPyObjectExt;
 use std::hash::{Hash, Hasher};
 
 use crate::event::InputEvent;
@@ -182,7 +183,7 @@ impl Reader {
     }
 
     pub fn next(&self, py: Python) -> Vec<PyObject> {
-        self.state.lock().unwrap().next.values().map(|v| v.py_object().to_object(py)).collect()
+        self.state.lock().unwrap().next.values().map(|v| v.py_object().clone_ref(py).into_any()).collect()
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {

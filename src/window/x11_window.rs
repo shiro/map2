@@ -45,7 +45,7 @@ pub fn x11_window_handler() -> WindowHandler {
                                 continue;
                             }
 
-                            let ret = callback.call_bound(py, (val.class.clone(),), None);
+                            let ret = callback.call(py, (val.class.clone(),), None);
 
                             if let Err(err) = ret {
                                 eprintln!("{err}");

@@ -88,7 +88,7 @@ impl ChordMapper {
 
         let _link = link.clone();
         let _self = Py::new(py, Self { id, link, ev_tx, state })?;
-        _link.py_object.set(Arc::new(_self.to_object(py)));
+        _link.py_object.set(Arc::new(_self.clone_ref(py).into_any()));
         Ok(_self)
     }
 
@@ -142,6 +142,7 @@ impl ChordMapper {
         Ok(())
     }
 
+    #[pyo3(signature = (existing=None))]
     pub fn snapshot(&self, existing: Option<&ChordMapperSnapshot>) -> PyResult<Option<ChordMapperSnapshot>> {
         let mut state = self.state.blocking_lock();
         if let Some(existing) = existing {
@@ -209,11 +210,11 @@ impl ChordMapper {
     }
 
     pub fn next(&self, py: Python) -> Vec<PyObject> {
-        self.state.blocking_lock().next.values().map(|v| v.py_object().to_object(py)).collect()
+        self.state.blocking_lock().next.values().map(|v| v.py_object().clone_ref(py).into_any()).collect()
     }
 
     pub fn prev(&self, py: Python) -> Vec<PyObject> {
-        self.state.blocking_lock().prev.values().map(|v| v.py_object().to_object(py)).collect()
+        self.state.blocking_lock().prev.values().map(|v| v.py_object().clone_ref(py).into_any()).collect()
     }
 
     pub fn reset(&mut self) {

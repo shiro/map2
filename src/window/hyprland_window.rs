@@ -92,7 +92,7 @@ pub fn hyprland_window_handler() -> WindowHandler {
                                 tokio::task::spawn_blocking(move || {
                                     Python::with_gil(|py| {
                                         let is_callable = callback.bind(py).is_callable();
-                                        let ret = callback.call_bound(py, (info.class.clone(),), None);
+                                        let ret = callback.call(py, (info.class.clone(),), None);
                                         if let Err(err) = ret {
                                             eprintln!("{err}");
                                             std::process::exit(1);

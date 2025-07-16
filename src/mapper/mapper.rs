@@ -7,6 +7,7 @@ use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 use futures::executor::block_on;
+use pyo3::IntoPyObjectExt;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -76,7 +77,7 @@ impl Mapper {
 
         let _link = link.clone();
         let _self = Py::new(py, Self { id, link, ev_tx, state })?;
-        _link.py_object.set(Arc::new(_self.to_object(py)));
+        _link.py_object.set(Arc::new(_self.clone_ref(py).into_any()));
         Ok(_self)
     }
 
@@ -187,6 +188,7 @@ impl Mapper {
         Ok(())
     }
 
+    #[pyo3(signature = (existing=None))]
     pub fn snapshot(&self, py: Python, existing: Option<&KeyMapperSnapshot>) -> PyResult<Option<KeyMapperSnapshot>> {
         let mut state = self.state.blocking_lock();
         if let Some(existing) = existing {
@@ -280,11 +282,11 @@ impl Mapper {
     }
 
     pub fn next(&self, py: Python) -> Vec<PyObject> {
-        self.state.blocking_lock().next.values().map(|v| v.py_object().to_object(py)).collect()
+        self.state.blocking_lock().next.values().map(|v| v.py_object().clone_ref(py).into_any()).collect()
     }
 
     pub fn prev(&self, py: Python) -> Vec<PyObject> {
-        self.state.blocking_lock().prev.values().map(|v| v.py_object().to_object(py)).collect()
+        self.state.blocking_lock().prev.values().map(|v| v.py_object().clone_ref(py).into_any()).collect()
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {

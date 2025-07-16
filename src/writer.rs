@@ -1,5 +1,6 @@
 #[cfg(not(feature = "integration"))]
 use evdev_rs::enums::EventType::EV_SYN;
+use pyo3::IntoPyObjectExt;
 use pythonize::depythonize;
 #[cfg(not(feature = "integration"))]
 use std::sync::mpsc;
@@ -182,7 +183,7 @@ impl Writer {
                 ev_rx,
             },
         )?;
-        _link.py_object.set(Arc::new(_self.to_object(py)));
+        _link.py_object.set(Arc::new(_self.clone_ref(py).into_any()));
         Ok(_self)
     }
 
@@ -217,7 +218,7 @@ impl Writer {
     }
 
     pub fn prev(&self, py: Python) -> Vec<PyObject> {
-        self.state.lock().unwrap().prev.values().map(|v| v.py_object().to_object(py)).collect()
+        self.state.lock().unwrap().prev.values().map(|v| v.py_object().clone_ref(py).into_any()).collect()
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {

@@ -1,7 +1,7 @@
 use std::thread;
 
 use pyo3::types::{PyAnyMethods, PyTuple};
-use pyo3::{IntoPy, Py, PyAny, Python};
+use pyo3::{IntoPyObjectExt, Py, PyAny, Python};
 
 use crate::*;
 
@@ -14,13 +14,14 @@ pub enum PythonArgument {
 type Args = Vec<PythonArgument>;
 
 pub fn args_to_py(py: Python<'_>, args: Args) -> PyBound<'_, PyTuple> {
-    PyTuple::new_bound(
+    PyTuple::new(
         py,
         args.into_iter().map(|x| match x {
-            PythonArgument::String(x) => x.into_py(py),
-            PythonArgument::Number(x) => x.into_py(py),
+            PythonArgument::String(x) => x.into_bound_py_any(py).unwrap(),
+            PythonArgument::Number(x) => x.into_bound_py_any(py).unwrap(),
         }),
     )
+    .unwrap()
 }
 
 pub struct EventLoop {
@@ -46,7 +47,7 @@ impl EventLoop {
                                 let args = args_to_py(py, args.unwrap_or_default());
 
                                 let asyncio = py
-                                    .import_bound("asyncio")
+                                    .import("asyncio")
                                     .expect("python runtime error: failed to import 'asyncio', is it installed?");
 
                                 let is_async_callback: bool = asyncio
@@ -57,7 +58,7 @@ impl EventLoop {
 
                                 if is_async_callback {
                                     let coroutine = callback_object
-                                        .call_bound(py, args, None)
+                                        .call(py, args, None)
                                         .expect("python runtime error: failed to call async callback");
 
                                     let event_loop = pyo3_async_runtimes::tokio::get_current_loop(py)
@@ -72,7 +73,7 @@ impl EventLoop {
                                         std::process::exit(1);
                                     }
                                 } else {
-                                    if let Err(err) = callback_object.call_bound(py, args, None) {
+                                    if let Err(err) = callback_object.call(py, args, None) {
                                         eprintln!("an uncaught error was thrown by the python callback: {}", err);
                                         std::process::exit(1);
                                     }

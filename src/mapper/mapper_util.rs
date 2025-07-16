@@ -33,7 +33,7 @@ pub async fn run_python_handler(
     tokio::task::spawn_blocking(move || {
         let ret = Python::with_gil(|py| -> Result<()> {
             let asyncio =
-                py.import_bound("asyncio").expect("python runtime error: failed to import 'asyncio', is it installed?");
+                py.import("asyncio").expect("python runtime error: failed to import 'asyncio', is it installed?");
 
             let is_async_callback: bool = asyncio
                 .call_method1("iscoroutinefunction", (handler.deref().bind(py),))
@@ -47,7 +47,7 @@ pub async fn run_python_handler(
                 Ok(())
             } else {
                 let args = args_to_py(py, args.unwrap_or(vec![]));
-                let ret = handler.call_bound(py, args, None).map_err(|err| anyhow!("{}", err)).and_then(|ret| {
+                let ret = handler.call(py, args, None).map_err(|err| anyhow!("{}", err)).and_then(|ret| {
                     if ret.is_none(py) {
                         return Ok(None);
                     }
