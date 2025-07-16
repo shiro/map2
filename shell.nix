@@ -31,10 +31,9 @@ pkgs.mkShell {
         # Setup the virtual environment if it doesn't already exist.
         VENV=venv
         if test ! -d $VENV; then
-            virtualenv $VENV
+            python -m venv $VENV
         fi
         source ./$VENV/bin/activate
-        export PYTHONPATH=`pwd`/$VENV/${python.sitePackages}/:$PYTHONPATH
     '';
     RUST_BACKTRACE = 1;
 }
