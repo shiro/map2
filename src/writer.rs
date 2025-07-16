@@ -25,6 +25,7 @@ struct State {
     prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
 }
 
+#[gen_stub_pyclass]
 #[pyclass]
 pub struct Writer {
     pub id: Uuid,
@@ -36,6 +37,7 @@ pub struct Writer {
     ev_rx: tokio::sync::mpsc::Receiver<InputEvent>,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Writer {
     #[new]

@@ -23,6 +23,7 @@ struct State {
     on_disconnect_handler: Option<Arc<PyObject>>,
 }
 
+/// Reads input events from sources such as device nodes
 #[gen_stub_pyclass]
 #[pyclass]
 pub struct Reader {

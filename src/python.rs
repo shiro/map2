@@ -54,6 +54,27 @@ fn default(options: Option<PyBound<PyDict>>) -> PyResult<()> {
     Ok(())
 }
 
+// Submit type information for stub file generation to inventory
+use pyo3_stub_gen::PyStubType;
+use pyo3_stub_gen::TypeInfo;
+// use pyo3_stub_gen::;
+pyo3_stub_gen::inventory::submit! {
+    pyo3_stub_gen::type_info::PyFunctionInfo {
+        name: "link",
+        args: &[
+            pyo3_stub_gen::type_info::ArgInfo {
+                name: "a1",
+                r#type: || TypeInfo::list_of::<reader::Reader | writer::Writer>(),
+                signature: None,
+            }
+        ],
+        doc: "Docstring used in Python",
+        r#return: || pyo3_stub_gen::TypeInfo::none(),
+        module: None
+    }
+}
+
+// #[gen_stub_pyfunction]
 #[pyfunction]
 fn link(py: Python, mut chain: Vec<PyObject>) -> PyResult<()> {
     let mut prev: Option<Arc<dyn LinkSrc>> = None;
