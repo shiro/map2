@@ -4,9 +4,9 @@ reader = map2.Reader(patterns=["/dev/input/by-id/example"])
 writer = map2.Writer(clone_from = "/dev/input/by-id/example")
 
 m = map2.Mapper()
-mod = map2.Modifier("z")
+# mod = map2.Modifier("z")
 
-map2.link([reader, mod, m, writer])
+# map2.link([reader, mod, m, writer])
 
 # print(m + "ok")
 
