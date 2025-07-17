@@ -2,7 +2,7 @@ import map2
 
 reader = map2.Reader(patterns=["/dev/input/by-id/example"])
 mapper = map2.Mapper()
-writer = map2.Writer(clone_from = "/dev/input/by-id/example")
+writer = map2.Writer()
 
 map2.link([reader, mapper, writer])
 
@@ -20,7 +20,7 @@ mapper.map_key("#1 up", "^a up")
 
 # compatible
 mapper.map_key("#2 down", "^b down")
-def fn(): pass
+def fn(*args): pass
 mapper.map("#2 repeat", fn)
 mapper.map_key("#2 up", "^b up")
 

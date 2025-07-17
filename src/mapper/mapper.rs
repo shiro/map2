@@ -26,8 +26,6 @@ struct State {
     modifiers: KeyModifierFlags,
 }
 
-/// Maps input events to output events
-#[gen_stub_pyclass]
 #[pyclass]
 pub struct Mapper {
     pub id: Uuid,
@@ -36,7 +34,6 @@ pub struct Mapper {
     state: Arc<Mutex<State>>,
 }
 
-#[gen_stub_pymethods]
 #[pymethods]
 impl Mapper {
     #[new]
@@ -469,7 +466,6 @@ impl LinkDst for MapperLink {
     }
 }
 
-#[gen_stub_pyclass]
 #[pyclass]
 pub struct KeyMapperSnapshot {
     mappings: Mappings,

@@ -43,19 +43,19 @@ map2.link([reader, mapper, controller])
 
 # some convenience functions
 def joystick(axis, offset):
-    def fn():
+    def fn(*args):
         # the joystick range is [0..255], so 128 is neutral
         print([axis, offset])
         controller.send("{absolute "+axis+" "+str(128 + offset)+"}")
     return fn
 
 def dpad(axis, offset):
-    def fn():
+    def fn(*args):
         controller.send("{absolute "+axis+" "+str(offset)+"}")
     return fn
 
 def button(button, state):
-    def fn():
+    def fn(*args):
         controller.send("{"+button+" "+state+"}")
     return fn
 
@@ -134,7 +134,7 @@ mapper.map("x", "{btn_thumbl}")
 mapper.map("m", "{btn_thumbr}")
 
 # exit wtih space
-mapper.map("space", lambda: map2.exit())
+mapper.map("space", lambda *args: map2.exit())
 
 
 # keep running

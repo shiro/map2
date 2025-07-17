@@ -12,7 +12,7 @@ mapper.map("LaSeRs", "lAsErS")
 
 counter = 0
 
-def increment():
+def increment(*args):
   global counter
   counter += 1
 mapper.map("Something", increment)

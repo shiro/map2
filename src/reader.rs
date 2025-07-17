@@ -24,7 +24,6 @@ struct State {
 }
 
 /// Reads input events from sources such as device nodes
-#[gen_stub_pyclass]
 #[pyclass]
 pub struct Reader {
     pub id: Uuid,
@@ -35,7 +34,6 @@ pub struct Reader {
     reader_exit_tx: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
-#[gen_stub_pymethods]
 #[pymethods]
 impl Reader {
     #[new]
