@@ -174,10 +174,19 @@ type ParsedDeviceMatcher = HashMap<String, Regex>;
 //     attributes: HashMap<String, String>,
 // }
 
+#[derive(Hash, Eq, PartialEq, Clone)]
 #[pyo3::pyclass]
 pub struct NativeDeviceInfo {
     #[pyo3(get)]
     path: String,
+}
+
+impl NativeDeviceInfo {
+    pub fn to_hash_map(&self) -> HashMap<String, String> {
+        let mut ret = HashMap::new();
+        ret.insert("path".to_string(), self.path.clone());
+        ret
+    }
 }
 
 pub enum NativeDeviceEvent {
@@ -204,6 +213,22 @@ pub fn watch_udev_inputs(
         .collect::<Result<Vec<ParsedDeviceMatcher>>>()
         .unwrap();
 
+    // check all devices
+    for entry in WalkDir::new("/dev/input").into_iter().filter_map(Result::ok).filter(|e| !e.file_type().is_file()) {
+        let fd_path = entry.path().to_owned();
+        if fd_path.is_dir() {
+            continue;
+        }
+
+        let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
+
+        if !parsed_matchers.is_empty() && !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
+            continue;
+        }
+
+        ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+    }
+
     // devices are monitored and hooked up when added/removed, so we need another thread
     pyo3_async_runtimes::tokio::get_runtime().spawn(async move {
         let (fs_ev_tx, mut fs_ev_rx) = tokio::sync::mpsc::channel(32);
@@ -214,19 +239,6 @@ pub fn watch_udev_inputs(
             })
         })?;
         watcher.watch(Path::new("/dev/input"), notify::RecursiveMode::Recursive)?;
-
-        // check all devices
-        for entry in WalkDir::new("/dev/input").into_iter().filter_map(Result::ok).filter(|e| !e.file_type().is_file())
-        {
-            let fd_path = entry.path().to_owned();
-            let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
-
-            if !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
-                continue;
-            }
-
-            ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
-        }
 
         // continuously check if devices are added/removed and handle it
         tokio::select!(
@@ -239,9 +251,11 @@ pub fn watch_udev_inputs(
                         match event.kind {
                             notify::EventKind::Create(_) => {
                                 let fd_path = event.paths.first().unwrap();
+                                if fd_path.is_dir() { continue }
+
                                 let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
 
-                                if !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
+                                if !parsed_matchers.is_empty() && !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
                                     continue;
                                 }
 
@@ -249,6 +263,14 @@ pub fn watch_udev_inputs(
                             }
                             notify::EventKind::Remove(_) => {
                                 let fd_path = event.paths.first().unwrap().to_path_buf();
+                                if fd_path.is_dir() { continue }
+
+                                let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
+
+                                if !parsed_matchers.is_empty() && !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
+                                    continue;
+                                }
+
                                 ev_handler(NativeDeviceEvent::RemoveDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
                             }
                             _ => {
