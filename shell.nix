@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> { } }:
 
 let 
-    python = with pkgs; python312.withPackages (python-pkgs: with python-pkgs; [ ]);
+    python = with pkgs; python312.withPackages (python-pkgs: with python-pkgs; []);
     lib-path = with pkgs; pkgs.lib.makeLibraryPath [ libxkbcommon libevdev udev libcap python ];
 
     rust_overlay = import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz");
@@ -32,8 +32,11 @@ pkgs.mkShell {
         VENV=venv
         if test ! -d $VENV; then
             python -m venv $VENV
+            source ./$VENV/bin/activate
+            pip install -r requirements.txt
+        else
+            source ./$VENV/bin/activate
         fi
-        source ./$VENV/bin/activate
     '';
     RUST_BACKTRACE = 1;
 }
