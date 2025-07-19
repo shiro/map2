@@ -3,8 +3,10 @@ use device::virtual_input_device::DeviceMatcher;
 use pyo3::IntoPyObjectExt;
 use std::hash::{Hash, Hasher};
 
+use crate::device::virtual_input_device::NativeDeviceInfo;
 use crate::event::InputEvent;
 use crate::python::*;
+use crate::python_util::*;
 use crate::subscriber::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -17,6 +19,8 @@ struct State {
     name: String,
     #[new(default)]
     next: HashMap<Uuid, Arc<dyn LinkDst>>,
+    #[new(default)]
+    devices: HashSet<NativeDeviceInfo>,
     #[new(default)]
     on_connect_handler: Option<Arc<PyObject>>,
     #[new(default)]
@@ -91,21 +95,28 @@ impl Reader {
 
             let state = state.clone();
             let handler = Arc::new(move |ev: NativeDeviceEvent| {
-                let state = state.lock().unwrap();
+                let mut state = state.lock().unwrap();
                 match ev {
                     NativeDeviceEvent::InputEvent(ev) => {
                         state.next.send_all(InputEvent::Raw(ev));
                     }
-
                     NativeDeviceEvent::AddDevice(info) => {
                         if let Some(handler) = state.on_connect_handler.as_ref() {
-                            Python::with_gil(|py| handler.call(py, (info,), None));
+                            Python::with_gil(|py| {
+                                let info = device_info_to_py(py, &info);
+                                handler.call(py, (info,), None);
+                            });
                         }
+                        state.devices.insert(info);
                     }
                     NativeDeviceEvent::RemoveDevice(info) => {
                         if let Some(handler) = state.on_disconnect_handler.as_ref() {
-                            Python::with_gil(|py| handler.call(py, (info,), None));
+                            Python::with_gil(|py| {
+                                let info = device_info_to_py(py, &info);
+                                handler.call(py, (info,), None);
+                            });
                         }
+                        state.devices.remove(&info);
                     }
                 };
             });
@@ -197,6 +208,12 @@ impl Reader {
             state.next.send_all(InputEvent::Raw(action.to_input_ev()));
         }
         Ok(())
+    }
+
+    #[getter]
+    pub fn devices(&self, py: Python) -> Vec<PyObject> {
+        let state = self.state.lock().unwrap();
+        state.devices.iter().map(|info| device_info_to_py(py, info)).collect()
     }
 
     #[cfg(feature = "integration")]

@@ -12,6 +12,7 @@ import map2
 # map2.wait()
 
 watcher = map2.Watcher()
-watcher.on_connect(lambda info: print(info))
+print(watcher.devices)
+# watcher.on_connect(lambda info: print(info.properties["ID_SERIAL"]))
 
 map2.wait()

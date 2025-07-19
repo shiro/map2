@@ -2,7 +2,7 @@
 name = "map2"
 version = "2.1.1"
 authors = ["shiro <shiro@usagi.io>"]
-edition = "2021"
+edition = "2024"
 
 [features]
 integration = []

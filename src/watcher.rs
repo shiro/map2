@@ -3,8 +3,8 @@ use device::virtual_input_device::{DeviceMatcher, NativeDeviceInfo};
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
-use crate::event::InputEvent;
 use crate::python::*;
+use crate::python_util::*;
 use crate::subscriber::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -16,7 +16,7 @@ const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 struct State {
     name: String,
     #[new(default)]
-    devices: Arc<Mutex<HashSet<NativeDeviceInfo>>>,
+    devices: HashSet<NativeDeviceInfo>,
     #[new(default)]
     on_connect_handler: Option<Arc<PyObject>>,
     #[new(default)]
@@ -85,15 +85,21 @@ impl Watcher {
                 match ev {
                     NativeDeviceEvent::AddDevice(info) => {
                         if let Some(handler) = state.on_connect_handler.as_ref() {
-                            Python::with_gil(|py| handler.call(py, (info.to_hash_map(),), None));
+                            Python::with_gil(|py| {
+                                let info = device_info_to_py(py, &info);
+                                handler.call(py, (info,), None)
+                            });
                         }
-                        state.devices.lock().unwrap().insert(info);
+                        state.devices.insert(info);
                     }
                     NativeDeviceEvent::RemoveDevice(info) => {
                         if let Some(handler) = state.on_disconnect_handler.as_ref() {
-                            Python::with_gil(|py| handler.call(py, (info.to_hash_map(),), None));
+                            Python::with_gil(|py| {
+                                let info = device_info_to_py(py, &info);
+                                handler.call(py, (info,), None)
+                            });
                         }
-                        state.devices.lock().unwrap().remove(&info);
+                        state.devices.remove(&info);
                     }
                     NativeDeviceEvent::InputEvent(_) => unreachable!(),
                 };
@@ -120,11 +126,6 @@ impl Watcher {
             return Err(ApplicationError::NotCallable.into());
         }
 
-        // call the handler with all known devices
-        for info in state.devices.lock().unwrap().iter() {
-            Python::with_gil(|py| handler.call(py, (info.to_hash_map(),), None));
-        }
-
         state.on_connect_handler = Some(Arc::new(handler));
         Ok(())
     }
@@ -140,6 +141,12 @@ impl Watcher {
         }
         state.on_disconnect_handler = Some(Arc::new(handler));
         Ok(())
+    }
+
+    #[getter]
+    pub fn devices(&self, py: Python) -> Vec<PyObject> {
+        let state = self.state.lock().unwrap();
+        state.devices.iter().map(|info| device_info_to_py(py, info)).collect()
     }
 }
 

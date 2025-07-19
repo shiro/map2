@@ -1,12 +1,13 @@
-use std::collections::HashMap;
+use crate::*;
+use std::collections::{BTreeMap, HashMap};
 use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use std::{fs, io, thread, time};
 
 use crate::EvdevInputEvent;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use evdev_rs::{Device, GrabMode, InputEvent, ReadFlag, ReadStatus};
 use notify::Watcher;
 use regex::Regex;
@@ -27,6 +28,22 @@ fn udev_info(fd_path: &Path) -> Option<udev::Device> {
         Err(_) => return None,
     };
     Some(ud)
+}
+
+fn get_udev_properties(device: &udev::Device) -> BTreeMap<String, String> {
+    let mut properties = BTreeMap::new();
+    let mut current_device = Some(device.clone());
+
+    while let Some(device) = current_device {
+        for prop in device.properties() {
+            let name = prop.name().to_string_lossy().to_string();
+            let value = prop.value().to_string_lossy().to_string();
+            properties.entry(name).or_insert(value);
+        }
+        current_device = device.parent();
+    }
+
+    properties
 }
 
 fn find_fd_with_pattern(fd_path: &PathBuf, udev: &udev::Device, matchers: &Vec<ParsedDeviceMatcher>) -> bool {
@@ -166,27 +183,11 @@ fn grab_device(
 
 pub type DeviceMatcher = HashMap<String, String>;
 type ParsedDeviceMatcher = HashMap<String, Regex>;
-// pub struct DeviceFilter {
-//     path: PathBuf,
-//     name: String,
-//     phys: String,
-//     uniq: String,
-//     attributes: HashMap<String, String>,
-// }
 
-#[derive(Hash, Eq, PartialEq, Clone)]
-#[pyo3::pyclass]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct NativeDeviceInfo {
-    #[pyo3(get)]
-    path: String,
-}
-
-impl NativeDeviceInfo {
-    pub fn to_hash_map(&self) -> HashMap<String, String> {
-        let mut ret = HashMap::new();
-        ret.insert("path".to_string(), self.path.clone());
-        ret
-    }
+    pub path: String,
+    pub properties: BTreeMap<String, String>,
 }
 
 pub enum NativeDeviceEvent {
@@ -213,20 +214,32 @@ pub fn watch_udev_inputs(
         .collect::<Result<Vec<ParsedDeviceMatcher>>>()
         .unwrap();
 
+    let handle_device_event = move |fd_path: &PathBuf, action: fn(NativeDeviceInfo) -> NativeDeviceEvent| {
+        if fd_path.is_dir() || parsed_matchers.is_empty() {
+            return;
+        }
+
+        let udev = if let Some(v) = udev_info(&fd_path) { v } else { return };
+        let properties = get_udev_properties(&udev);
+
+        let all_match = parsed_matchers.iter().all(|matcher| {
+            matcher.iter().all(|(key, regex)| properties.get(key).map_or(false, |value| regex.is_match(value)))
+        });
+
+        if !all_match {
+            return;
+        }
+
+        ev_handler(action(NativeDeviceInfo {
+            path: fd_path.to_string_lossy().to_string(),
+            properties: get_udev_properties(&udev),
+        }));
+    };
+
     // check all devices
     for entry in WalkDir::new("/dev/input").into_iter().filter_map(Result::ok).filter(|e| !e.file_type().is_file()) {
         let fd_path = entry.path().to_owned();
-        if fd_path.is_dir() {
-            continue;
-        }
-
-        let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
-
-        if !parsed_matchers.is_empty() && !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
-            continue;
-        }
-
-        ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+        handle_device_event(&fd_path, NativeDeviceEvent::AddDevice);
     }
 
     // devices are monitored and hooked up when added/removed, so we need another thread
@@ -245,37 +258,20 @@ pub fn watch_udev_inputs(
             Ok(()) = exit_rx => {
                 return Ok::<_, anyhow::Error>(());
             },
+
             (_) = async {
                 loop {
                     if let Some(Ok(event)) = fs_ev_rx.recv().await {
                         match event.kind {
                             notify::EventKind::Create(_) => {
                                 let fd_path = event.paths.first().unwrap();
-                                if fd_path.is_dir() { continue }
-
-                                let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
-
-                                if !parsed_matchers.is_empty() && !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
-                                    continue;
-                                }
-
-                                ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+                                handle_device_event(&fd_path, NativeDeviceEvent::AddDevice);
                             }
                             notify::EventKind::Remove(_) => {
                                 let fd_path = event.paths.first().unwrap().to_path_buf();
-                                if fd_path.is_dir() { continue }
-
-                                let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
-
-                                if !parsed_matchers.is_empty() && !find_fd_with_pattern(&fd_path, &udev, &parsed_matchers) {
-                                    continue;
-                                }
-
-                                ev_handler(NativeDeviceEvent::RemoveDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+                                handle_device_event(&fd_path, NativeDeviceEvent::RemoveDevice);
                             }
-                            _ => {
-                                continue;
-                            }
+                            _ => { continue; }
                         };
                     }
                 }
@@ -353,7 +349,10 @@ pub fn grab_udev_inputs(
             };
 
             device_map.insert(udev.syspath().to_owned(), abort_handle);
-            ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+            ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo {
+                path: fd_path.to_string_lossy().to_string(),
+                properties: get_udev_properties(&udev),
+            }));
         }
 
         // continuously check if devices are added/removed and handle it
@@ -380,16 +379,24 @@ pub fn grab_udev_inputs(
                                 let abort_handle = grab_device(&fd_path, ev_handler.clone())?;
                                 device_map.insert(udev.syspath().to_owned(), abort_handle).map(|(v)|{v.abort()});
 
-                                ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+                                ev_handler(NativeDeviceEvent::AddDevice(NativeDeviceInfo {
+                                    path: fd_path.to_string_lossy().to_string(),
+                                    properties: get_udev_properties(&udev)
+                                }));
                             }
                             notify::EventKind::Remove(_) => {
                                 let fd_path = event.paths.first().unwrap().to_path_buf();
+
+                                let udev = if let Some(v) = udev_info(&fd_path) { v } else { continue };
 
                                 if let Some(abort_handle) = device_map.remove(&fd_path) {
                                     // this might return an error if the device read thread crashed for any reason, ignore it since it was logged already
                                     let _ = abort_handle.abort();
                                 }
-                                ev_handler(NativeDeviceEvent::RemoveDevice(NativeDeviceInfo { path: fd_path.to_string_lossy().to_string() }));
+                                ev_handler(NativeDeviceEvent::RemoveDevice(NativeDeviceInfo {
+                                    path: fd_path.to_string_lossy().to_string(),
+                                    properties: get_udev_properties(&udev)
+                                }));
                             }
                             _ => {
                                 continue;
