@@ -53,11 +53,39 @@ pub trait LinkSrc: Send + Sync {
     fn next(&self) -> Vec<Arc<dyn LinkDst>>;
 }
 
-pub trait PyLinkSrc: LinkSrc {
-    fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()> {
+pub trait LinkSrcExt {
+    fn py_insert_after(self, target: &PyBound<PyAny>) -> PyResult<()>;
+    fn py_link_to(self, target: &PyBound<PyAny>) -> PyResult<()>;
+    fn py_unlink_to(self, target: &PyBound<PyAny>) -> PyResult<bool>;
+    fn py_unlink_to_all(self);
+}
+
+impl LinkSrcExt for Arc<dyn LinkSrc> {
+    fn py_link_to(self, target: &PyBound<PyAny>) -> PyResult<()> {
+        let target_dst =
+            node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a \"destination\" node"))?;
+        target_dst.link_from(self.clone());
+        self.link_to(target_dst);
+        Ok(())
+    }
+
+    fn py_unlink_to(self, target: &PyBound<PyAny>) -> PyResult<bool> {
+        let target_dst =
+            node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a \"destination\" node"))?;
+        target_dst.unlink_from(self.id());
+        self.unlink_to(target_dst.id()).map_err(err_to_py)
+    }
+
+    fn py_unlink_to_all(self) {
+        for node in self.clear_next() {
+            let _ = node.unlink_from(self.id());
+        }
+    }
+
+    fn py_insert_after(self, target: &PyBound<PyAny>) -> PyResult<()> {
         let target_src = node_to_link_src(target)
             .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
-        let target_dst = node_to_link_dst(target)
+        let _ = node_to_link_dst(target)
             .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
 
         // move this node's dst nodes the target's dst nodes
@@ -65,18 +93,10 @@ pub trait PyLinkSrc: LinkSrc {
             target_src.link_to(node);
         }
 
+        self.py_link_to(target);
         Ok(())
     }
-
-    // fn link_to(&self, target: &PyBound<PyAny>) -> PyResult<()> {
-    //     let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
-    //     target.link_from(self.clone());
-    //     self.link_to(target);
-    //     Ok(())
-    // }
 }
-
-impl<T: LinkSrc> PyLinkSrc for T {}
 
 pub trait LinkDst: Send + Sync {
     fn id(&self) -> &Uuid;
@@ -84,6 +104,53 @@ pub trait LinkDst: Send + Sync {
     fn unlink_from(&self, id: &Uuid) -> Result<bool>;
     fn send(&self, ev: InputEvent) -> Result<()>;
     fn py_object(&self) -> Arc<PyObject>;
+    fn clear_prev(&self) -> Vec<Arc<dyn LinkSrc>>;
+    fn prev(&self) -> Vec<Arc<dyn LinkSrc>>;
+}
+
+pub trait LinkDstExt {
+    fn py_insert_before(self, target: &PyBound<PyAny>) -> PyResult<()>;
+    fn py_link_from(self, target: &PyBound<PyAny>) -> PyResult<()>;
+    fn py_unlink_from(self, target: &PyBound<PyAny>) -> PyResult<bool>;
+    fn py_unlink_from_all(self);
+}
+
+impl LinkDstExt for Arc<dyn LinkDst> {
+    fn py_link_from(self, target: &PyBound<PyAny>) -> PyResult<()> {
+        let target_src =
+            node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a \"source\" node"))?;
+        target_src.link_to(self.clone());
+        self.link_from(target_src);
+        Ok(())
+    }
+
+    fn py_unlink_from(self, target: &PyBound<PyAny>) -> PyResult<bool> {
+        let target_src =
+            node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a \"source\" node"))?;
+        target_src.unlink_to(self.id());
+        self.unlink_from(target_src.id()).map_err(err_to_py)
+    }
+
+    fn py_unlink_from_all(self) {
+        for node in self.clear_prev() {
+            let _ = node.unlink_to(self.id());
+        }
+    }
+
+    fn py_insert_before(self, target: &PyBound<PyAny>) -> PyResult<()> {
+        let _ = node_to_link_src(target)
+            .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
+        let target_dst = node_to_link_dst(target)
+            .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
+
+        // move this node's src nodes the target's src nodes
+        for node in self.clear_prev() {
+            target_dst.link_from(node);
+        }
+
+        self.py_link_from(target);
+        Ok(())
+    }
 }
 
 pub trait SubscriberHashmapExt {

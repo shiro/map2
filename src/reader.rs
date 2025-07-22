@@ -179,26 +179,20 @@ impl Reader {
         Ok(())
     }
 
-    pub fn link_to(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
-        let mut target = node_to_link_dst(target).unwrap();
-        target.link_from(self.link.clone());
-        self.link.link_to(target);
-        Ok(())
+    pub fn link_to(&self, target: &PyBound<PyAny>) -> PyResult<()> {
+        (self.link.clone() as Arc<dyn LinkSrc>).py_link_to(target)
     }
 
     pub fn unlink_to(&mut self, py: Python, target: &PyBound<PyAny>) -> PyResult<bool> {
-        let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
-        target.unlink_from(&self.id);
-        let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
-        Ok(ret)
+        (self.link.clone() as Arc<dyn LinkSrc>).py_unlink_to(target)
     }
 
     pub fn unlink_to_all(&mut self) {
-        let mut state = self.state.lock().unwrap();
-        for l in state.next.values_mut() {
-            l.unlink_from(&self.id);
-        }
-        state.next.clear();
+        (self.link.clone() as Arc<dyn LinkSrc>).py_unlink_to_all();
+    }
+
+    pub fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()> {
+        (self.link.clone() as Arc<dyn LinkSrc>).py_insert_after(target)
     }
 
     pub fn unlink_all(&mut self) {
@@ -210,7 +204,7 @@ impl Reader {
     }
 
     pub fn next(&self, py: Python) -> Vec<PyObject> {
-        self.state.lock().unwrap().next.values().map(|v| v.py_object().clone_ref(py).into_any()).collect()
+        self.link.next().into_iter().map(|v| v.py_object().clone_ref(py).into_any()).collect()
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
@@ -270,5 +264,13 @@ impl LinkSrc for ReaderLink {
     }
     fn py_object(&self) -> Arc<PyObject> {
         self.py_object.get().unwrap().clone()
+    }
+    fn clear_next(&self) -> Vec<Arc<dyn LinkDst>> {
+        let mut state = self.state.lock().unwrap();
+        state.next.drain().map(|(_, v)| v).collect()
+    }
+    fn next(&self) -> Vec<Arc<dyn LinkDst>> {
+        let state = self.state.lock().unwrap();
+        state.next.values().cloned().collect()
     }
 }

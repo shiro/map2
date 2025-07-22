@@ -7,8 +7,8 @@ use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTR
 use crate::*;
 use nom::Slice;
 use pyo3::IntoPyObjectExt;
-use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc::Sender;
 
 type Mappings = SuffixTree<RuntimeAction>;
 
@@ -140,48 +140,28 @@ impl TextMapper {
         Some(TextMapperSnapshot { mappings: state.mappings.clone() })
     }
 
-    pub fn link_to(&self, target: &PyBound<PyAny>) -> PyResult<()> {
-        let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
-        target.link_from(self.link.clone());
-        self.link.link_to(target);
-        Ok(())
+    pub fn link_to(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
+        (self.link.clone() as Arc<dyn LinkSrc>).py_link_to(target)
     }
 
     pub fn unlink_to(&mut self, py: Python, target: &PyBound<PyAny>) -> PyResult<bool> {
-        let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
-        target.unlink_from(&self.id);
-        let ret = self.link.unlink_to(target.id()).map_err(err_to_py)?;
-        Ok(ret)
+        (self.link.clone() as Arc<dyn LinkSrc>).py_unlink_to(target)
     }
 
     pub fn unlink_to_all(&mut self) {
-        let mut state = self.state.blocking_lock();
-        for l in state.next.values_mut() {
-            l.unlink_from(&self.id);
-        }
-        state.next.clear();
+        (self.link.clone() as Arc<dyn LinkSrc>).py_unlink_to_all();
     }
 
     pub fn link_from(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
-        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
-        target.link_to(self.link.clone());
-        self.link.link_from(target);
-        Ok(())
+        (self.link.clone() as Arc<dyn LinkDst>).py_link_from(target)
     }
 
     pub fn unlink_from(&mut self, target: &PyBound<PyAny>) -> PyResult<bool> {
-        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
-        target.unlink_to(&self.id);
-        let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;
-        Ok(ret)
+        (self.link.clone() as Arc<dyn LinkDst>).py_unlink_from(target)
     }
 
     pub fn unlink_from_all(&mut self) {
-        let mut state = self.state.blocking_lock();
-        for l in state.prev.values_mut() {
-            l.unlink_to(&self.id);
-        }
-        state.prev.clear();
+        (self.link.clone() as Arc<dyn LinkDst>).py_unlink_from_all();
     }
 
     pub fn unlink_all(&mut self) {
@@ -189,21 +169,12 @@ impl TextMapper {
         self.unlink_to_all();
     }
 
+    pub fn insert_before(&self, target: &PyBound<PyAny>) -> PyResult<()> {
+        (self.link.clone() as Arc<dyn LinkDst>).py_insert_before(target)
+    }
+
     pub fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()> {
-        let mut state = self.state.blocking_lock();
-
-        let target_src =
-            node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source+destination node"))?;
-        let target_dst =
-            node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a source+destination node"))?;
-
-        for (_, node) in state.next.drain() {
-            target_src.link_to(node);
-        }
-        drop(state);
-        self.link_to(target);
-
-        Ok(())
+        (self.link.clone() as Arc<dyn LinkSrc>).py_insert_after(target)
     }
 
     pub fn name(&self) -> String {
@@ -266,6 +237,14 @@ impl LinkSrc for TextMapperLink {
     fn py_object(&self) -> Arc<PyObject> {
         self.py_object.get().unwrap().clone()
     }
+    fn clear_next(&self) -> Vec<Arc<dyn LinkDst>> {
+        let mut state = self.state.blocking_lock();
+        state.next.drain().map(|(_, v)| v).collect()
+    }
+    fn next(&self) -> Vec<Arc<dyn LinkDst>> {
+        let state = self.state.blocking_lock();
+        state.next.values().cloned().collect()
+    }
 }
 
 impl LinkDst for TextMapperLink {
@@ -285,6 +264,14 @@ impl LinkDst for TextMapperLink {
     }
     fn py_object(&self) -> Arc<PyObject> {
         self.py_object.get().unwrap().clone()
+    }
+    fn clear_prev(&self) -> Vec<Arc<dyn LinkSrc>> {
+        let mut state = self.state.blocking_lock();
+        state.prev.drain().map(|(_, v)| v).collect()
+    }
+    fn prev(&self) -> Vec<Arc<dyn LinkSrc>> {
+        let state = self.state.blocking_lock();
+        state.prev.values().cloned().collect()
     }
 }
 

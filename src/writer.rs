@@ -188,25 +188,15 @@ impl Writer {
     }
 
     pub fn link_from(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
-        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
-        target.link_to(self.link.clone());
-        self.link.link_from(target);
-        Ok(())
+        (self.link.clone() as Arc<dyn LinkDst>).py_link_from(target)
     }
 
     pub fn unlink_from(&mut self, target: &PyBound<PyAny>) -> PyResult<bool> {
-        let target = node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source node"))?;
-        target.unlink_to(&self.id);
-        let ret = self.link.unlink_from(target.id()).map_err(err_to_py)?;
-        Ok(ret)
+        (self.link.clone() as Arc<dyn LinkDst>).py_unlink_from(target)
     }
 
     pub fn unlink_from_all(&mut self) {
-        let mut state = self.state.lock().unwrap();
-        for l in state.prev.values_mut() {
-            l.unlink_to(&self.id);
-        }
-        state.prev.clear();
+        (self.link.clone() as Arc<dyn LinkDst>).py_unlink_from_all();
     }
 
     pub fn unlink_all(&mut self) {
@@ -288,5 +278,13 @@ impl LinkDst for WriterLink {
     }
     fn py_object(&self) -> Arc<PyObject> {
         self.py_object.get().unwrap().clone()
+    }
+    fn clear_prev(&self) -> Vec<Arc<dyn LinkSrc>> {
+        let mut state = self.state.lock().unwrap();
+        state.prev.drain().map(|(_, v)| v).collect()
+    }
+    fn prev(&self) -> Vec<Arc<dyn LinkSrc>> {
+        let mut state = self.state.lock().unwrap();
+        state.prev.values().cloned().collect()
     }
 }
