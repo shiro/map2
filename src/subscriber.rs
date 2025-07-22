@@ -49,7 +49,34 @@ pub trait LinkSrc: Send + Sync {
     fn link_to(&self, node: Arc<dyn LinkDst>) -> Result<()>;
     fn unlink_to(&self, id: &Uuid) -> Result<bool>;
     fn py_object(&self) -> Arc<PyObject>;
+    fn clear_next(&self) -> Vec<Arc<dyn LinkDst>>;
+    fn next(&self) -> Vec<Arc<dyn LinkDst>>;
 }
+
+pub trait PyLinkSrc: LinkSrc {
+    fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()> {
+        let target_src = node_to_link_src(target)
+            .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
+        let target_dst = node_to_link_dst(target)
+            .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
+
+        // move this node's dst nodes the target's dst nodes
+        for node in self.clear_next() {
+            target_src.link_to(node);
+        }
+
+        Ok(())
+    }
+
+    // fn link_to(&self, target: &PyBound<PyAny>) -> PyResult<()> {
+    //     let target = node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a destination node"))?;
+    //     target.link_from(self.clone());
+    //     self.link_to(target);
+    //     Ok(())
+    // }
+}
+
+impl<T: LinkSrc> PyLinkSrc for T {}
 
 pub trait LinkDst: Send + Sync {
     fn id(&self) -> &Uuid;

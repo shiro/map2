@@ -1,7 +1,7 @@
 use self::event_loop::PythonArgument;
 use super::*;
-use crate::mapper::mapping_functions::*;
 use crate::mapper::RuntimeAction;
+use crate::mapper::mapping_functions::*;
 use crate::python::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
@@ -12,6 +12,26 @@ use tokio::sync::mpsc::Sender;
 use tokio::sync::{Mutex, MutexGuard};
 
 const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+
+// trait StateInsertAfter {
+//     fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()>;
+// }
+//
+// impl StateInsertAfter for LinkSrc {
+//     fn insert_after(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
+//         let target_src = node_to_link_src(target)
+//             .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
+//         let target_dst = node_to_link_dst(target)
+//             .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
+//
+//         // move this node's dst nodes the target's dst nodes
+//         for (_, node) in self.next.drain() {
+//             target_src.link_to(node);
+//         }
+//
+//         Ok(())
+//     }
+// }
 
 #[derive(Default)]
 struct State {
@@ -262,19 +282,8 @@ impl Mapper {
     // }
 
     pub fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()> {
-        let mut state = self.state.blocking_lock();
-
-        let target_src =
-            node_to_link_src(target).ok_or_else(|| PyRuntimeError::new_err("expected a source+destination node"))?;
-        let target_dst =
-            node_to_link_dst(target).ok_or_else(|| PyRuntimeError::new_err("expected a source+destination node"))?;
-
-        for (_, node) in state.next.drain() {
-            target_src.link_to(node);
-        }
-        drop(state);
+        self.link.insert_after(target);
         self.link_to(target);
-
         Ok(())
     }
 
@@ -443,6 +452,14 @@ impl LinkSrc for MapperLink {
     }
     fn py_object(&self) -> Arc<PyObject> {
         self.py_object.get().unwrap().clone()
+    }
+    fn clear_next(&self) -> Vec<Arc<dyn LinkDst>> {
+        let mut state = self.state.blocking_lock();
+        state.next.drain().map(|(_, v)| v).collect()
+    }
+    fn next(&self) -> Vec<Arc<dyn LinkDst>> {
+        let state = self.state.blocking_lock();
+        state.next.values().cloned().collect()
     }
 }
 
