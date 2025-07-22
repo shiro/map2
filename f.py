@@ -11,8 +11,11 @@ import map2
 #
 # map2.wait()
 
-watcher = map2.Watcher()
-print(watcher.devices)
+# reader = map2.Reader(name=99)
+# watcher = map2.Watcher()
+# print(watcher.devices)
 # watcher.on_connect(lambda info: print(info.properties["ID_SERIAL"]))
+
+
 
 map2.wait()

@@ -1,3 +1,5 @@
+use crate::conversions::extract_with_error;
+use crate::conversions::get_py_type;
 use crate::device::virtual_input_device::NativeDeviceInfo;
 use crate::device::virtual_input_device::grab_device;
 use crate::device::virtual_input_device::watch_udev_inputs;
@@ -61,7 +63,12 @@ impl Reader {
                     } else if let Ok(matcher) = v.extract::<HashMap<String, String>>(py) {
                         matcher
                     } else {
-                        return Err(PyRuntimeError::new_err("'filters' must be of type 'list[str] | list[dict]'"));
+                        return Err(ApplicationError::InvalidNamedInputType {
+                            name: "filters".to_string(),
+                            actual_type: get_py_type(v.bind(py)),
+                            expected_type: "list[str] | list[dict]".to_string(),
+                        }
+                        .into_py())?;
                     };
                     filters.push(filter);
                 }
@@ -70,15 +77,14 @@ impl Reader {
             }
         }
 
-        let name = options
-            .get("name")
-            .and_then(|x| x.extract().ok())
-            .unwrap_or(format!("reader {}", node_util::get_id_and_incremen(&ID_COUNTER)))
-            .to_string();
-        let kbd_model = options.get("model").and_then(|x| x.extract().ok());
-        let kbd_layout = options.get("layout").and_then(|x| x.extract().ok());
-        let kbd_variant = options.get("variant").and_then(|x| x.extract().ok());
-        let kbd_options = options.get("options").and_then(|x| x.extract().ok());
+        let name = extract_with_error::<String>(&options, "name")?
+            .unwrap_or_else(|| format!("Reader {}", node_util::get_id_and_incremen(&ID_COUNTER)));
+
+        let kbd_model = extract_with_error::<String>(&options, "model")?;
+        let kbd_layout = extract_with_error::<String>(&options, "layout")?;
+        let kbd_variant = extract_with_error::<String>(&options, "variant")?;
+        let kbd_options = extract_with_error::<String>(&options, "options")?;
+
         let transformer = XKB_TRANSFORMER_REGISTRY
             .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))
             .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;

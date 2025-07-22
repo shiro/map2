@@ -85,6 +85,7 @@ class ModifierMapper(MapperBase):
 
 class ReaderNewKwargs(typing.TypedDict, total=False):
     patterns: list[str]
+    name: str
 
 class Reader:
     r"""
@@ -124,6 +125,7 @@ class Watcher:
     r"""
     Watches input devices and notifies on connect/disconnect
     """
+    def __new__(cls, **kwargs) -> Watcher: ...
     def on_connect(self, handler: typing.Callable | None) -> None: ...
     def on_disconnect(self, handler: typing.Callable | None) -> None: ...
 

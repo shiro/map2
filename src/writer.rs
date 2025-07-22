@@ -46,17 +46,15 @@ impl Writer {
             None => HashMap::new(),
         };
 
-        let name = options
-            .get("name")
-            .and_then(|x| x.extract().ok())
-            .unwrap_or(format!("writer {}", node_util::get_id_and_incremen(&ID_COUNTER)))
-            .to_string();
-        let device_name = match options.get("name") {
-            Some(option) => {
-                option.extract::<String>().map_err(|_| PyRuntimeError::new_err("'name' must be a string"))?
-            }
-            None => "Virtual map2 output".to_string(),
-        };
+        let name = extract_with_error::<String>(&options, "name")?
+            .unwrap_or_else(|| format!("Writer {}", node_util::get_id_and_incremen(&ID_COUNTER)));
+        let device_name =
+            extract_with_error::<String>(&options, "device_name")?.unwrap_or("Virtual map2 output".to_string());
+
+        let kbd_model = extract_with_error::<String>(&options, "model")?;
+        let kbd_layout = extract_with_error::<String>(&options, "layout")?;
+        let kbd_variant = extract_with_error::<String>(&options, "variant")?;
+        let kbd_options = extract_with_error::<String>(&options, "options")?;
 
         let mut capabilities = DeviceCapabilities::new();
         if let Some(_capabilities) = options.get("capabilities") {

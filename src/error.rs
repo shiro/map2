@@ -14,17 +14,26 @@ pub enum ApplicationError {
     InvalidLinkTarget,
     #[error("[NOT_CALLABLE] expected a callable object (i.e. a function)")]
     NotCallable,
-    #[error("[INVALID_INPUT_TYPE] expected input to be of type {type_}")]
-    InvalidInputType { type_: String },
+    #[error("[INVALID_INPUT_TYPE] expected input '{name}' to be of type {expected_type}, not {actual_type}")]
+    InvalidInputType { name: String, expected_type: String, actual_type: String },
+    #[error(
+        "[INVALID_NAMED_INPUT_TYPE] expected named input '{name}' to be of type {expected_type}, not {actual_type}"
+    )]
+    InvalidNamedInputType { name: String, expected_type: String, actual_type: String },
     #[error("[UNEXPECTED_NON_BUTTON_INPUT] expected only button inputs")]
     NonButton,
-    #[error("can't keep up with event processing, dropping events!")]
+    #[error("[TOO_MANY_EVENTS] can't keep up with event processing, dropping events!")]
     TooManyEvents,
 }
 
 impl From<ApplicationError> for PyErr {
     fn from(value: ApplicationError) -> Self {
-        PyRuntimeError::new_err(value.to_string())
+        match value {
+            ApplicationError::InvalidInputType { .. } | ApplicationError::InvalidNamedInputType { .. } => {
+                PyTypeError::new_err(value.to_string())
+            }
+            _ => PyRuntimeError::new_err(value.to_string()),
+        }
     }
 }
 

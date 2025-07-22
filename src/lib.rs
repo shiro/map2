@@ -34,6 +34,12 @@ use nom::lib::std::collections::{BTreeSet, HashMap, HashSet};
 use tap::Tap;
 use uuid::Uuid;
 
+pub use crate::closure_channel::*;
+use crate::error::*;
+use crate::event::InputEvent;
+pub use crate::key_defs::*;
+use crate::key_primitives::*;
+use conversions::extract_with_error;
 use event_loop::EVENT_LOOP;
 pub use mapper::*;
 pub use python::{PyBound, err_to_py};
@@ -42,14 +48,9 @@ pub use subscriber::*;
 use watcher::Watcher;
 use writer::Writer;
 
-pub use crate::closure_channel::*;
-use crate::error::*;
-use crate::event::InputEvent;
-pub use crate::key_defs::*;
-use crate::key_primitives::*;
-
 pub mod capabilities;
 pub mod closure_channel;
+pub mod conversions;
 pub mod device;
 pub mod encoding;
 pub mod error;
