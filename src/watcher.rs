@@ -75,9 +75,9 @@ impl Watcher {
         let state = Arc::new(Mutex::new(State::new(name)));
 
         #[cfg(not(feature = "integration"))]
-        let reader_thread_handle = {
-            use device::virtual_input_device::watch_udev_inputs;
+        {
             use device::virtual_input_device::NativeDeviceEvent;
+            use device::virtual_input_device::watch_udev_inputs;
 
             let state = state.clone();
             let handler = Arc::new(move |ev: NativeDeviceEvent| {
@@ -101,7 +101,6 @@ impl Watcher {
                         }
                         state.devices.remove(&info);
                     }
-                    NativeDeviceEvent::InputEvent(_) => unreachable!(),
                 };
             });
 

@@ -14,9 +14,9 @@ use arc_swap::ArcSwapOption;
 use std::borrow::BorrowMut;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::AtomicU32;
 use std::sync::OnceLock;
-use std::sync::{mpsc, Arc, Mutex, RwLock, Weak};
+use std::sync::atomic::AtomicU32;
+use std::sync::{Arc, Mutex, RwLock, Weak, mpsc};
 use std::thread;
 use std::time::Duration;
 use std::{fs, io};
@@ -27,23 +27,22 @@ pub use evdev_rs::enums::EV_REL::*;
 pub use key_primitives::Key;
 pub use parsing::*;
 
-pub use anyhow::{anyhow, Result};
-use evdev_rs::enums::EventCode;
+pub use anyhow::{Result, anyhow};
 pub use evdev_rs::InputEvent as EvdevInputEvent;
+use evdev_rs::enums::EventCode;
 use nom::lib::std::collections::{BTreeSet, HashMap, HashSet};
 use tap::Tap;
 use uuid::Uuid;
 
 use event_loop::EVENT_LOOP;
 pub use mapper::*;
-pub use python::{err_to_py, PyBound};
+pub use python::{PyBound, err_to_py};
 use reader::Reader;
 pub use subscriber::*;
 use watcher::Watcher;
 use writer::Writer;
 
 pub use crate::closure_channel::*;
-use crate::device::virtual_input_device::grab_udev_inputs;
 use crate::error::*;
 use crate::event::InputEvent;
 pub use crate::key_defs::*;

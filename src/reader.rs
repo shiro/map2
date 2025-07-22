@@ -1,9 +1,6 @@
-use ::oneshot;
-use device::virtual_input_device::DeviceMatcher;
-use pyo3::IntoPyObjectExt;
-use std::hash::{Hash, Hasher};
-
 use crate::device::virtual_input_device::NativeDeviceInfo;
+use crate::device::virtual_input_device::grab_device;
+use crate::device::virtual_input_device::watch_udev_inputs;
 use crate::event::InputEvent;
 use crate::python::*;
 use crate::python_util::*;
@@ -11,6 +8,10 @@ use crate::subscriber::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
+use ::oneshot;
+use device::virtual_input_device::DeviceMatcher;
+use pyo3::IntoPyObjectExt;
+use std::hash::{Hash, Hasher};
 
 const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -60,12 +61,12 @@ impl Reader {
                     } else if let Ok(matcher) = v.extract::<HashMap<String, String>>(py) {
                         matcher
                     } else {
-                        return Err(PyRuntimeError::new_err("'filters' must be of type 'string[]?'"));
+                        return Err(PyRuntimeError::new_err("'filters' must be of type 'list[str] | list[dict]'"));
                     };
                     filters.push(filter);
                 }
             } else {
-                return Err(PyRuntimeError::new_err("'patterns' must be of type 'string[]?'"));
+                return Err(PyRuntimeError::new_err("'filters' must be of type 'list[str] | list[dict]'"));
             }
         }
 
@@ -90,17 +91,33 @@ impl Reader {
         let link = Arc::new(ReaderLink::new(id, state.clone()));
 
         #[cfg(not(feature = "integration"))]
-        let reader_thread_handle = if !filters.is_empty() {
+        if !filters.is_empty() {
             use device::virtual_input_device::NativeDeviceEvent;
 
-            let state = state.clone();
-            let handler = Arc::new(move |ev: NativeDeviceEvent| {
-                let mut state = state.lock().unwrap();
+            let _state = state.clone();
+            let handler = Arc::new(move |ev| {
+                let mut state = _state.lock().unwrap();
+                let mut device_map = HashMap::new();
+
                 match ev {
-                    NativeDeviceEvent::InputEvent(ev) => {
-                        state.next.send_all(InputEvent::Raw(ev));
-                    }
                     NativeDeviceEvent::AddDevice(info) => {
+                        let _state = _state.clone();
+                        let res = grab_device(
+                            &info.fd_path,
+                            Arc::new(move |ev| {
+                                let mut state = _state.lock().unwrap();
+                                state.next.send_all(InputEvent::Raw(ev));
+                            }),
+                        );
+                        let abort_handle = match res {
+                            Ok(v) => v,
+                            Err(err) => {
+                                eprintln!("{}", err);
+                                std::process::exit(1);
+                            }
+                        };
+                        device_map.insert(info.sys_path.clone(), abort_handle);
+
                         if let Some(handler) = state.on_connect_handler.as_ref() {
                             Python::with_gil(|py| {
                                 let info = device_info_to_py(py, &info);
@@ -121,7 +138,7 @@ impl Reader {
                 };
             });
 
-            Some(grab_udev_inputs(filters, handler, reader_exit_rx).map_err(err_to_py)?)
+            Some(watch_udev_inputs(filters, handler, reader_exit_rx).map_err(err_to_py)?)
         } else {
             None
         };
@@ -133,8 +150,6 @@ impl Reader {
             link,
             #[cfg(not(feature = "integration"))]
             reader_exit_tx: Some(reader_exit_tx),
-            // #[cfg(not(feature = "integration"))]
-            // reader_thread_handle,
         })
     }
 
