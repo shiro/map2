@@ -1,19 +1,16 @@
+use crate::EvdevInputEvent;
 use crate::python::*;
 use crate::python_util::PyRegex;
 use crate::*;
+use evdev_rs::{Device, GrabMode, InputEvent, ReadFlag, ReadStatus};
+use notify::Watcher;
 use std::collections::{BTreeMap, HashMap};
 use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, mpsc};
+use std::sync::mpsc;
 use std::{fs, io, thread, time};
-
-use crate::EvdevInputEvent;
-use anyhow::{Result, anyhow};
-use evdev_rs::{Device, GrabMode, InputEvent, ReadFlag, ReadStatus};
-use notify::Watcher;
 use tokio::io::unix::AsyncFd;
-use uuid::Uuid;
 use walkdir::WalkDir;
 
 fn udev_info(fd_path: &Path) -> Option<udev::Device> {
@@ -287,8 +284,7 @@ pub fn watch_udev_inputs(
                         };
                     }
                 }
-                // anyhow::Ok(())
-                Ok::<_, anyhow::Error>(())
+                anyhow::Ok(())
             } => {},
         );
         Ok(())
