@@ -1,8 +1,5 @@
-#![feature(fn_traits)]
-#![feature(type_alias_impl_trait)]
 #![recursion_limit = "256"]
 #![allow(warnings)]
-#![feature(async_closure)]
 
 extern crate core;
 #[macro_use]
