@@ -1,3 +1,4 @@
+use super::*;
 #[cfg(not(feature = "integration"))]
 use evdev_rs::enums::EventType::EV_SYN;
 use pyo3::IntoPyObjectExt;

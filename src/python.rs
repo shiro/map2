@@ -1,3 +1,7 @@
+use crate::routing::*;
+use crate::virtual_writer::VirtualWriter;
+use crate::window::Window;
+use crate::*;
 pub use pyo3::Bound as PyBound;
 pub use pyo3::PyClass;
 pub use pyo3::exceptions::PyRuntimeError;
@@ -7,10 +11,6 @@ pub use pyo3::types::PyDict;
 pub use pyo3::types::PyString;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use tokio::runtime::Runtime;
-
-use crate::virtual_writer::VirtualWriter;
-use crate::window::Window;
-use crate::*;
 
 #[pyclass]
 struct PyKey {

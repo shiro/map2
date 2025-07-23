@@ -1,10 +1,10 @@
-use evdev_rs::enums::EV_KEY;
-use tokio::sync::MutexGuard;
-
+use super::*;
 use crate::conversions::get_py_type;
 use crate::device::virtual_input_device::MatcherValue;
 use crate::*;
 use crate::{device::virtual_input_device::DeviceMatcher, python::*};
+use evdev_rs::enums::EV_KEY;
+use tokio::sync::MutexGuard;
 
 use self::xkb::XKBTransformer;
 use crate::event_loop::{PythonArgument, args_to_py};

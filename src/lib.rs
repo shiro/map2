@@ -43,8 +43,6 @@ use conversions::extract_with_error;
 use event_loop::EVENT_LOOP;
 pub use node::*;
 pub use python::{PyBound, err_to_py};
-pub use subscriber::*;
-use writer::Writer;
 
 pub mod capabilities;
 pub mod closure_channel;
@@ -62,7 +60,6 @@ pub mod logging;
 pub mod node_util;
 pub mod parsing;
 pub mod platform;
-pub mod subscriber;
 pub mod xkb;
 pub mod xkb_transformer_registry;
 
@@ -74,4 +71,3 @@ pub mod python;
 pub mod python_util;
 pub mod virtual_writer;
 pub mod window;
-pub mod writer;

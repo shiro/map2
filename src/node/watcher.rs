@@ -1,9 +1,9 @@
 use super::mapper_util::parse_device_filters;
+use super::*;
 use crate::conversions::get_py_type;
 use crate::device::virtual_input_device::MatcherValue;
 use crate::python::*;
 use crate::python_util::*;
-use crate::subscriber::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
