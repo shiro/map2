@@ -1,3 +1,4 @@
+use crate::python::*;
 use crate::*;
 use std::collections::{BTreeMap, HashMap};
 use std::os::fd::AsRawFd;
@@ -148,7 +149,28 @@ pub fn grab_device(
     Ok(handle.abort_handle())
 }
 
-pub type DeviceMatcher = HashMap<String, String>;
+#[pyclass]
+pub struct DeviceMatcher {
+    pub path: Option<String>,
+    pub properties: Option<HashMap<String, String>>,
+}
+
+impl<'source> FromPyObject<'source> for DeviceMatcher {
+    fn extract_bound(ob: &Bound<'source, PyAny>) -> PyResult<Self> {
+        let dict = ob.downcast::<PyDict>()?;
+
+        let path = dict.get_item("path")?.map(|p| p.extract()).transpose()?;
+        let properties = dict.get_item("properties")?.map(|p| p.extract()).transpose()?;
+
+        Ok(DeviceMatcher { path, properties })
+    }
+}
+
+#[derive(Debug)]
+struct DeviceMatcherInternal {
+    path: Option<Regex>,
+    properties: Option<HashMap<String, Regex>>,
+}
 type ParsedDeviceMatcher = HashMap<String, Regex>;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -170,16 +192,16 @@ pub fn watch_udev_inputs(
 ) -> Result<()> {
     let parsed_matchers = matchers
         .into_iter()
-        .map(|x| {
-            Ok(x.into_iter()
-                .map(|(k, v)| {
-                    let regex = Regex::new(&v).unwrap();
-                    Ok((k, regex))
-                })
-                .collect::<Result<HashMap<String, Regex>>>()?)
+        .map(|matcher| {
+            let path_regex = matcher.path.as_deref().map(|p| Regex::new(p).unwrap());
+            DeviceMatcherInternal {
+                path: path_regex,
+                properties: matcher
+                    .properties
+                    .map(|props| props.into_iter().map(|(k, v)| (k, Regex::new(&v).unwrap())).collect()),
+            }
         })
-        .collect::<Result<Vec<ParsedDeviceMatcher>>>()
-        .unwrap();
+        .collect::<Vec<DeviceMatcherInternal>>();
 
     let handle_device_event = move |fd_path: PathBuf| -> Option<NativeDeviceInfo> {
         if fd_path.is_dir() {
@@ -190,12 +212,10 @@ pub fn watch_udev_inputs(
         let properties = get_udev_properties(&udev);
 
         let all_match = parsed_matchers.iter().all(|matcher| {
-            matcher.iter().all(|(key, regex)| {
-                if key == "path" {
-                    return regex.is_match(&fd_path.to_string_lossy());
-                }
-                properties.get(key).map_or(false, |value| regex.is_match(value))
-            })
+            matcher.path.as_ref().map_or(true, |path_regex| path_regex.is_match(&fd_path.to_string_lossy().as_ref()))
+                && matcher.properties.as_ref().map_or(true, |props| {
+                    props.iter().all(|(key, regex)| properties.get(key).map_or(false, |value| regex.is_match(value)))
+                })
         });
 
         if !all_match {

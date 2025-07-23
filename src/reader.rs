@@ -69,9 +69,7 @@ impl Reader {
                 .into_iter()
                 .map(|v| {
                     if let Ok(v) = v.extract::<String>(py) {
-                        Ok(DeviceMatcher::new().tap_mut(|matcher| {
-                            matcher.insert("path".to_string(), v);
-                        }))
+                        Ok(DeviceMatcher { path: Some(v), properties: Default::default() })
                     } else if let Ok(matcher) = v.extract::<DeviceMatcher>(py) {
                         Ok(matcher)
                     } else {

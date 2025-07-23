@@ -15,6 +15,15 @@ type SrcNode = Reader | AnyMapper
 type DstNode = Writer| AnyMapper
 type AnyNode = SrcNode | DstNode
 
+class DeviceMatcher(typing.TypedDict, total=False):
+    path: str
+    properties: dict[str, str]
+
+class DeviceInfo(typing.TypedDict):
+    path: str
+    sys_path: str
+    properties: dict[str, str]
+
 class MapAxisCallback(typing.Protocol):
     def __call__(self, axis:builtins.str, value:builtins.int, /) -> builtins.int | builtins.bool | None: ...
 
@@ -84,14 +93,15 @@ class ModifierMapper(MapperBase):
         """
 
 class ReaderNewKwargs(typing.TypedDict, total=False):
-    patterns: list[str]
     name: str
+    filters: DeviceMatcher | list[str | DeviceMatcher]
 
 class Reader:
     r"""
     Reads input events from sources such as device nodes
     """
     def __new__(cls, **kwargs: Unpack[ReaderNewKwargs]) -> Reader: ...
+    devices: list[DeviceInfo]
     def on_connect(self, handler: typing.Callable) -> None: ...
     def on_disconnect(self, handler: typing.Callable) -> None: ...
     def link_to(self, target:DstNode) -> None: ...
@@ -120,12 +130,16 @@ class Writer:
     def send(self, val:builtins.str) -> None: ...
     def __test__read_ev(self) -> typing.Optional[builtins.str]: ...
 
+class WatcherNewKwargs(typing.TypedDict, total=False):
+    name: str
+    filters: DeviceMatcher | list[str | DeviceMatcher]
 
 class Watcher:
     r"""
     Watches input devices and notifies on connect/disconnect
     """
-    def __new__(cls, **kwargs) -> Watcher: ...
+    def __new__(cls, **kwargs: Unpack[WatcherNewKwargs]) -> Watcher: ...
+    devices: list[DeviceInfo]
     def on_connect(self, handler: typing.Callable | None) -> None: ...
     def on_disconnect(self, handler: typing.Callable | None) -> None: ...
 

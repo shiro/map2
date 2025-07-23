@@ -50,7 +50,7 @@ impl Watcher {
                 return Err(ApplicationError::InvalidNamedInputType {
                     name: "filters".to_string(),
                     actual_type: get_py_type(v),
-                    expected_type: "list[str | dict]".to_string(),
+                    expected_type: "list[str] | list[DeviceMatcher]".to_string(),
                 }
                 .into_py())?;
             };
@@ -59,16 +59,14 @@ impl Watcher {
                 .into_iter()
                 .map(|v| {
                     if let Ok(v) = v.extract::<String>(py) {
-                        Ok(DeviceMatcher::new().tap_mut(|matcher| {
-                            matcher.insert("path".to_string(), v);
-                        }))
+                        Ok(DeviceMatcher { path: Some(v), properties: Default::default() })
                     } else if let Ok(matcher) = v.extract::<DeviceMatcher>(py) {
                         Ok(matcher)
                     } else {
                         Err(ApplicationError::InvalidNamedInputType {
                             name: "filters".to_string(),
                             actual_type: get_py_type(v.bind(py)),
-                            expected_type: "list[str] | list[dict]".to_string(),
+                            expected_type: "list[str] | list[DeviceMatcher]".to_string(),
                         }
                         .into_py())
                     }
