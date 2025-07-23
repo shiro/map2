@@ -1,15 +1,17 @@
+use super::mapping_functions::*;
+use super::suffix_tree::SuffixTree;
 use super::*;
 use crate::conversions::{extract_with_error, get_py_type};
-use crate::mapper::mapping_functions::*;
 use crate::python::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
 use nom::Slice;
+use pyo3::IntoPyObjectExt;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::Sender;
 
-type Mappings = HashMap<Vec<Key>, RuntimeAction>;
+type Mappings = SuffixTree<RuntimeAction>;
 
 const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -24,30 +26,21 @@ struct State {
     #[new(default)]
     mappings: Mappings,
     #[new(default)]
-    chorded_keys: HashSet<Key>,
-    #[new(default)]
     modifiers: KeyModifierFlags,
-    // all keys on the stack are included in mappings and are currently pressed
     #[new(default)]
-    stack: Vec<Key>,
-    #[new(default)]
-    ignored_keys: HashSet<Key>,
-    #[new(default)]
-    pressed_keys: HashSet<Key>,
-    #[new(default)]
-    interval: Option<tokio::task::JoinHandle<()>>,
+    window: Vec<char>,
 }
 
 #[pyclass]
-pub struct ChordMapper {
+pub struct TextMapper {
     pub id: Uuid,
-    pub link: Arc<ChordMapperLink>,
+    pub link: Arc<TextMapperLink>,
     ev_tx: tokio::sync::mpsc::Sender<InputEvent>,
     state: Arc<Mutex<State>>,
 }
 
 #[pymethods]
-impl ChordMapper {
+impl TextMapper {
     #[new]
     #[pyo3(signature = (**kwargs))]
     pub fn new(py: Python, kwargs: Option<PyBound<PyDict>>) -> PyResult<Py<Self>> {
@@ -57,7 +50,7 @@ impl ChordMapper {
         };
 
         let name = extract_with_error::<String>(&options, "name")?
-            .unwrap_or_else(|| format!("ChordMapper {}", node_util::get_id_and_incremen(&ID_COUNTER)));
+            .unwrap_or_else(|| format!("TextMapper {}", node_util::get_id_and_incremen(&ID_COUNTER)));
 
         let kbd_model = extract_with_error::<String>(&options, "model")?;
         let kbd_layout = extract_with_error::<String>(&options, "layout")?;
@@ -71,7 +64,7 @@ impl ChordMapper {
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(64);
         let state = Arc::new(Mutex::new(State::new(name, transformer)));
-        let link = Arc::new(ChordMapperLink::new(id, ev_tx.clone(), state.clone()));
+        let link = Arc::new(TextMapperLink::new(id, ev_tx.clone(), state.clone()));
 
         {
             let state = state.clone();
@@ -92,23 +85,26 @@ impl ChordMapper {
         Ok(_self)
     }
 
-    pub fn map(&mut self, py: Python, from: Vec<String>, to: PyObject) -> PyResult<()> {
+    pub fn map(&mut self, py: Python, from: String, to: PyObject) -> PyResult<()> {
         let mut state = self.state.blocking_lock();
-        // if from.len() > 32 {
-        //     return Err(PyRuntimeError::new_err(
-        //         "'from' side cannot be longer than 32 character",
-        //     ));
-        // }
+        if from.len() > 32 {
+            return Err(PyRuntimeError::new_err("'from' side cannot be longer than 32 character"));
+        }
 
-        let mut from_parsed =
-            from.into_iter().map(|x| parse_key(&x, Some(&state.transformer))).collect::<Result<Vec<_>>>().map_err(
-                |err| {
-                    PyRuntimeError::new_err(format!(
-                        "mapping error on the 'from' side:\n{}",
-                        ApplicationError::KeyParse(err.to_string()),
-                    ))
-                },
-            )?;
+        let from_seq: Vec<KeyClickActionWithMods> = parse_key_sequence(&from, Some(&state.transformer))
+            .map_err(|err| {
+                PyRuntimeError::new_err(format!(
+                    "mapping error on the 'from' side:\n{}",
+                    ApplicationError::KeyParse(err.to_string()),
+                ))
+            })?
+            .into_iter()
+            .map(|x| match x {
+                ParsedKeyAction::KeyClickAction(x) => Some(x),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| PyRuntimeError::new_err("invalid key sequence"))?;
 
         let to = if to.bind(py).is_callable() {
             RuntimeAction::PythonCallback(Arc::new(to))
@@ -133,31 +129,19 @@ impl ChordMapper {
             RuntimeAction::ActionSequence(to.to_key_actions_with_mods())
         };
 
-        let mut from_parsed = from_parsed.clone();
-
-        // mark chorded keys
-        state.chorded_keys.extend(from_parsed.iter().cloned());
-
-        // insert all combinations
-        state.mappings.insert(from_parsed.clone(), to.clone());
-        from_parsed.reverse();
-        state.mappings.insert(from_parsed, to);
+        state.mappings.insert(from, to);
 
         Ok(())
     }
 
     #[pyo3(signature = (existing=None))]
-    pub fn snapshot(&self, existing: Option<&ChordMapperSnapshot>) -> PyResult<Option<ChordMapperSnapshot>> {
+    pub fn snapshot(&self, existing: Option<&TextMapperSnapshot>) -> Option<TextMapperSnapshot> {
         let mut state = self.state.blocking_lock();
         if let Some(existing) = existing {
             state.mappings = existing.mappings.clone();
-            state.chorded_keys = state.mappings.keys().fold(HashSet::new(), |mut acc, e| {
-                acc.extend(e.iter().cloned());
-                acc
-            });
-            return Ok(None);
+            return None;
         }
-        Ok(Some(ChordMapperSnapshot { mappings: state.mappings.clone() }))
+        Some(TextMapperSnapshot { mappings: state.mappings.clone() })
     }
 
     pub fn link_to(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
@@ -214,7 +198,8 @@ impl ChordMapper {
     }
 
     pub fn send(&mut self, val: String) -> PyResult<()> {
-        let actions = parse_key_sequence(val.as_str(), Some(&self.state.blocking_lock().transformer))
+        let mut state = self.state.blocking_lock();
+        let actions = parse_key_sequence(val.as_str(), Some(&state.transformer))
             .map_err(|err| ApplicationError::KeySequenceParse(err.to_string()).into_py())?
             .to_key_actions();
         for action in actions {
@@ -226,7 +211,7 @@ impl ChordMapper {
     }
 }
 
-impl Drop for ChordMapper {
+impl Drop for TextMapper {
     fn drop(&mut self) {
         self.unlink_from_all();
         self.unlink_to_all();
@@ -234,7 +219,7 @@ impl Drop for ChordMapper {
 }
 
 #[derive(Clone, derive_new::new)]
-pub struct ChordMapperLink {
+pub struct TextMapperLink {
     id: Uuid,
     ev_tx: Sender<InputEvent>,
     state: Arc<Mutex<State>>,
@@ -242,7 +227,7 @@ pub struct ChordMapperLink {
     py_object: OnceLock<Arc<PyObject>>,
 }
 
-impl LinkSrc for ChordMapperLink {
+impl LinkSrc for TextMapperLink {
     fn id(&self) -> &Uuid {
         &self.id
     }
@@ -266,7 +251,7 @@ impl LinkSrc for ChordMapperLink {
     }
 }
 
-impl LinkDst for ChordMapperLink {
+impl LinkDst for TextMapperLink {
     fn id(&self) -> &Uuid {
         &self.id
     }
@@ -295,162 +280,89 @@ impl LinkDst for ChordMapperLink {
 }
 
 #[pyclass]
-#[derive(Clone)]
-pub struct ChordMapperSnapshot {
+pub struct TextMapperSnapshot {
     mappings: Mappings,
 }
 
 async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
     let mut state = _state.lock().await;
-
-    let ev = match &raw_ev {
-        InputEvent::Raw(ev) => ev,
-    };
-
-    let _key = Key { event_code: ev.event_code };
-
-    match ev {
-        EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-            state.modifiers.update_from_action(&KeyAction::from_input_ev(&ev));
-
-            // ignore modifiers
-            match key {
-                KEY_LEFTCTRL | KEY_RIGHTCTRL | KEY_LEFTSHIFT | KEY_RIGHTSHIFT | KEY_LEFTALT | KEY_RIGHTALT
-                | KEY_LEFTMETA | KEY_RIGHTMETA => {
-                    state.next.send_all(raw_ev);
-                    return;
-                }
-                _ => {}
-            };
-
-            match ev.value {
-                TYPE_DOWN => {
-                    let should_handle = state.chorded_keys.contains(&_key)
-                        && state.pressed_keys.iter().all(|x| state.stack.contains(x));
-
-                    state.pressed_keys.insert(_key.clone());
-
-                    if should_handle {
-                        state.stack.push(_key.clone());
-                        state.interval.take().map(|task| task.abort());
-
-                        if state.stack.len() == 2 {
-                            drop(state);
-                            handle_cb(_state.clone(), raw_ev).await;
-                        } else {
-                            let _state = _state.clone();
-                            state.interval = Some(tokio::spawn(async move {
-                                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                                handle_cb(_state.clone(), raw_ev).await;
-                            }));
-                        }
-                    } else {
-                        state.interval.take().map(|task| task.abort());
-
-                        let state = &mut *state;
-                        for k in state.stack.iter() {
-                            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
-                            // state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
-                            // state.ignored_keys.insert(k.clone());
-                        }
-                        state.stack.clear();
-
-                        state.next.send_all(raw_ev);
-                    }
-                }
-                TYPE_UP => {
-                    state.pressed_keys.remove(&_key);
-                    state.interval.take().map(|task| task.abort());
-
-                    if let Some(pos) = state.stack.iter().position(|x| x == &_key) {
-                        state.stack.remove(pos);
-
-                        if !state.ignored_keys.remove(&_key) {
-                            state.next.send_all(InputEvent::Raw(_key.to_input_ev(TYPE_DOWN)));
-                            state.next.send_all(raw_ev);
-                        }
-                    } else {
-                        for k in state.stack.iter() {
-                            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
-                            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
-                        }
-                        state.stack.clear();
-
-                        if !state.ignored_keys.remove(&_key) {
-                            state.next.send_all(raw_ev);
-                        }
-                    }
-                }
-                TYPE_REPEAT => {
-                    if state.ignored_keys.contains(&_key) {
-                        return;
-                    }
-                    if state.stack.is_empty() {
-                        state.next.send_all(raw_ev);
-                    };
-                }
-                _ => unreachable!(),
-            };
-            return;
-        }
-        _ => {}
+    // let mut state = &mut *_state;
+    if !state.next.is_empty() {
+        state.next.send_all(raw_ev.clone());
     }
-
-    state.next.send_all(raw_ev);
-}
-
-// fired after the chord timeout has passed, submits the keys held on the stack
-async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
-    let mut state = _state.lock().await;
     let ev = match raw_ev {
         InputEvent::Raw(ev) => ev,
     };
 
-    if let Some(action) = state.mappings.get(&state.stack).cloned() {
-        for k in state.stack.clone().into_iter() {
-            state.ignored_keys.insert(k);
+    match ev {
+        EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_BACKSPACE), value: 1, .. } => {
+            state.window.pop();
         }
+        EvdevInputEvent { event_code: EventCode::EV_KEY(KEY_DELETE), value: 1, .. } => {
+            state.window.remove(0);
+        }
+        // key event
+        EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+            if ev.value == 0 {
+                let key = state.transformer.raw_to_utf(&key, state.modifiers);
 
-        match action {
-            RuntimeAction::ActionSequence(seq) => {
-                handle_seq2(&seq, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
-            }
-            RuntimeAction::PythonCallback(handler) => {
-                // TODO pass stack as first arg
-                // let args = Some(PythonArgument::String(
-                //     match value {
-                //         0 => "up",
-                //         1 => "down",
-                //         2 => "repeat",
-                //         _ => unreachable!(),
-                //     }
-                //     .to_string(),
-                // ));
+                if let Some(key) = key {
+                    state.window.push(key.chars().next().unwrap());
+                    // TODO set window size dynamically
+                    if state.window.len() > 32 {
+                        state.window.remove(0);
+                    }
 
-                handle_callback(
-                    &ev,
-                    handler.clone(),
-                    None,
-                    state.transformer.clone(),
-                    &state.modifiers.clone(),
-                    state.next.values().cloned().collect(),
-                    state,
-                )
-                .await;
+                    let mut hit = None;
+
+                    for i in (0..state.window.len()).rev() {
+                        let search: String = state.window.iter().skip(i).collect();
+                        if let Some(x) = state.mappings.get(&search) {
+                            hit = Some((x.clone(), search.len()));
+                        }
+                    }
+
+                    if let Some((to, from_len)) = hit {
+                        state.window.clear();
+
+                        if !state.next.is_empty() {
+                            for _ in 0..from_len {
+                                state.next.send_all(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(1)));
+                                state.next.send_all(InputEvent::Raw(Key::from(KEY_BACKSPACE).to_input_ev(0)));
+                            }
+                        }
+
+                        match to {
+                            RuntimeAction::ActionSequence(seq) => {
+                                handle_seq2(&seq, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
+                            }
+                            RuntimeAction::PythonCallback(handler) => {
+                                // delay the callback until the backspace events are processed
+                                tokio::time::sleep(Duration::from_millis(10 * from_len as u64)).await;
+
+                                handle_callback(
+                                    &ev,
+                                    handler.clone(),
+                                    None,
+                                    state.transformer.clone(),
+                                    &state.modifiers.clone(),
+                                    state.next.values().cloned().collect(),
+                                    state,
+                                )
+                                .await;
+                            }
+                            RuntimeAction::NOP => {}
+                        }
+
+                        // return after handled match
+                        return;
+                    }
+                }
             }
-            RuntimeAction::NOP => {}
+
+            // event_handlers::update_modifiers(&mut state.modifiers, &KeyAction::from_input_ev(&ev));
+            state.modifiers.update_from_action(&KeyAction::from_input_ev(&ev));
         }
-    } else {
-        // only one key on the stack
-        if state.stack.len() == 1 && state.stack[0].event_code == ev.event_code {
-            state.next.send_all(InputEvent::Raw(ev.clone()));
-        } else {
-            // no match, send all buffered keys from stack
-            for k in state.stack.iter() {
-                state.next.send_all(InputEvent::Raw(k.to_input_ev(1)));
-                // state.next.send_all(InputEvent::Raw(k.to_input_ev(0)));
-            }
-        }
-        state.stack.clear();
+        _ => {}
     }
 }

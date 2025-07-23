@@ -1,7 +1,5 @@
+use crate::node::*;
 use crate::python::*;
-use pyo3::{PyAny, PyRefMut};
-
-use crate::mapper::*;
 use crate::*;
 
 pub fn node_to_link_dst(target: &PyBound<PyAny>) -> Option<Arc<dyn LinkDst>> {

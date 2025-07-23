@@ -41,11 +41,9 @@ pub use crate::key_defs::*;
 use crate::key_primitives::*;
 use conversions::extract_with_error;
 use event_loop::EVENT_LOOP;
-pub use mapper::*;
+pub use node::*;
 pub use python::{PyBound, err_to_py};
-use reader::Reader;
 pub use subscriber::*;
-use watcher::Watcher;
 use writer::Writer;
 
 pub mod capabilities;
@@ -71,11 +69,9 @@ pub mod xkb_transformer_registry;
 #[cfg(feature = "integration")]
 pub mod testing;
 
-pub mod mapper;
+pub mod node;
 pub mod python;
 pub mod python_util;
-pub mod reader;
 pub mod virtual_writer;
-pub mod watcher;
 pub mod window;
 pub mod writer;

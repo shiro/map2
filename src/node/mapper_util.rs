@@ -1,11 +1,13 @@
 use evdev_rs::enums::EV_KEY;
 use tokio::sync::MutexGuard;
 
-use crate::python::*;
+use crate::conversions::get_py_type;
+use crate::device::virtual_input_device::MatcherValue;
 use crate::*;
+use crate::{device::virtual_input_device::DeviceMatcher, python::*};
 
 use self::xkb::XKBTransformer;
-use crate::event_loop::{args_to_py, PythonArgument};
+use crate::event_loop::{PythonArgument, args_to_py};
 
 pub fn hash_path(path: &Vec<uuid::Uuid>) -> u64 {
     use std::hash::Hash;
@@ -314,4 +316,37 @@ pub fn get_mode(mappings: &Mappings, from: &KeyActionWithMods, seq: &Vec<KeyActi
         2 => SeqModifierRestoreMode::SkipPrePost,
         _ => unreachable!(),
     }
+}
+
+pub fn parse_device_filters(py: Python, filters: &Bound<PyAny>) -> PyResult<Vec<DeviceMatcher>> {
+    let filter_vec = if let Ok(v) = filters.extract::<Vec<PyObject>>() {
+        v
+    } else if let Ok(_) = filters.extract::<PyObject>() {
+        vec![filters.clone().unbind()]
+    } else {
+        return Err(ApplicationError::InvalidNamedInputType {
+            name: "filters".to_string(),
+            actual_type: get_py_type(filters),
+            expected_type: "list[str] | list[DeviceMatcher]".to_string(),
+        }
+        .into_py())?;
+    };
+
+    filter_vec
+        .into_iter()
+        .map(|v| {
+            if let Ok(v) = v.extract::<String>(py) {
+                Ok(DeviceMatcher { path: Some(MatcherValue::Str(v)), properties: Default::default() })
+            } else if let Ok(matcher) = v.extract::<DeviceMatcher>(py) {
+                Ok(matcher)
+            } else {
+                Err(ApplicationError::InvalidNamedInputType {
+                    name: "filters".to_string(),
+                    actual_type: get_py_type(v.bind(py)),
+                    expected_type: "list[str] | list[DeviceMatcher]".to_string(),
+                }
+                .into_py())
+            }
+        })
+        .collect::<PyResult<Vec<DeviceMatcher>>>()
 }

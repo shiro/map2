@@ -1,8 +1,8 @@
 use self::event_loop::PythonArgument;
+use super::RuntimeAction;
+use super::mapping_functions::*;
 use super::*;
 use crate::conversions::extract_with_error;
-use crate::mapper::RuntimeAction;
-use crate::mapper::mapping_functions::*;
 use crate::python::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};

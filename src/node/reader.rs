@@ -1,3 +1,4 @@
+use super::mapper_util::parse_device_filters;
 use crate::conversions::extract_with_error;
 use crate::conversions::get_py_type;
 use crate::device::virtual_input_device::MatcherValue;
@@ -52,40 +53,7 @@ impl Reader {
             None => HashMap::new(),
         };
 
-        let filters = if let Some(v) = options.get("filters") {
-            let filter_vec = if let Ok(v) = v.extract::<Vec<PyObject>>() {
-                v
-            } else if let Ok(_) = v.extract::<PyObject>() {
-                vec![v.clone().unbind()]
-            } else {
-                return Err(ApplicationError::InvalidNamedInputType {
-                    name: "filters".to_string(),
-                    actual_type: get_py_type(v),
-                    expected_type: "list[str | dict]".to_string(),
-                }
-                .into_py())?;
-            };
-
-            filter_vec
-                .into_iter()
-                .map(|v| {
-                    if let Ok(v) = v.extract::<String>(py) {
-                        Ok(DeviceMatcher { path: Some(MatcherValue::Str(v)), properties: Default::default() })
-                    } else if let Ok(matcher) = v.extract::<DeviceMatcher>(py) {
-                        Ok(matcher)
-                    } else {
-                        Err(ApplicationError::InvalidNamedInputType {
-                            name: "filters".to_string(),
-                            actual_type: get_py_type(v.bind(py)),
-                            expected_type: "list[str] | list[dict]".to_string(),
-                        }
-                        .into_py())
-                    }
-                })
-                .collect::<PyResult<Vec<DeviceMatcher>>>()?
-        } else {
-            vec![]
-        };
+        let filters = if let Some(v) = options.get("filters") { parse_device_filters(py, v)? } else { vec![] };
 
         let name = extract_with_error::<String>(&options, "name")?
             .unwrap_or_else(|| format!("Reader {}", node_util::get_id_and_incremen(&ID_COUNTER)));
