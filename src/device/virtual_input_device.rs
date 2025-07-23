@@ -12,7 +12,6 @@ use crate::EvdevInputEvent;
 use anyhow::{Result, anyhow};
 use evdev_rs::{Device, GrabMode, InputEvent, ReadFlag, ReadStatus};
 use notify::Watcher;
-use regex::Regex;
 use tokio::io::unix::AsyncFd;
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -192,8 +191,6 @@ impl<'source> FromPyObject<'source> for DeviceMatcher {
         Ok(DeviceMatcher { path, properties })
     }
 }
-
-type ParsedDeviceMatcher = HashMap<String, Regex>;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct NativeDeviceInfo {

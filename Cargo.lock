@@ -990,7 +990,6 @@ dependencies = [
  "pyo3-stub-gen",
  "pytests",
  "pythonize",
- "regex",
  "serde",
  "serde_json",
  "signal-hook",
