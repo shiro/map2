@@ -181,12 +181,12 @@ pub fn watch_udev_inputs(
         .collect::<Result<Vec<ParsedDeviceMatcher>>>()
         .unwrap();
 
-    let handle_device_event = move |fd_path: PathBuf, action: fn(NativeDeviceInfo) -> NativeDeviceEvent| {
-        if fd_path.is_dir() || parsed_matchers.is_empty() {
-            return;
+    let handle_device_event = move |fd_path: PathBuf| -> Option<NativeDeviceInfo> {
+        if fd_path.is_dir() {
+            return None;
         }
 
-        let udev = if let Some(v) = udev_info(&fd_path) { v } else { return };
+        let udev = if let Some(v) = udev_info(&fd_path) { v } else { return None };
         let properties = get_udev_properties(&udev);
 
         let all_match = parsed_matchers.iter().all(|matcher| {
@@ -199,20 +199,23 @@ pub fn watch_udev_inputs(
         });
 
         if !all_match {
-            return;
+            return None;
         }
 
-        ev_handler(action(NativeDeviceInfo {
-            fd_path,
-            sys_path: udev.syspath().to_owned(),
-            properties: get_udev_properties(&udev),
-        }));
+        Some(NativeDeviceInfo { fd_path, sys_path: udev.syspath().to_owned(), properties: get_udev_properties(&udev) })
     };
 
     // check all devices
+    let mut device_map: HashMap<PathBuf, NativeDeviceInfo> = HashMap::new();
+
     for entry in WalkDir::new("/dev/input").into_iter().filter_map(Result::ok).filter(|e| !e.file_type().is_file()) {
         let fd_path = entry.path().to_owned();
-        handle_device_event(fd_path, NativeDeviceEvent::AddDevice);
+        if let Some(device_info) = handle_device_event(fd_path) {
+            if !device_map.contains_key(&device_info.sys_path) {
+                device_map.insert(device_info.sys_path.clone(), device_info.clone());
+                ev_handler(NativeDeviceEvent::AddDevice(device_info));
+            }
+        }
     }
 
     // devices are monitored and hooked up when added/removed, so we need another thread
@@ -238,11 +241,19 @@ pub fn watch_udev_inputs(
                         match event.kind {
                             notify::EventKind::Create(_) => {
                                 let fd_path = event.paths.into_iter().next().unwrap();
-                                handle_device_event(fd_path, NativeDeviceEvent::AddDevice);
+                                if let Some(device_info) = handle_device_event(fd_path) {
+                                    if !device_map.contains_key(&device_info.sys_path) {
+                                        device_map.insert(device_info.sys_path.clone(), device_info.clone());
+                                        ev_handler(NativeDeviceEvent::AddDevice(device_info));
+                                    }
+                                }
                             }
                             notify::EventKind::Remove(_) => {
                                 let fd_path = event.paths.into_iter().next().unwrap();
-                                handle_device_event(fd_path, NativeDeviceEvent::RemoveDevice);
+                                if let Some(device_info) = handle_device_event(fd_path) {
+                                    device_map.remove(&device_info.sys_path);
+                                    ev_handler(NativeDeviceEvent::RemoveDevice(device_info));
+                                }
                             }
                             _ => { continue; }
                         };

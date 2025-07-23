@@ -1,6 +1,6 @@
 use super::suffix_tree::SuffixTree;
 use super::*;
-use crate::conversions::extract_with_error;
+use crate::conversions::{extract_with_error, get_py_type};
 use crate::mapper::mapping_functions::*;
 use crate::python::*;
 use crate::xkb::XKBTransformer;
@@ -112,7 +112,11 @@ impl TextMapper {
             let to = to.extract::<String>(py).map_err(|err| {
                 PyRuntimeError::new_err(format!(
                     "mapping error on the 'to' side:\n{}",
-                    ApplicationError::InvalidInputType { type_: "String".to_string() }
+                    ApplicationError::InvalidInputType {
+                        name: "to".to_string(),
+                        expected_type: "str".to_string(),
+                        actual_type: get_py_type(to.bind(py))
+                    }
                 ))
             })?;
             let to = parse_key_sequence(&to, Some(&state.transformer)).map_err(|err| {

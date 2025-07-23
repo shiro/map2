@@ -1,14 +1,14 @@
-use ::oneshot;
-use device::virtual_input_device::{DeviceMatcher, NativeDeviceInfo};
-use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
-
+use crate::conversions::get_py_type;
 use crate::python::*;
 use crate::python_util::*;
 use crate::subscriber::*;
 use crate::xkb::XKBTransformer;
 use crate::xkb_transformer_registry::{TransformerParams, XKB_TRANSFORMER_REGISTRY};
 use crate::*;
+use ::oneshot;
+use device::virtual_input_device::{DeviceMatcher, NativeDeviceInfo};
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 
 const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -41,26 +41,42 @@ impl Watcher {
             None => HashMap::new(),
         };
 
-        let mut filters = vec![];
-
-        if let Some(v) = options.get("filters") {
-            if let Ok(v) = v.extract::<Vec<PyObject>>() {
-                for v in v.into_iter() {
-                    let filter = if let Ok(value) = v.extract::<String>(py) {
-                        DeviceMatcher::new().tap_mut(|v| {
-                            v.insert("path".to_string(), value);
-                        })
-                    } else if let Ok(matcher) = v.extract::<HashMap<String, String>>(py) {
-                        matcher
-                    } else {
-                        return Err(PyRuntimeError::new_err("'filters' must be of type 'string[]?'"));
-                    };
-                    filters.push(filter);
-                }
+        let filters = if let Some(v) = options.get("filters") {
+            let filter_vec = if let Ok(v) = v.extract::<Vec<PyObject>>() {
+                v
+            } else if let Ok(_) = v.extract::<PyObject>() {
+                vec![v.clone().unbind()]
             } else {
-                return Err(PyRuntimeError::new_err("'patterns' must be of type 'string[]?'"));
-            }
-        }
+                return Err(ApplicationError::InvalidNamedInputType {
+                    name: "filters".to_string(),
+                    actual_type: get_py_type(v),
+                    expected_type: "list[str | dict]".to_string(),
+                }
+                .into_py())?;
+            };
+
+            filter_vec
+                .into_iter()
+                .map(|v| {
+                    if let Ok(v) = v.extract::<String>(py) {
+                        Ok(DeviceMatcher::new().tap_mut(|matcher| {
+                            matcher.insert("path".to_string(), v);
+                        }))
+                    } else if let Ok(matcher) = v.extract::<DeviceMatcher>(py) {
+                        Ok(matcher)
+                    } else {
+                        Err(ApplicationError::InvalidNamedInputType {
+                            name: "filters".to_string(),
+                            actual_type: get_py_type(v.bind(py)),
+                            expected_type: "list[str] | list[dict]".to_string(),
+                        }
+                        .into_py())
+                    }
+                })
+                .collect::<PyResult<Vec<DeviceMatcher>>>()?
+        } else {
+            vec![]
+        };
 
         let name = options
             .get("name")
