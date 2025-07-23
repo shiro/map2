@@ -4,6 +4,7 @@
 import builtins
 import typing
 from typing_extensions import Unpack
+import re
 
 class KeyMapperSnapshot:
     ...
@@ -16,8 +17,8 @@ type DstNode = Writer| AnyMapper
 type AnyNode = SrcNode | DstNode
 
 class DeviceMatcher(typing.TypedDict, total=False):
-    path: str
-    properties: dict[str, str]
+    path: str | re.Pattern
+    properties: dict[str, str | re.Pattern]
 
 class DeviceInfo(typing.TypedDict):
     path: str

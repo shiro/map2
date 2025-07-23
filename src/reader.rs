@@ -1,5 +1,6 @@
 use crate::conversions::extract_with_error;
 use crate::conversions::get_py_type;
+use crate::device::virtual_input_device::MatcherValue;
 use crate::device::virtual_input_device::NativeDeviceInfo;
 use crate::device::virtual_input_device::grab_device;
 use crate::device::virtual_input_device::watch_udev_inputs;
@@ -69,7 +70,7 @@ impl Reader {
                 .into_iter()
                 .map(|v| {
                     if let Ok(v) = v.extract::<String>(py) {
-                        Ok(DeviceMatcher { path: Some(v), properties: Default::default() })
+                        Ok(DeviceMatcher { path: Some(MatcherValue::Str(v)), properties: Default::default() })
                     } else if let Ok(matcher) = v.extract::<DeviceMatcher>(py) {
                         Ok(matcher)
                     } else {

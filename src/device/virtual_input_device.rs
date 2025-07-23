@@ -1,4 +1,5 @@
 use crate::python::*;
+use crate::python_util::PyRegex;
 use crate::*;
 use std::collections::{BTreeMap, HashMap};
 use std::os::fd::AsRawFd;
@@ -151,8 +152,34 @@ pub fn grab_device(
 
 #[pyclass]
 pub struct DeviceMatcher {
-    pub path: Option<String>,
-    pub properties: Option<HashMap<String, String>>,
+    pub path: Option<MatcherValue>,
+    pub properties: Option<HashMap<String, MatcherValue>>,
+}
+
+pub enum MatcherValue {
+    Str(String),
+    Regex(PyRegex),
+}
+
+impl MatcherValue {
+    pub fn is_match(&self, input: &str) -> bool {
+        match self {
+            MatcherValue::Str(s) => s == input,
+            MatcherValue::Regex(r) => Python::with_gil(|py| r.is_match(py, input)),
+        }
+    }
+}
+
+impl<'source> FromPyObject<'source> for MatcherValue {
+    fn extract_bound(ob: &Bound<'source, PyAny>) -> PyResult<Self> {
+        if let Ok(regex) = ob.extract::<PyRegex>() {
+            return Ok(MatcherValue::Regex(regex));
+        }
+        if let Ok(string) = ob.extract::<String>() {
+            return Ok(MatcherValue::Str(string));
+        }
+        Err(PyTypeError::new_err("Expected type 'str' or 're.Pattern'"))
+    }
 }
 
 impl<'source> FromPyObject<'source> for DeviceMatcher {
@@ -166,11 +193,6 @@ impl<'source> FromPyObject<'source> for DeviceMatcher {
     }
 }
 
-#[derive(Debug)]
-struct DeviceMatcherInternal {
-    path: Option<Regex>,
-    properties: Option<HashMap<String, Regex>>,
-}
 type ParsedDeviceMatcher = HashMap<String, Regex>;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -190,19 +212,6 @@ pub fn watch_udev_inputs(
     ev_handler: Arc<impl Fn(NativeDeviceEvent) + Send + Sync + 'static>,
     mut exit_rx: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<()> {
-    let parsed_matchers = matchers
-        .into_iter()
-        .map(|matcher| {
-            let path_regex = matcher.path.as_deref().map(|p| Regex::new(p).unwrap());
-            DeviceMatcherInternal {
-                path: path_regex,
-                properties: matcher
-                    .properties
-                    .map(|props| props.into_iter().map(|(k, v)| (k, Regex::new(&v).unwrap())).collect()),
-            }
-        })
-        .collect::<Vec<DeviceMatcherInternal>>();
-
     let handle_device_event = move |fd_path: PathBuf| -> Option<NativeDeviceInfo> {
         if fd_path.is_dir() {
             return None;
@@ -211,10 +220,12 @@ pub fn watch_udev_inputs(
         let udev = if let Some(v) = udev_info(&fd_path) { v } else { return None };
         let properties = get_udev_properties(&udev);
 
-        let all_match = parsed_matchers.iter().all(|matcher| {
-            matcher.path.as_ref().map_or(true, |path_regex| path_regex.is_match(&fd_path.to_string_lossy().as_ref()))
+        let all_match = matchers.iter().all(|matcher| {
+            matcher.path.as_ref().map_or(true, |pattern| pattern.is_match(&fd_path.to_string_lossy().as_ref()))
                 && matcher.properties.as_ref().map_or(true, |props| {
-                    props.iter().all(|(key, regex)| properties.get(key).map_or(false, |value| regex.is_match(value)))
+                    props
+                        .iter()
+                        .all(|(key, pattern)| properties.get(key).map_or(false, |value| pattern.is_match(value)))
                 })
         });
 

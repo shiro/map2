@@ -1,4 +1,5 @@
 use crate::conversions::get_py_type;
+use crate::device::virtual_input_device::MatcherValue;
 use crate::python::*;
 use crate::python_util::*;
 use crate::subscriber::*;
@@ -59,7 +60,7 @@ impl Watcher {
                 .into_iter()
                 .map(|v| {
                     if let Ok(v) = v.extract::<String>(py) {
-                        Ok(DeviceMatcher { path: Some(v), properties: Default::default() })
+                        Ok(DeviceMatcher { path: Some(MatcherValue::Str(v)), properties: Default::default() })
                     } else if let Ok(matcher) = v.extract::<DeviceMatcher>(py) {
                         Ok(matcher)
                     } else {
