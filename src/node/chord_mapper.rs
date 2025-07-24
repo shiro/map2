@@ -447,7 +447,6 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             // no match, send all buffered keys from stack
             for k in state.stack.iter() {
                 state.next.send_all(InputEvent::Raw(k.to_input_ev(1)));
-                // state.next.send_all(InputEvent::Raw(k.to_input_ev(0)));
             }
         }
         state.stack.clear();
