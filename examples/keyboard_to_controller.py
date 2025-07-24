@@ -20,7 +20,7 @@ import map2
 
 map2.default(layout = "us")
 
-reader = map2.Reader(patterns=["/dev/input/by-id/example-keyboard"])
+reader = map2.Reader(filters=["/dev/input/by-id/example-keyboard"])
 
 mapper = map2.Mapper()
 

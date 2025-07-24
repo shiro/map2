@@ -28,7 +28,7 @@ class setInterval:
 
 
 # read from keyboard
-reader_kbd = map2.Reader(patterns=["/dev/input/by-id/example-keyboard"])
+reader_kbd = map2.Reader(filters=["/dev/input/by-id/example-keyboard"])
 
 # to move the mouse programmatically, we need a mouse reader we can write into
 reader_mouse = map2.Reader()

@@ -50,18 +50,18 @@ impl ChordMapper {
     #[new]
     #[pyo3(signature = (**kwargs))]
     pub fn new(py: Python, kwargs: Option<PyBound<PyDict>>) -> PyResult<Py<Self>> {
-        let options: HashMap<String, Bound<PyAny>> = match kwargs {
+        let kwargs: HashMap<String, Bound<PyAny>> = match kwargs {
             Some(py_dict) => py_dict.extract()?,
             None => HashMap::new(),
         };
 
-        let name = extract_with_error::<String>(&options, "name")?
+        let name = extract_with_error::<String>(&kwargs, "name")?
             .unwrap_or_else(|| format!("ChordMapper {}", node_util::get_id_and_incremen(&ID_COUNTER)));
 
-        let kbd_model = extract_with_error::<String>(&options, "model")?;
-        let kbd_layout = extract_with_error::<String>(&options, "layout")?;
-        let kbd_variant = extract_with_error::<String>(&options, "variant")?;
-        let kbd_options = extract_with_error::<String>(&options, "options")?;
+        let kbd_model = extract_with_error::<String>(&kwargs, "model")?;
+        let kbd_layout = extract_with_error::<String>(&kwargs, "layout")?;
+        let kbd_variant = extract_with_error::<String>(&kwargs, "variant")?;
+        let kbd_options = extract_with_error::<String>(&kwargs, "options")?;
 
         let transformer = XKB_TRANSFORMER_REGISTRY
             .get(&TransformerParams::new(kbd_model, kbd_layout, kbd_variant, kbd_options))

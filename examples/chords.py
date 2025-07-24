@@ -1,6 +1,6 @@
 import map2
 
-reader = map2.Reader(patterns=[ "/dev/input/by-id/example"])
+reader = map2.Reader(filters=[ "/dev/input/by-id/example"])
 mapper = map2.ChordMapper()
 writer = map2.Writer(clone_from = "/dev/input/by-id/example")
 
@@ -10,7 +10,7 @@ mapper.map(["a", "b"], "c")
 
 counter = 0
 
-def increment():
+def increment(*args):
   global counter
   counter += 1
 mapper.map(["c", "d"], increment)
