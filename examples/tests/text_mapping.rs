@@ -44,6 +44,7 @@ async fn hold_key() -> PyResult<()> {
 async fn map_to_function() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
         let m = &pytests::include_python!();
+        // let v = m.getattr("eval");
 
         let counter = m.getattr("counter").unwrap().extract::<i32>().unwrap();
         assert_eq!(counter, 0);

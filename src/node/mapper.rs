@@ -34,17 +34,28 @@ const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 //     }
 // }
 
-#[derive(Default)]
+#[derive(derive_new::new)]
 struct State {
     name: String,
     transformer: Arc<XKBTransformer>,
+    #[new(default)]
     prev: HashMap<Uuid, Arc<dyn LinkSrc>>,
+    #[new(default)]
     next: HashMap<Uuid, Arc<dyn LinkDst>>,
+    #[new(default)]
     mappings: Mappings,
+    #[new(default)]
     fallback_handler: Option<Arc<PyObject>>,
+    #[new(default)]
     relative_handler: Option<Arc<PyObject>>,
+    #[new(default)]
     absolute_handler: Option<Arc<PyObject>>,
+    #[new(default)]
     modifiers: KeyModifierFlags,
+    #[new(default)]
+    ignored_keys: HashSet<Key>,
+    #[new(default)]
+    pressed_keys: HashSet<Key>,
 }
 
 #[pyclass]
@@ -79,7 +90,7 @@ impl Mapper {
 
         let id = Uuid::new_v4();
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel(64);
-        let state = Arc::new(Mutex::new(State { transformer, ..Default::default() }));
+        let state = Arc::new(Mutex::new(State::new(name, transformer)));
         let link = Arc::new(MapperLink::new(id, ev_tx.clone(), state.clone()));
 
         {
@@ -276,6 +287,20 @@ impl Mapper {
         self.state.blocking_lock().prev.values().map(|v| v.py_object().clone_ref(py).into_any()).collect()
     }
 
+    // TODO block until all handled
+    pub fn reset(&self, py: Python) {
+        let mut state = &mut (*self.state.blocking_lock());
+
+        state.ignored_keys.extend(state.pressed_keys.drain().map(|key| {
+            let action = KeyAction::new(key, 0);
+            self.ev_tx
+                .try_send(InputEvent::Raw(action.to_input_ev()))
+                .expect(&ApplicationError::TooManyEvents.to_string());
+            key
+        }));
+    }
+
+    // TODO block until all handled
     pub fn send(&mut self, val: String) -> PyResult<()> {
         let mut state = self.state.blocking_lock();
         let actions = parse_key_sequence(val.as_str(), Some(&state.transformer))
@@ -489,6 +514,26 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 key: Key { event_code: ev.event_code },
                 value: ev.value,
                 modifiers: state.modifiers,
+            };
+
+            match ev.value {
+                0 => {
+                    state.pressed_keys.remove(&from_key_action.key);
+                    let ignored = state.ignored_keys.remove(&from_key_action.key);
+                    if ignored {
+                        return;
+                    }
+                }
+                1 => {
+                    state.pressed_keys.insert(from_key_action.key.clone());
+                }
+                2 => {
+                    let ignored = state.ignored_keys.contains(&from_key_action.key);
+                    if ignored {
+                        return;
+                    }
+                }
+                _ => unreachable!(),
             };
 
             if let Some(runtime_action) = state.mappings.get(&from_key_action) {

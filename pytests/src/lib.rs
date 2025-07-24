@@ -59,6 +59,7 @@ async fn {name}() -> PyResult<()> {{
 enum IOTestAction {
     Input(String),
     Sleep(u32),
+    Run(String),
     Output(String),
     Global { name: String, value: String },
 }
@@ -91,6 +92,7 @@ impl syn::parse::Parse for IOTestAction {
             "input" => IOTestAction::Input(value.to_string()),
             "sleep" => IOTestAction::Sleep(value.parse().expect("failed to parse integer")),
             "output" => IOTestAction::Output(value.to_string()),
+            "run" => IOTestAction::Run(value.to_string()),
             "global" => {
                 let (name, value) = value.split_once(" ").expect("expected name, value pair");
                 let mut value = value.to_string();
@@ -187,6 +189,16 @@ pub fn io_test2(tokens: TokenStream) -> TokenStream {
                     thread::sleep(Duration::from_millis(10));
                 }});
                 assert_eq_events!(writer_read_all(py, m, "writer"), keys("{v}"));
+            "#
+            )
+            .parse()
+            .unwrap();
+            acc + &code
+        }
+        IOTestAction::Run(v) => {
+            let code: String = format!(
+                r#"
+                py.eval(pyo3::ffi::c_str!("{v}"), None, Some(&m.dict())).unwrap();
             "#
             )
             .parse()
