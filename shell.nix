@@ -2,11 +2,11 @@
 
 let 
     python = with pkgs; python312.withPackages (python-pkgs: with python-pkgs; []);
-    lib-path = with pkgs; pkgs.lib.makeLibraryPath [ libxkbcommon libevdev udev libcap python ];
+    lib-path = with pkgs; pkgs.lib.makeLibraryPath [ libxkbcommon libevdev udev python ];
 
     rust_overlay = import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz");
     pkgs = import <nixpkgs> { overlays = [ rust_overlay ]; };
-    rust = pkgs.rust-bin.nightly."2025-03-10".default.override {
+    rust = pkgs.rust-bin.stable."1.91.1".default.override {
         extensions = [ "rust-src" "rust-analyzer" ];
     };
 in
@@ -14,7 +14,7 @@ pkgs.mkShell {
     buildInputs = [
       rust
     ] ++ (with pkgs; [
-       libevdev udev libcap 
+       libevdev udev
     ]);
     nativeBuildInputs = with pkgs; [ pkg-config libxkbcommon libevdev udev ];
     packages = with pkgs; [

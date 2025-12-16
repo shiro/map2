@@ -1,5 +1,3 @@
-#![feature(internal_output_capture)]
-
 use std::io::Write;
 use std::thread;
 use std::time::Duration;
@@ -10,14 +8,7 @@ use pytests::*;
 
 #[pyo3_async_runtimes::tokio::main]
 async fn main() -> pyo3::PyResult<()> {
-    let cmd = std::process::Command::new("maturin")
-        .arg("dev")
-        // .arg("--")
-        // .arg("--cfg").arg("test")
-        // .arg("--cfg").arg("integration")
-        .arg("--features")
-        .arg("integration")
-        .output()?;
+    let cmd = std::process::Command::new("maturin").arg("dev").arg("--features").arg("integration").output()?;
 
     if !cmd.status.success() {
         std::io::stderr().write(&cmd.stderr)?;

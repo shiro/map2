@@ -13,7 +13,7 @@ async fn wasd_mouse_control() -> PyResult<()> {
         let m = &pytests::include_python!();
 
         // m.getattr("eval").unwrap().call1((PyString::new(py, "print('99')"),)).unwrap();
-        py.eval(
+        let _ = py.eval(
             pyo3::ffi::c_str!(
                 r#"
 print(setInterval)

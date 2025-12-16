@@ -14,26 +14,6 @@ use tokio::sync::{Mutex, MutexGuard};
 
 const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
-// trait StateInsertAfter {
-//     fn insert_after(&self, target: &PyBound<PyAny>) -> PyResult<()>;
-// }
-//
-// impl StateInsertAfter for LinkSrc {
-//     fn insert_after(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
-//         let target_src = node_to_link_src(target)
-//             .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
-//         let target_dst = node_to_link_dst(target)
-//             .ok_or_else(|| PyRuntimeError::new_err("expected a \"source & destination\" node"))?;
-//
-//         // move this node's dst nodes the target's dst nodes
-//         for (_, node) in self.next.drain() {
-//             target_src.link_to(node);
-//         }
-//
-//         Ok(())
-//     }
-// }
-
 #[derive(derive_new::new)]
 struct State {
     name: String,
