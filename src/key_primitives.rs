@@ -147,6 +147,24 @@ impl KeyModifierFlags {
             _ => unreachable!(),
         };
     }
+    pub fn update_from_action2(mut self, action: &KeyAction) -> Self {
+        let value = action.value == 1;
+        match action.key.event_code {
+            EventCode::EV_KEY(key) => match key {
+                KEY_LEFTCTRL => self.left_ctrl = value,
+                KEY_RIGHTCTRL => self.right_ctrl = value,
+                KEY_LEFTSHIFT => self.left_shift = value,
+                KEY_RIGHTSHIFT => self.right_shift = value,
+                KEY_LEFTALT => self.left_alt = value,
+                KEY_RIGHTALT => self.right_alt = value,
+                KEY_LEFTMETA => self.left_meta = value,
+                KEY_RIGHTMETA => self.right_meta = value,
+                _ => {}
+            },
+            _ => unreachable!(),
+        };
+        self
+    }
     pub fn hash(&self) -> u32 {
         let mut hash = 0;
         if self.left_ctrl || self.right_ctrl {

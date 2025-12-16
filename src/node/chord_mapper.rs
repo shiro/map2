@@ -412,7 +412,7 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
         match action {
             RuntimeAction::ActionSequence(seq) => {
-                handle_seq2(&seq, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
+                handle_seq(&seq, &state.modifiers, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
             }
             RuntimeAction::PythonCallback(handler) => {
                 // TODO pass stack as first arg

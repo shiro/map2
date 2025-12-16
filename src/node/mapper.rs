@@ -14,6 +14,17 @@ use tokio::sync::{Mutex, MutexGuard};
 
 const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
+fn is_modifier(key: &Key) -> bool {
+    match key.event_code {
+        EventCode::EV_KEY(key) => match key {
+            KEY_LEFTCTRL | KEY_RIGHTCTRL | KEY_LEFTSHIFT | KEY_RIGHTSHIFT | KEY_LEFTALT | KEY_RIGHTALT
+            | KEY_LEFTMETA | KEY_RIGHTMETA => true,
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
 #[derive(derive_new::new)]
 struct State {
     name: String,
@@ -31,11 +42,17 @@ struct State {
     #[new(default)]
     absolute_handler: Option<Arc<PyObject>>,
     #[new(default)]
+    /// The actual state of pressed modifers on the input side
     modifiers: KeyModifierFlags,
     #[new(default)]
-    ignored_keys: HashSet<Key>,
+    /// The virtually pressed modifers on the output side
+    virtual_modifiers: KeyModifierFlags,
     #[new(default)]
-    pressed_keys: HashSet<Key>,
+    surpressed_keys: HashSet<Key>,
+    #[new(default)]
+    pressed_key: Option<Key>,
+    #[new(default)]
+    is_in_mapping: bool,
 }
 
 #[pyclass]
@@ -271,13 +288,13 @@ impl Mapper {
     pub fn reset(&self, py: Python) {
         let mut state = &mut (*self.state.blocking_lock());
 
-        state.ignored_keys.extend(state.pressed_keys.drain().map(|key| {
-            let action = KeyAction::new(key, 0);
-            self.ev_tx
-                .try_send(InputEvent::Raw(action.to_input_ev()))
-                .expect(&ApplicationError::TooManyEvents.to_string());
-            key
-        }));
+        // state.surpressed_keys.extend(state.pressed_key.drain().map(|key| {
+        //     let action = KeyAction::new(key, 0);
+        //     self.ev_tx
+        //         .try_send(InputEvent::Raw(action.to_input_ev()))
+        //         .expect(&ApplicationError::TooManyEvents.to_string());
+        //     key
+        // }));
     }
 
     // TODO block until all handled
@@ -490,37 +507,123 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
     match ev {
         // key event
         EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
-            let from_key_action = KeyActionWithMods {
+            let key_action = KeyActionWithMods {
                 key: Key { event_code: ev.event_code },
                 value: ev.value,
                 modifiers: state.modifiers,
             };
 
-            match ev.value {
-                0 => {
-                    state.pressed_keys.remove(&from_key_action.key);
-                    let ignored = state.ignored_keys.remove(&from_key_action.key);
-                    if ignored {
-                        return;
-                    }
-                }
-                1 => {
-                    state.pressed_keys.insert(from_key_action.key.clone());
-                }
-                2 => {
-                    let ignored = state.ignored_keys.contains(&from_key_action.key);
-                    if ignored {
-                        return;
-                    }
-                }
-                _ => unreachable!(),
-            };
+            let previous_modifiers = state.modifiers;
+            let modifiers = state.modifiers.update_from_action2(&KeyAction::from_input_ev(&ev));
 
-            if let Some(runtime_action) = state.mappings.get(&from_key_action) {
+            if (key_action.value == 0) {
+                state.modifiers = modifiers;
+            }
+
+            // handle breaking out of a mapping by unpressing a modifier early or pressing down
+            // another key
+            if state.is_in_mapping
+                && let Some(pressed_key) = state.pressed_key
+                && key_action.key != pressed_key
+                && let Some(runtime_action) =
+                    state.mappings.get(&KeyActionWithMods::new(pressed_key, 0, previous_modifiers))
+            {
                 match runtime_action {
                     RuntimeAction::ActionSequence(seq) => {
-                        let mode = get_mode(&state.mappings, &from_key_action, seq);
-                        handle_seq2(seq, &state.modifiers, &state.next, mode);
+                        send_seq(seq, Some(&state.virtual_modifiers), Some(&modifiers), &state.next);
+
+                        state.modifiers = modifiers;
+                        state.virtual_modifiers = modifiers;
+
+                        state.surpressed_keys.insert(pressed_key);
+
+                        // consume modifiers since we already handled them above
+                        if (is_modifier(&key_action.key)) {
+                            return;
+                        }
+                    }
+                    RuntimeAction::PythonCallback(handler) => {
+                        handle_callback(
+                            &ev,
+                            handler.clone(),
+                            Some(python_callback_args(
+                                &EventCode::EV_KEY(*key),
+                                &state.modifiers,
+                                *value,
+                                &state.transformer,
+                            )),
+                            state.transformer.clone(),
+                            &state.modifiers.clone(),
+                            state.next.values().cloned().collect(),
+                            state,
+                        )
+                        .await;
+
+                        state = _state.lock().await;
+                    }
+                    RuntimeAction::NOP => {}
+                }
+            }
+
+            if !is_modifier(&key_action.key) {
+                match ev.value {
+                    0 => {
+                        if state.pressed_key == Some(key_action.key) {
+                            state.pressed_key = None;
+                        }
+
+                        let ignored = state.surpressed_keys.remove(&key_action.key);
+                        if ignored {
+                            return;
+                        }
+                    }
+                    1 => {
+                        let ignored = state.surpressed_keys.contains(&key_action.key);
+                        if ignored {
+                            return;
+                        }
+
+                        let previous = state.pressed_key.replace(key_action.key.clone());
+                        if let Some(previous) = previous {
+                            state.surpressed_keys.insert(previous);
+                        }
+                    }
+                    2 => {
+                        let ignored = state.surpressed_keys.contains(&key_action.key);
+                        if ignored {
+                            return;
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+            }
+
+            state.is_in_mapping = false;
+
+            if let Some(runtime_action) = state.mappings.get(&key_action) {
+                match runtime_action {
+                    RuntimeAction::ActionSequence(seq) => {
+                        let mut virtual_modifiers = None;
+                        let compatible = is_mapping_compatible(&state.mappings, &key_action, seq);
+
+                        let from_modifiers =
+                            if !compatible || ev.value != 0 { Some(&state.virtual_modifiers) } else { None };
+
+                        let to_modifiers = if !compatible || ev.value != 1 {
+                            virtual_modifiers = Some(state.modifiers.clone());
+                            Some(&state.modifiers)
+                        } else {
+                            virtual_modifiers = Some(seq.last().unwrap().modifiers);
+                            None
+                        };
+
+                        send_seq(seq, from_modifiers, to_modifiers, &state.next);
+
+                        if let Some(virtual_modifiers) = virtual_modifiers {
+                            state.virtual_modifiers = virtual_modifiers;
+                        }
+
+                        state.is_in_mapping = true;
                     }
                     RuntimeAction::PythonCallback(handler) => {
                         handle_callback(
@@ -548,7 +651,10 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             let args =
                 Some(python_callback_args(&EventCode::EV_KEY(*key), &state.modifiers, *value, &state.transformer));
 
-            state.modifiers.update_from_action(&KeyAction::from_input_ev(&ev));
+            if (key_action.value == 1) {
+                state.modifiers = modifiers;
+                state.virtual_modifiers = modifiers;
+            }
 
             if let Some(handler) = state.fallback_handler.as_ref() {
                 let handler = handler.clone();

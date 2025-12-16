@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 
+use super::*;
 use crate::*;
 
 #[derive(Clone, Debug)]
@@ -85,7 +86,48 @@ pub fn map_click_to_action(from: &KeyClickActionWithMods, to: &KeyActionWithMods
     ]
 }
 
-pub fn release_restore_modifiers(from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags) -> Vec<KeyAction> {
+pub fn send_sync_modifiers<Next: SubscriberHashmapExt>(
+    from_flags: &KeyModifierFlags,
+    to_flags: &KeyModifierFlags,
+    next: &Next,
+) {
+    let mut output_events = vec![];
+
+    // first release, then press
+    for value in [0, 1] {
+        for (from, to, key) in [
+            (from_flags.left_ctrl, to_flags.left_ctrl, KEY_LEFTCTRL),
+            (from_flags.right_ctrl, to_flags.right_ctrl, KEY_RIGHTCTRL),
+            (from_flags.left_shift, to_flags.left_shift, KEY_LEFTSHIFT),
+            (from_flags.right_shift, to_flags.right_shift, KEY_RIGHTSHIFT),
+            (from_flags.left_alt, to_flags.left_alt, KEY_LEFTALT),
+            (from_flags.right_alt, to_flags.right_alt, KEY_RIGHTALT),
+            (from_flags.left_meta, to_flags.left_meta, KEY_LEFTMETA),
+            (from_flags.right_meta, to_flags.right_meta, KEY_RIGHTMETA),
+        ] {
+            if value == 0 && from && !to {
+                output_events.push(KeyAction { key: key.into(), value });
+            }
+            if value == 1 && !from && to {
+                output_events.push(KeyAction { key: key.into(), value });
+            }
+        }
+    }
+
+    if output_events.len() > 0 {
+        // output_events.push(SYN_REPORT.clone());
+        output_events.push(KeyAction::new(
+            Key { event_code: evdev_rs::enums::EventCode::EV_SYN(evdev_rs::enums::EV_SYN::SYN_REPORT) },
+            0,
+        ));
+    }
+
+    for action in output_events.into_iter() {
+        let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+    }
+}
+
+pub fn sync_modifiers(from_flags: &KeyModifierFlags, to_flags: &KeyModifierFlags) -> Vec<KeyAction> {
     let mut output_events = vec![];
 
     // first release, then press

@@ -17,5 +17,3 @@ io_test!("click3", "{meta down}3{meta up}", "{meta}{ctrl down}{c down}{ctrl up}{
 io_test!("click4", "{meta down}4{meta up}", "{meta}{ctrl down}{d down}{ctrl up}{meta}{alt down}{d up}{alt up}{meta}");
 
 // io_test2!("reset1", "input {a down}", "sleep 10", "run mapper.reset()", "output b");
-
-// io_test2!("break1", "input {meta down}{q down}{meta up}", "output {meta}t",);

@@ -72,12 +72,12 @@ impl ParsedKeyActionVecExt for Vec<ParsedKeyAction> {
                 acc
             }
             ParsedKeyAction::KeyClickAction(action) => {
-                acc.extend(release_restore_modifiers(&KeyModifierFlags::default(), &action.modifiers));
+                acc.extend(sync_modifiers(&KeyModifierFlags::default(), &action.modifiers));
 
                 acc.push(KeyAction::new(action.key, TYPE_DOWN));
                 acc.push(KeyAction::new(action.key, TYPE_UP));
 
-                acc.extend(release_restore_modifiers(&action.modifiers, &KeyModifierFlags::default()));
+                acc.extend(sync_modifiers(&action.modifiers, &KeyModifierFlags::default()));
 
                 acc
             }

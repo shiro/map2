@@ -130,41 +130,6 @@ pub fn python_callback_args(
     vec![PythonArgument::String(name), value]
 }
 
-pub fn handle_seq<Next: SubscriberHashmapExt>(
-    seq: &Vec<KeyActionWithMods>,
-    pressed_modifiers: &KeyModifierFlags,
-    next: &Next,
-    restore_modifiers: bool,
-) {
-    let mut flags = pressed_modifiers.clone();
-    // let mut prev = None;
-    for action in seq {
-        for action in release_restore_modifiers(&flags, &action.modifiers) {
-            let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
-        }
-
-        // only restore modifiers for click events
-        // if let Some(prev) = prev
-        //     && prev.key == action.key
-        //     && prev.modifiers == action.modifiers
-        //     && prev.value == 1
-        //     && aciton.value == 0
-        // {
-        flags = action.modifiers;
-        // }
-
-        // prev = Some(action);
-        let action = action.to_key_action();
-        let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
-    }
-
-    if restore_modifiers {
-        for action in release_restore_modifiers(&flags, pressed_modifiers) {
-            let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
-        }
-    }
-}
-
 #[derive(Eq, PartialEq)]
 pub enum SeqModifierRestoreMode {
     Default,
@@ -179,20 +144,21 @@ impl Default for SeqModifierRestoreMode {
     }
 }
 
-pub fn handle_seq2<Next: SubscriberHashmapExt>(
+pub fn handle_seq<Next: SubscriberHashmapExt>(
     seq: &Vec<KeyActionWithMods>,
-    pressed_modifiers: &KeyModifierFlags,
+    before_modifiers: &KeyModifierFlags,
+    after_modifiers: &KeyModifierFlags,
     next: &Next,
     modifier_restore_mode: SeqModifierRestoreMode,
 ) {
-    let mut flags = pressed_modifiers.clone();
+    let mut flags = before_modifiers.clone();
     for (i, action) in seq.iter().enumerate() {
         // adjust mods between prefvious and current key
         if i != 0
             || (modifier_restore_mode != SeqModifierRestoreMode::SkipPre
                 && modifier_restore_mode != SeqModifierRestoreMode::SkipPrePost)
         {
-            for action in release_restore_modifiers(&flags, &action.modifiers) {
+            for action in sync_modifiers(&flags, &action.modifiers) {
                 let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
             }
         }
@@ -206,9 +172,32 @@ pub fn handle_seq2<Next: SubscriberHashmapExt>(
     if modifier_restore_mode != SeqModifierRestoreMode::SkipPost
         && modifier_restore_mode != SeqModifierRestoreMode::SkipPrePost
     {
-        for action in release_restore_modifiers(&flags, pressed_modifiers) {
+        for action in sync_modifiers(&flags, after_modifiers) {
             let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
         }
+    }
+}
+
+pub fn send_seq<Next: SubscriberHashmapExt>(
+    seq: &Vec<KeyActionWithMods>,
+    from_modifiers: Option<&KeyModifierFlags>,
+    to_modifiers: Option<&KeyModifierFlags>,
+    next: &Next,
+) {
+    let mut flags = from_modifiers.cloned().unwrap_or_else(|| seq.first().unwrap().modifiers.clone());
+
+    for (i, action) in seq.iter().enumerate() {
+        // adjust mods between prefvious and current key
+        send_sync_modifiers(&flags, &action.modifiers, next);
+
+        flags = action.modifiers;
+        let action = action.to_key_action();
+        let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
+    }
+
+    // restore mods to original state
+    if let Some(to_modifiers) = to_modifiers {
+        send_sync_modifiers(&flags, to_modifiers, next);
     }
 }
 
@@ -224,13 +213,13 @@ pub async fn handle_callback<'a, State>(
     drop(state);
     // release all trigger mods before running the callback
     if !next.is_empty() {
-        let new_events = release_restore_modifiers(&modifiers, &KeyModifierFlags::default());
+        let new_events = sync_modifiers(&modifiers, &KeyModifierFlags::default());
         new_events.iter().cloned().for_each(|ev| next.send_all(InputEvent::Raw(ev.to_input_ev())));
     }
     run_python_handler(handler.clone(), args, ev.clone(), transformer, next.clone()).await;
     // restore all trigger mods after running the callback
     if !next.is_empty() {
-        let new_events = release_restore_modifiers(&KeyModifierFlags::default(), &modifiers);
+        let new_events = sync_modifiers(&KeyModifierFlags::default(), &modifiers);
         new_events.iter().cloned().for_each(|ev| next.send_all(InputEvent::Raw(ev.to_input_ev())));
     }
 }
@@ -315,6 +304,79 @@ pub fn get_mode(mappings: &Mappings, from: &KeyActionWithMods, seq: &Vec<KeyActi
         2 => SeqModifierRestoreMode::SkipPrePost,
         _ => unreachable!(),
     }
+}
+
+pub fn is_mapping_compatible(mappings: &Mappings, from: &KeyActionWithMods, seq: &Vec<KeyActionWithMods>) -> bool {
+    enum MatchType<'a> {
+        Seq(&'a Vec<KeyActionWithMods>),
+        /// mapping does not exist - `from` key maps to itself (mostly for repeat)
+        Identity,
+        /// mapping exists, but is python callback, nop, etc.
+        None,
+    };
+
+    let mut mapping_up;
+    let mut mapping_down;
+    let mut mapping_repeat;
+
+    match from.value {
+        0 => {
+            mapping_up = MatchType::Seq(seq);
+            mapping_down = match mappings.get(&from.clone().tap_mut(|v| v.value = 1)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => return false,
+            };
+            mapping_repeat = match mappings.get(&from.clone().tap_mut(|v| v.value = 2)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => MatchType::Identity,
+            };
+        }
+        1 => {
+            mapping_up = match mappings.get(&from.clone().tap_mut(|v| v.value = 0)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => return false,
+            };
+            mapping_down = MatchType::Seq(seq);
+            mapping_repeat = match mappings.get(&from.clone().tap_mut(|v| v.value = 2)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => MatchType::Identity,
+            };
+        }
+        2 => {
+            mapping_up = match mappings.get(&from.clone().tap_mut(|v| v.value = 0)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => return false,
+            };
+            mapping_down = match mappings.get(&from.clone().tap_mut(|v| v.value = 1)) {
+                Some(RuntimeAction::ActionSequence(seq)) => MatchType::Seq(seq),
+                Some(_) => MatchType::None,
+                None => return false,
+            };
+            mapping_repeat = MatchType::Seq(seq);
+        }
+        _ => unreachable!(),
+    }
+
+    let compatible = match (mapping_up, mapping_down, mapping_repeat) {
+        (MatchType::Seq(up), MatchType::Seq(down), MatchType::Seq(repeat)) => {
+            down.last().unwrap().modifiers == repeat.first().unwrap().modifiers
+                && repeat.last().unwrap().modifiers == up.first().unwrap().modifiers
+        }
+        (MatchType::Seq(up), MatchType::Seq(down), MatchType::Identity) => {
+            down.last().unwrap().modifiers == from.modifiers && from.modifiers == up.last().unwrap().modifiers
+        }
+        (MatchType::Seq(up), MatchType::Seq(down), MatchType::None) => {
+            down.last().unwrap().modifiers == up.first().unwrap().modifiers
+        }
+        (_, _, _) => false,
+    };
+
+    compatible
 }
 
 pub fn parse_device_filters(py: Python, filters: &Bound<PyAny>) -> PyResult<Vec<DeviceMatcher>> {
