@@ -505,7 +505,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         match runtime_action {
                             RuntimeAction::ActionSequence(seq) => {
                                 let mode = get_mode(&state.mappings, &from_key_action, seq);
-                                handle_seq(seq, &state.modifiers, &state.modifiers, &state.next, mode);
+                                handle_seq(seq, &state.modifiers, &state.next, mode);
                             }
                             RuntimeAction::PythonCallback(handler) => {
                                 handle_callback(
@@ -535,7 +535,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                             match runtime_action {
                                 RuntimeAction::ActionSequence(seq) => {
                                     let mode = get_mode(&state.mappings, &from_key_action, seq);
-                                    handle_seq(seq, &state.modifiers, &state.modifiers, &state.next, mode);
+                                    handle_seq(seq, &state.modifiers, &state.next, mode);
                                 }
                                 RuntimeAction::PythonCallback(handler) => {
                                     handle_callback(
@@ -574,7 +574,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         match runtime_action {
                             RuntimeAction::ActionSequence(seq) => {
                                 let mode = get_mode(&state.mappings, &from_key_action, seq);
-                                handle_seq(seq, &state.modifiers, &state.modifiers, &state.next, mode);
+                                handle_seq(seq, &state.modifiers, &state.next, mode);
                             }
                             RuntimeAction::PythonCallback(handler) => {
                                 handle_callback(
@@ -657,7 +657,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                 match runtime_action {
                     RuntimeAction::ActionSequence(seq) => {
                         let mode = get_mode(&state.mappings, &from_key_action, seq);
-                        handle_seq(seq, &state.modifiers, &state.modifiers, &state.next, mode);
+                        handle_seq(seq, &state.modifiers, &state.next, mode);
                     }
                     RuntimeAction::PythonCallback(handler) => {
                         handle_callback(

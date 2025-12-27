@@ -146,21 +146,18 @@ impl Default for SeqModifierRestoreMode {
 
 pub fn handle_seq<Next: SubscriberHashmapExt>(
     seq: &Vec<KeyActionWithMods>,
-    before_modifiers: &KeyModifierFlags,
-    after_modifiers: &KeyModifierFlags,
+    pressed_modifiers: &KeyModifierFlags,
     next: &Next,
     modifier_restore_mode: SeqModifierRestoreMode,
 ) {
-    let mut flags = before_modifiers.clone();
+    let mut flags = pressed_modifiers.clone();
     for (i, action) in seq.iter().enumerate() {
         // adjust mods between prefvious and current key
         if i != 0
             || (modifier_restore_mode != SeqModifierRestoreMode::SkipPre
                 && modifier_restore_mode != SeqModifierRestoreMode::SkipPrePost)
         {
-            for action in sync_modifiers(&flags, &action.modifiers) {
-                let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
-            }
+            send_sync_modifiers(&flags, &action.modifiers, next);
         }
 
         flags = action.modifiers;
@@ -172,9 +169,7 @@ pub fn handle_seq<Next: SubscriberHashmapExt>(
     if modifier_restore_mode != SeqModifierRestoreMode::SkipPost
         && modifier_restore_mode != SeqModifierRestoreMode::SkipPrePost
     {
-        for action in sync_modifiers(&flags, after_modifiers) {
-            let _ = next.send_all(InputEvent::Raw(action.to_input_ev()));
-        }
+        send_sync_modifiers(&flags, &pressed_modifiers, next);
     }
 }
 

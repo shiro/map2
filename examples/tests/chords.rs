@@ -37,6 +37,28 @@ io_test2!(
     "output {b down}{a up}a"
 );
 
+// chained
+io_test2!(
+    "multi_chord3",
+    "input {a down}{b down}",
+    "sleep 55",
+    "input {b up}{d down}",
+    "sleep 55",
+    "input {d up}{a up}",
+    "output ce"
+);
+
+// chained + overlapping
+io_test2!(
+    "multi_chord4",
+    "input {a down}{b down}",
+    "sleep 55",
+    "input {d down}{b up}",
+    "sleep 55",
+    "input {d up}{a up}",
+    "output ce"
+);
+
 io_test2!(
     "chord_to_function",
     "global counter 0",

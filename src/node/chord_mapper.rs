@@ -299,21 +299,21 @@ pub struct ChordMapperSnapshot {
     mappings: Mappings,
 }
 
-async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
-    let mut state = _state.lock().await;
+async fn handle(state_mutex: Arc<Mutex<State>>, raw_ev: InputEvent) {
+    let mut state = state_mutex.lock().await;
 
     let ev = match &raw_ev {
         InputEvent::Raw(ev) => ev,
     };
 
-    let _key = Key { event_code: ev.event_code };
+    let key = Key { event_code: ev.event_code };
 
     match ev {
-        EvdevInputEvent { event_code: EventCode::EV_KEY(key), value, .. } => {
+        EvdevInputEvent { event_code: EventCode::EV_KEY(key_code), value, .. } => {
             state.modifiers.update_from_action(&KeyAction::from_input_ev(&ev));
 
             // ignore modifiers
-            match key {
+            match key_code {
                 KEY_LEFTCTRL | KEY_RIGHTCTRL | KEY_LEFTSHIFT | KEY_RIGHTSHIFT | KEY_LEFTALT | KEY_RIGHTALT
                 | KEY_LEFTMETA | KEY_RIGHTMETA => {
                     state.next.send_all(raw_ev);
@@ -324,33 +324,50 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
             match ev.value {
                 TYPE_DOWN => {
-                    let should_handle = state.chorded_keys.contains(&_key)
-                        && state.pressed_keys.iter().all(|x| state.stack.contains(x));
+                    let should_handle =
+                        state.chorded_keys.contains(&key) && state.pressed_keys.iter().all(|x| state.stack.contains(x));
 
-                    state.pressed_keys.insert(_key.clone());
+                    state.pressed_keys.insert(key.clone());
 
                     if should_handle {
-                        state.stack.push(_key.clone());
+                        state.stack.push(key.clone());
                         state.interval.take().map(|task| task.abort());
 
                         if state.stack.len() == 2 {
                             drop(state);
-                            handle_cb(_state.clone(), raw_ev).await;
-                        } else {
-                            let _state = _state.clone();
-                            state.interval = Some(tokio::spawn(async move {
-                                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-                                handle_cb(_state.clone(), raw_ev).await;
-                            }));
+                            handle_cb(state_mutex.clone(), raw_ev).await;
+                            return;
                         }
+
+                        // TODO allow overlap or not? make it opt-in
+                        let allow_overlap = true;
+                        if state.stack.len() == 3 && allow_overlap {
+                            for pos in 0..=1 {
+                                let mut tmp_stack = state.stack.clone();
+
+                                let overlapped_key = tmp_stack.remove(pos);
+
+                                if state.mappings.get(&tmp_stack).is_some() {
+                                    state.stack = tmp_stack;
+                                    state.ignored_keys.insert(overlapped_key);
+                                    drop(state);
+                                    handle_cb(state_mutex.clone(), raw_ev).await;
+                                    return;
+                                }
+                            }
+                        }
+
+                        let state_mutex = state_mutex.clone();
+                        state.interval = Some(tokio::spawn(async move {
+                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                            handle_cb(state_mutex.clone(), raw_ev).await;
+                        }));
                     } else {
                         state.interval.take().map(|task| task.abort());
 
                         let state = &mut *state;
                         for k in state.stack.iter() {
                             state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
-                            // state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
-                            // state.ignored_keys.insert(k.clone());
                         }
                         state.stack.clear();
 
@@ -358,30 +375,33 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     }
                 }
                 TYPE_UP => {
-                    state.pressed_keys.remove(&_key);
+                    state.pressed_keys.remove(&key);
                     state.interval.take().map(|task| task.abort());
 
-                    if let Some(pos) = state.stack.iter().position(|x| x == &_key) {
+                    if let Some(pos) = state.stack.iter().position(|x| x == &key) {
                         state.stack.remove(pos);
 
-                        if !state.ignored_keys.remove(&_key) {
-                            state.next.send_all(InputEvent::Raw(_key.to_input_ev(TYPE_DOWN)));
+                        if !state.ignored_keys.remove(&key) {
+                            state.next.send_all(InputEvent::Raw(key.to_input_ev(TYPE_DOWN)));
                             state.next.send_all(raw_ev);
                         }
                     } else {
+                        if state.ignored_keys.remove(&key) {
+                            return;
+                        }
+
+                        // flush the stack
                         for k in state.stack.iter() {
                             state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
                             state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
                         }
                         state.stack.clear();
 
-                        if !state.ignored_keys.remove(&_key) {
-                            state.next.send_all(raw_ev);
-                        }
+                        state.next.send_all(raw_ev);
                     }
                 }
                 TYPE_REPEAT => {
-                    if state.ignored_keys.contains(&_key) {
+                    if state.ignored_keys.contains(&key) {
                         return;
                     }
                     if state.stack.is_empty() {
@@ -412,7 +432,7 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
         match action {
             RuntimeAction::ActionSequence(seq) => {
-                handle_seq(&seq, &state.modifiers, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
+                handle_seq(&seq, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
             }
             RuntimeAction::PythonCallback(handler) => {
                 // TODO pass stack as first arg
@@ -446,7 +466,7 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
         } else {
             // no match, send all buffered keys from stack
             for k in state.stack.iter() {
-                state.next.send_all(InputEvent::Raw(k.to_input_ev(1)));
+                state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
             }
         }
         state.stack.clear();

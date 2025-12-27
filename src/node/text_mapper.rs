@@ -334,13 +334,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
                         match to {
                             RuntimeAction::ActionSequence(seq) => {
-                                handle_seq(
-                                    &seq,
-                                    &state.modifiers,
-                                    &state.modifiers,
-                                    &state.next,
-                                    SeqModifierRestoreMode::Default,
-                                );
+                                handle_seq(&seq, &state.modifiers, &state.next, SeqModifierRestoreMode::Default);
                             }
                             RuntimeAction::PythonCallback(handler) => {
                                 // delay the callback until the backspace events are processed
