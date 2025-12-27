@@ -584,9 +584,6 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         }
 
                         let previous = state.pressed_key.replace(key_action.key.clone());
-                        if let Some(previous) = previous {
-                            state.surpressed_keys.insert(previous);
-                        }
                     }
                     2 => {
                         let ignored = state.surpressed_keys.contains(&key_action.key);

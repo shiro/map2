@@ -2,8 +2,8 @@ use crate::*;
 use std::thread;
 use std::time::Duration;
 
-io_test!("basic1", "{capslock down}{a down}{capslock up}", "{b down}");
-io_test!("basic2", "a{capslock down}a{capslock up}", "ab");
+io_test2!("basic1", "input {capslock down}{a down}{capslock up}", "output {b down}", "input {a up}a", "output {b up}a");
+io_test!("basic2", "a{capslock down}a{capslock up}c", "abc");
 io_test!("basic3", "{capslock down}a{capslock up}{capslock down}a{capslock up}{capslock down}a{capslock up}", "bbb");
 
 io_test!("out_of_order_pre1", "{a down}{capslock down}{a up}{capslock up}", "a{capslock}");
