@@ -8,6 +8,7 @@ map2.link([reader, mapper, writer])
 
 mapper.map(["a", "b"], "c")
 mapper.map(["a", "d"], "e")
+mapper.map(["i", "j"], "o")
 
 counter = 0
 

@@ -71,3 +71,21 @@ io_test2!(
 // TODO do we want to hold c here?
 io_test2!("foo1", "input {a down}{b down}", "output c");
 // io_test2!("foo2", "input {a down}{d down}", "output {a down}{d down}");
+
+// tests if unrelated keys still work normally
+io_test2!("unrelated_1", "input {z down}", "output {z down}", "input {z up}", "output {z up}");
+io_test2!(
+    "unrelated_2",
+    "input {z down}{x down}",
+    "output {z down}{x down}",
+    "input {z up}{x up}",
+    "output {z up}{x up}"
+);
+// press 2 keys together that are in different chords
+io_test2!(
+    "unrelated_3",
+    "input {a down}{i down}",
+    "output ai",
+    "input {a up}{i up}",
+    // TODO assert empty
+);

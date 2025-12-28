@@ -16,4 +16,15 @@ io_test!("click2", "{meta down}2{meta up}", "{meta}{ctrl down}b{ctrl up}{meta}")
 io_test!("click3", "{meta down}3{meta up}", "{meta}{ctrl down}{c down}{ctrl up}{meta}{ctrl down}{c up}{ctrl up}{meta}");
 io_test!("click4", "{meta down}4{meta up}", "{meta}{ctrl down}{d down}{ctrl up}{meta}{alt down}{d up}{alt up}{meta}");
 
+// test unrelated keys function normally
+io_test2!(
+    "mapper_unrelated_1",
+    "input {z down}{x down}",
+    "sleep 10",
+    "output {z down}{x down}",
+    "input {z up}{x up}",
+    "sleep 10",
+    "output {z up}{x up}"
+);
+
 // io_test2!("reset1", "input {a down}", "sleep 10", "run mapper.reset()", "output b");

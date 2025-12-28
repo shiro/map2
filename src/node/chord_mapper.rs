@@ -459,16 +459,18 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
             }
             RuntimeAction::NOP => {}
         }
-    } else {
-        // only one key on the stack
-        if state.stack.len() == 1 && state.stack[0].event_code == ev.event_code {
-            state.next.send_all(InputEvent::Raw(ev.clone()));
-        } else {
-            // no match, send all buffered keys from stack
-            for k in state.stack.iter() {
-                state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
-            }
-        }
-        state.stack.clear();
+        return;
     }
+
+    // only one key on the stack
+    if state.stack.len() == 1 && state.stack[0].event_code == ev.event_code {
+        state.next.send_all(InputEvent::Raw(ev.clone()));
+    } else {
+        // no match, send all buffered keys from stack
+        for k in state.stack.iter() {
+            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
+            state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
+        }
+    }
+    state.stack.clear();
 }

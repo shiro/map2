@@ -12,17 +12,6 @@ async fn wasd_mouse_control() -> PyResult<()> {
     Python::with_gil(|py| -> PyResult<()> {
         let m = &pytests::include_python!();
 
-        // m.getattr("eval").unwrap().call1((PyString::new(py, "print('99')"),)).unwrap();
-        let _ = py.eval(
-            pyo3::ffi::c_str!(
-                r#"
-print(setInterval)
-"#
-            ),
-            None,
-            Some(&m.dict()),
-        );
-
         reader_send(py, m, "reader_kbd", &Key::from_str("w").unwrap().to_input_ev(1));
 
         // sleep for long enough to trigger the timeout once
