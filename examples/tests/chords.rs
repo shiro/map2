@@ -65,7 +65,7 @@ io_test2!(
     "input {c down}{d down}{c up}{d up}",
     "sleep 55",
     "global counter 1",
-    // TODO assert empty
+    "output "
 );
 
 // TODO do we want to hold c here?
@@ -82,10 +82,4 @@ io_test2!(
     "output {z up}{x up}"
 );
 // press 2 keys together that are in different chords
-io_test2!(
-    "unrelated_3",
-    "input {a down}{i down}",
-    "output ai",
-    "input {a up}{i up}",
-    // TODO assert empty
-);
+io_test2!("unrelated_3", "input {a down}{i down}", "output ai", "input {a up}{i up}", "output ");

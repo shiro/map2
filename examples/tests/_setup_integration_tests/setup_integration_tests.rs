@@ -88,6 +88,9 @@ pub fn reader_send_all(py: Python, module: &PyBound<PyModule>, name: &str, ev_li
 }
 
 pub fn keys(input: &str) -> Vec<EvdevInputEvent> {
+    if input.is_empty() {
+        return vec![];
+    }
     parse_key_sequence(input, Some(&Default::default())).unwrap().to_input_ev()
 }
 

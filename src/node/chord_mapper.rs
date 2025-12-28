@@ -462,15 +462,18 @@ async fn handle_cb(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
         return;
     }
 
+    // clear stack
+    let stack = std::mem::replace(&mut state.stack, Vec::new());
+
     // only one key on the stack
-    if state.stack.len() == 1 && state.stack[0].event_code == ev.event_code {
+    if stack.len() == 1 && stack[0].event_code == ev.event_code {
         state.next.send_all(InputEvent::Raw(ev.clone()));
     } else {
         // no match, send all buffered keys from stack
-        for k in state.stack.iter() {
+        for k in stack.into_iter() {
             state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_DOWN)));
             state.next.send_all(InputEvent::Raw(k.to_input_ev(TYPE_UP)));
+            state.ignored_keys.insert(k);
         }
     }
-    state.stack.clear();
 }
