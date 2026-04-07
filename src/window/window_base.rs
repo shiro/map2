@@ -1,15 +1,19 @@
-use crate::platform::{get_platform, Platform};
+use crate::platform::{Platform, get_platform};
 use crate::python::*;
 use crate::window::hyprland_window::hyprland_window_handler;
 use crate::window::x11_window::x11_window_handler;
 use crate::*;
 use tokio::sync::oneshot;
 
+#[pyclass]
 #[derive(Debug, Clone)]
 pub struct ActiveWindowInfo {
+    #[pyo3(get, set, name = "classname")]
     pub class: String,
+    #[pyo3(get, set)]
     pub instance: String,
-    pub name: String,
+    #[pyo3(get, set)]
+    pub title: String,
 }
 
 pub type WindowHandler =

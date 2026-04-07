@@ -3,7 +3,7 @@
 }:
 
 let
-  python = with pkgs; python312.withPackages (python-pkgs: with python-pkgs; [ ]);
+  python = with pkgs; python313.withPackages (python-pkgs: with python-pkgs; [ ]);
   lib-path =
     with pkgs;
     pkgs.lib.makeLibraryPath [
@@ -27,6 +27,7 @@ let
 in
 pkgs.mkShell {
   buildInputs = [
+    pkgs.libxkbcommon
     rust
   ]
   ++ (with pkgs; [

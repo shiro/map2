@@ -14,7 +14,7 @@ use tokio::io::unix::AsyncFd;
 use walkdir::WalkDir;
 
 fn udev_info(fd_path: &Path) -> Option<udev::Device> {
-    let metadata = fs::metadata(fd_path).unwrap_or_else(|_| panic!("Can't open file: {:?}", fd_path));
+    let metadata = fs::metadata(fd_path).ok()?;
     let devtype = match std::os::linux::fs::MetadataExt::st_mode(&metadata) & libc::S_IFMT {
         libc::S_IFCHR => udev::DeviceType::Character,
         libc::S_IFBLK => udev::DeviceType::Block,
@@ -214,7 +214,7 @@ pub fn watch_udev_inputs(
         let udev = if let Some(v) = udev_info(&fd_path) { v } else { return None };
         let properties = get_udev_properties(&udev);
 
-        let all_match = matchers.iter().all(|matcher| {
+        let any_match = matchers.iter().any(|matcher| {
             matcher.path.as_ref().map_or(true, |pattern| pattern.is_match(&fd_path.to_string_lossy().as_ref()))
                 && matcher.properties.as_ref().map_or(true, |props| {
                     props
@@ -223,7 +223,7 @@ pub fn watch_udev_inputs(
                 })
         });
 
-        if !all_match {
+        if !any_match {
             return None;
         }
 

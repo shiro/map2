@@ -5,10 +5,10 @@ use tokio::sync::oneshot;
 
 use anyhow::Result;
 use x11rb::connection::Connection;
-use x11rb::protocol::xproto::{
-    intern_atom, Atom, AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply, Screen, Window,
-};
 use x11rb::protocol::Event::PropertyNotify;
+use x11rb::protocol::xproto::{
+    Atom, AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply, Screen, Window, intern_atom,
+};
 use x11rb::x11_utils::TryParse;
 
 pub fn x11_window_handler() -> WindowHandler {
@@ -45,7 +45,13 @@ pub fn x11_window_handler() -> WindowHandler {
                                 continue;
                             }
 
-                            let ret = callback.call(py, (val.class.clone(),), None);
+                            let info = ActiveWindowInfo {
+                                class: val.class.clone(),
+                                instance: "".to_string(),
+                                title: val.title.clone(),
+                            };
+
+                            let ret = callback.call(py, (info.clone(),), None);
 
                             if let Err(err) = ret {
                                 eprintln!("{err}");
@@ -120,7 +126,7 @@ pub(crate) fn x11_get_active_window() -> Result<ActiveWindowInfo> {
 
     let name = parse_string_property(&_name);
 
-    Ok(ActiveWindowInfo { class: class.to_string(), instance: instance.to_string(), name: name.to_string() })
+    Ok(ActiveWindowInfo { class: class.to_string(), instance: instance.to_string(), title: name.to_string() })
 }
 
 fn find_active_window(conn: &impl Connection, root: Window, net_active_window: Atom) -> Result<Window> {

@@ -16,6 +16,7 @@ use ::oneshot;
 use device::virtual_input_device::DeviceMatcher;
 use pyo3::IntoPyObjectExt;
 use std::hash::{Hash, Hasher};
+use tokio::task::AbortHandle;
 
 const ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -25,7 +26,7 @@ struct State {
     #[new(default)]
     next: HashMap<Uuid, Arc<dyn LinkDst>>,
     #[new(default)]
-    devices: HashSet<NativeDeviceInfo>,
+    devices: HashMap<NativeDeviceInfo, AbortHandle>,
     #[new(default)]
     on_connect_handler: Option<Arc<PyObject>>,
     #[new(default)]
@@ -81,7 +82,6 @@ impl Reader {
             let _state = state.clone();
             let handler = Arc::new(move |ev| {
                 let mut state = _state.lock().unwrap();
-                let mut device_map = HashMap::new();
 
                 match ev {
                     NativeDeviceEvent::AddDevice(info) => {
@@ -97,10 +97,9 @@ impl Reader {
                             Ok(v) => v,
                             Err(err) => {
                                 eprintln!("{}", err);
-                                std::process::exit(1);
+                                return;
                             }
                         };
-                        device_map.insert(info.sys_path.clone(), abort_handle);
 
                         if let Some(handler) = state.on_connect_handler.as_ref() {
                             Python::with_gil(|py| {
@@ -108,7 +107,7 @@ impl Reader {
                                 handler.call(py, (info,), None);
                             });
                         }
-                        state.devices.insert(info);
+                        state.devices.insert(info, abort_handle);
                     }
                     NativeDeviceEvent::RemoveDevice(info) => {
                         if let Some(handler) = state.on_disconnect_handler.as_ref() {
@@ -117,7 +116,9 @@ impl Reader {
                                 handler.call(py, (info,), None);
                             });
                         }
-                        state.devices.remove(&info);
+                        if let Some(abort_handle) = state.devices.remove(&info) {
+                            abort_handle.abort();
+                        }
                     }
                 };
             });
@@ -206,7 +207,7 @@ impl Reader {
     #[getter]
     pub fn devices(&self, py: Python) -> Vec<PyObject> {
         let state = self.state.lock().unwrap();
-        state.devices.iter().map(|info| device_info_to_py(py, info)).collect()
+        state.devices.keys().map(|info| device_info_to_py(py, info)).collect()
     }
 
     #[cfg(feature = "integration")]
@@ -223,6 +224,10 @@ impl Drop for Reader {
         let _ = self.reader_exit_tx.take().map(|v| {
             v.send(());
         });
+        #[cfg(not(feature = "integration"))]
+        for abort_handle in self.state.lock().unwrap().devices.values() {
+            abort_handle.abort();
+        }
         self.unlink_all();
     }
 }

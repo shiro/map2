@@ -44,7 +44,7 @@ pub fn hyprland_window_handler() -> WindowHandler {
                                     continue;
                                 }
 
-                                let ret = callback.call((info.class.clone(),), None);
+                                let ret = callback.call((info.clone(),), None);
 
                                 if let Err(err) = ret {
                                     eprintln!("{err}");
@@ -64,7 +64,7 @@ pub fn hyprland_window_handler() -> WindowHandler {
                         handle_window_change(ActiveWindowInfo {
                             class: info.class,
                             instance: "".to_string(),
-                            name: info.title,
+                            title: info.title,
                         });
                     }
                 })
@@ -92,7 +92,15 @@ pub fn hyprland_window_handler() -> WindowHandler {
                                 tokio::task::spawn_blocking(move || {
                                     Python::with_gil(|py| {
                                         let is_callable = callback.bind(py).is_callable();
-                                        let ret = callback.call(py, (info.class.clone(),), None);
+
+                                        let info = ActiveWindowInfo {
+                                            class: info.class,
+                                            instance: "".to_string(),
+                                            title: info.title,
+                                        };
+
+                                        let ret = callback.call(py, (info.clone(),), None);
+
                                         if let Err(err) = ret {
                                             eprintln!("{err}");
                                             std::process::exit(1);

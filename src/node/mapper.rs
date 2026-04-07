@@ -522,48 +522,48 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
 
             // handle breaking out of a mapping by unpressing a modifier early or pressing down
             // another key
-            if state.is_in_mapping
-                && let Some(pressed_key) = state.pressed_key
-                && key_action.key != pressed_key
-                && let Some(runtime_action) =
-                    state.mappings.get(&KeyActionWithMods::new(pressed_key, 0, previous_modifiers))
-            {
-                match runtime_action {
-                    RuntimeAction::ActionSequence(seq) => {
-                        send_seq(seq, Some(&state.virtual_modifiers), Some(&modifiers), &state.next);
-
-                        state.modifiers = modifiers;
-                        state.virtual_modifiers = modifiers;
-
-                        state.surpressed_keys.insert(pressed_key);
-
-                        // consume modifiers since we already handled them above
-                        if (is_modifier(&key_action.key)) {
-                            return;
-                        }
-                    }
-                    RuntimeAction::PythonCallback(handler) => {
-                        handle_callback(
-                            &ev,
-                            handler.clone(),
-                            Some(python_callback_args(
-                                &EventCode::EV_KEY(*key),
-                                &state.modifiers,
-                                *value,
-                                &state.transformer,
-                            )),
-                            state.transformer.clone(),
-                            &state.modifiers.clone(),
-                            state.next.values().cloned().collect(),
-                            state,
-                        )
-                        .await;
-
-                        state = _state.lock().await;
-                    }
-                    RuntimeAction::NOP => {}
-                }
-            }
+            // if state.is_in_mapping
+            //     && let Some(pressed_key) = state.pressed_key
+            //     && key_action.key != pressed_key
+            //     && let Some(runtime_action) =
+            //         state.mappings.get(&KeyActionWithMods::new(pressed_key, 0, previous_modifiers))
+            // {
+            //     match runtime_action {
+            //         RuntimeAction::ActionSequence(seq) => {
+            //             send_seq(seq, Some(&state.virtual_modifiers), Some(&modifiers), &state.next);
+            //
+            //             state.modifiers = modifiers;
+            //             state.virtual_modifiers = modifiers;
+            //
+            //             state.surpressed_keys.insert(pressed_key);
+            //
+            //             // consume modifiers since we already handled them above
+            //             if (is_modifier(&key_action.key)) {
+            //                 return;
+            //             }
+            //         }
+            //         RuntimeAction::PythonCallback(handler) => {
+            //             handle_callback(
+            //                 &ev,
+            //                 handler.clone(),
+            //                 Some(python_callback_args(
+            //                     &EventCode::EV_KEY(*key),
+            //                     &state.modifiers,
+            //                     *value,
+            //                     &state.transformer,
+            //                 )),
+            //                 state.transformer.clone(),
+            //                 &state.modifiers.clone(),
+            //                 state.next.values().cloned().collect(),
+            //                 state,
+            //             )
+            //             .await;
+            //
+            //             state = _state.lock().await;
+            //         }
+            //         RuntimeAction::NOP => {}
+            //     }
+            // }
 
             if !is_modifier(&key_action.key) {
                 match ev.value {
