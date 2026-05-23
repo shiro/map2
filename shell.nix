@@ -18,7 +18,7 @@ let
     builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz"
   );
   pkgs = import <nixpkgs> { overlays = [ rust_overlay ]; };
-  rust = pkgs.rust-bin.stable."1.91.1".default.override {
+  rust = pkgs.rust-bin.stable."1.94.1".default.override {
     extensions = [
       "rust-src"
       "rust-analyzer"

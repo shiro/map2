@@ -29,7 +29,6 @@ struct State {
 #[pyclass]
 pub struct Writer {
     pub id: Uuid,
-    pub link: Arc<WriterLink>,
     transformer: Arc<XKBTransformer>,
     state: Arc<Mutex<State>>,
     exit_tx: tokio::sync::mpsc::Sender<()>,
@@ -128,74 +127,69 @@ impl Writer {
         let (ev_tx, mut ev_rx) = tokio::sync::mpsc::channel::<InputEvent>(255);
         let (exit_tx, mut exit_rx) = tokio::sync::mpsc::channel::<()>(32);
         let state = Arc::new(Mutex::new(State::new(name, ev_tx)));
-        let link = Arc::new(WriterLink::new(id, state.clone()));
 
         #[cfg(not(feature = "integration"))]
         {
             // grab udev device
             let mut output_device = virtual_output_device::init_virtual_output_device(&device_init_policy)
                 .map_err(|err| PyRuntimeError::new_err(err.to_string()))?;
+
             get_runtime().spawn(async move {
                 loop {
-                    loop {
-                        let ev = match ev_rx.recv().await {
-                            Some(v) => v,
-                            None => return,
-                        };
+                    let ev = match ev_rx.recv().await {
+                        Some(v) => v,
+                        None => return,
+                    };
 
-                        if let Ok(()) = exit_rx.try_recv() {
-                            return;
-                        }
+                    if let Ok(()) = exit_rx.try_recv() {
+                        return;
+                    }
 
-                        let ev = match &ev {
-                            InputEvent::Raw(ev) => ev,
-                        };
-                        let mut syn = SYN_REPORT.clone();
-                        syn.time.tv_sec = ev.time.tv_sec;
-                        syn.time.tv_usec = ev.time.tv_usec;
+                    let ev = match &ev {
+                        InputEvent::Raw(ev) => ev,
+                    };
+                    let mut syn = SYN_REPORT.clone();
+                    syn.time.tv_sec = ev.time.tv_sec;
+                    syn.time.tv_usec = ev.time.tv_usec;
 
-                        #[cfg(not(feature = "integration"))]
-                        {
-                            let _ = output_device.send(&ev);
-                            let _ = output_device.send(&syn);
-                        }
+                    #[cfg(not(feature = "integration"))]
+                    {
+                        let _ = output_device.send(&ev);
+                        let _ = output_device.send(&syn);
+                    }
 
-                        // this is a hack that stops successive events to not get registered
-                        if let EventCode::EV_KEY(_) = ev.event_code {
-                            tokio::time::sleep(Duration::from_millis(1)).await;
-                        }
+                    // this is a hack that stops successive events to not get registered
+                    if let EventCode::EV_KEY(_) = ev.event_code {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
                     }
                 }
             });
         }
 
-        let _link = link.clone();
         let _self = Py::new(
             py,
             Self {
                 id,
                 state,
-                link,
                 exit_tx,
                 transformer,
                 #[cfg(feature = "integration")]
                 ev_rx,
             },
         )?;
-        _link.py_object.set(Arc::new(_self.clone_ref(py).into_any()));
         Ok(_self)
     }
 
     pub fn link_from(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
-        (self.link.clone() as Arc<dyn LinkDst>).py_link_from(target)
+        self.get_link().py_link_from(target)
     }
 
     pub fn unlink_from(&mut self, target: &PyBound<PyAny>) -> PyResult<bool> {
-        (self.link.clone() as Arc<dyn LinkDst>).py_unlink_from(target)
+        self.get_link().py_unlink_from(target)
     }
 
     pub fn unlink_from_all(&mut self) {
-        (self.link.clone() as Arc<dyn LinkDst>).py_unlink_from_all();
+        self.get_link().py_unlink_from_all();
     }
 
     pub fn unlink_all(&mut self) {
@@ -236,6 +230,12 @@ impl Writer {
             }
             None => Ok(None),
         }
+    }
+}
+
+impl Writer {
+    pub fn get_link(&self) -> Arc<dyn LinkDst> {
+        Arc::new(WriterLink::new(self.id, self.state.clone()))
     }
 }
 

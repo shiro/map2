@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use evdev_rs::enums::*;
 use evdev_rs::Device;
+use evdev_rs::enums::*;
 use evdev_rs::*;
 
 use crate::*;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DeviceCapabilities {
     abs_bits: HashSet<(EventCode, AbsInfo)>,
     bits: HashSet<EventCode>,
@@ -90,7 +90,12 @@ fn clone_code_bits(src: &Device, dst: &Device, ev_code: &EventCode, max: &EventC
             continue;
         }
 
-        dst.enable(&code).map_err(|err| anyhow!("failed to enable code bit: {}", err))?;
+        if let Some(abs_info) = src.abs_info(&code) {
+            dst.enable_event_code(&code, Some(&abs_info))
+                .map_err(|err| anyhow!("failed to enable code bit: {}", err))?;
+        } else {
+            dst.enable(&code).map_err(|err| anyhow!("failed to enable code bit: {}", err))?;
+        }
     }
     Ok(())
 }
@@ -122,25 +127,12 @@ fn clone_device_props(src: &Device, dst: &mut Device) {
 }
 
 fn clone_device_bits(src: &Device, dst: &Device) -> Result<()> {
-    for ev_type in EventType::EV_SYN.iter() {
-        match ev_type {
-            EventType::EV_KEY => clone_code_bits(
-                src,
-                dst,
-                &EventCode::EV_KEY(EV_KEY::KEY_RESERVED),
-                &EventCode::EV_KEY(EV_KEY::KEY_MAX),
-            )?,
-            EventType::EV_REL => clone_code_bits(src, dst, &EventCode::EV_REL(REL_X), &EventCode::EV_REL(REL_MAX))?,
-            EventType::EV_ABS => clone_code_bits(src, dst, &EventCode::EV_ABS(ABS_X), &EventCode::EV_ABS(ABS_MAX))?,
-            EventType::EV_LED => {
-                clone_code_bits(src, dst, &EventCode::EV_LED(EV_LED::LED_NUML), &EventCode::EV_LED(EV_LED::LED_MAX))?
-            }
-            EventType::EV_MSC => {
-                clone_code_bits(src, dst, &EventCode::EV_MSC(EV_MSC::MSC_SERIAL), &EventCode::EV_MSC(EV_MSC::MSC_MAX))?
-            }
-            _ => (),
-        }
-    }
+    clone_code_bits(src, dst, &EventCode::EV_KEY(EV_KEY::KEY_RESERVED), &EventCode::EV_KEY(EV_KEY::KEY_MAX))?;
+    clone_code_bits(src, dst, &EventCode::EV_ABS(ABS_X), &EventCode::EV_ABS(ABS_MAX))?;
+    clone_code_bits(src, dst, &EventCode::EV_REL(REL_X), &EventCode::EV_REL(REL_MAX))?;
+    clone_code_bits(src, dst, &EventCode::EV_LED(EV_LED::LED_NUML), &EventCode::EV_LED(EV_LED::LED_MAX))?;
+    clone_code_bits(src, dst, &EventCode::EV_MSC(EV_MSC::MSC_SERIAL), &EventCode::EV_MSC(EV_MSC::MSC_MAX))?;
+
     Ok(())
 }
 
@@ -156,7 +148,7 @@ pub(crate) fn clone_virtual_device(dev: &mut Device, existing_device_fd_path: &s
     let device = Device::new_from_file(fd_file).unwrap();
 
     clone_device_props(&device, dev);
-    clone_device_bits(&device, dev).unwrap();
+    clone_device_bits(&device, dev)?;
 
     Ok(())
 }
