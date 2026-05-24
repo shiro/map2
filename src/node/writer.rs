@@ -48,8 +48,7 @@ impl Writer {
 
         let name = extract_with_error::<String>(&options, "name")?
             .unwrap_or_else(|| format!("Writer {}", node_util::get_id_and_incremen(&ID_COUNTER)));
-        let device_name =
-            extract_with_error::<String>(&options, "device_name")?.unwrap_or("Virtual map2 output".to_string());
+        let device_name = extract_with_error::<String>(&options, "device_name")?;
 
         let kbd_model = extract_with_error::<String>(&options, "model")?;
         let kbd_layout = extract_with_error::<String>(&options, "layout")?;
@@ -110,9 +109,15 @@ impl Writer {
                     return Err(PyRuntimeError::new_err("expected only one of: 'clone_from', 'capabilities'"));
                 }
 
-                virtual_output_device::DeviceInitPolicy::CloneExistingDevice(existing_dev_fd)
+                virtual_output_device::DeviceInitPolicy::CloneExistingDevice {
+                    name: device_name,
+                    fd_path: existing_dev_fd,
+                }
             }
-            None => virtual_output_device::DeviceInitPolicy::NewDevice(device_name, capabilities),
+            None => virtual_output_device::DeviceInitPolicy::NewDevice(
+                device_name.unwrap_or("Virtual map2 output".to_string()),
+                capabilities,
+            ),
         };
 
         let kbd_model = options.get("model").and_then(|x| x.extract().ok());

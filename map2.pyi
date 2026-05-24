@@ -173,6 +173,7 @@ class WriterCapabilities(typing.TypedDict):
 
 class WriterNewKwargs(typing.TypedDict):
     name: typing.NotRequired[str]
+    device_name: typing.NotRequired[str]
     clone_from: typing.NotRequired[builtins.str]
     capabilities: typing.NotRequired[WriterCapabilities]
 

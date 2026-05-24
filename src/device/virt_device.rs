@@ -69,17 +69,6 @@ pub fn enable_device_capabilities(dev: &mut Device, capabilities: &DeviceCapabil
     Ok(())
 }
 
-fn set_code_bits(dev: &Device, ev_code: &EventCode, max: &EventCode) -> Result<()> {
-    for code in ev_code.iter() {
-        if code == *max {
-            break;
-        }
-
-        dev.enable(&code).map_err(|err| anyhow!("failed to enable code bit: {}", err))?;
-    }
-    Ok(())
-}
-
 fn clone_code_bits(src: &Device, dst: &Device, ev_code: &EventCode, max: &EventCode) -> Result<()> {
     for code in ev_code.iter() {
         if code == *max {
@@ -104,16 +93,15 @@ fn clone_device_props(src: &Device, dst: &mut Device) {
     if let Some(v) = src.name() {
         dst.set_name(v);
     }
-    dst.set_vendor_id(src.vendor_id());
     if let Some(v) = src.phys() {
         dst.set_phys(v);
     }
-    dst.set_bustype(src.bustype());
-    dst.set_product_id(src.product_id());
-    dst.set_vendor_id(src.vendor_id());
     if let Some(v) = src.uniq() {
         dst.set_uniq(v);
     }
+    dst.set_vendor_id(src.vendor_id());
+    dst.set_bustype(src.bustype());
+    dst.set_product_id(src.product_id());
 
     for prop in InputProp::INPUT_PROP_POINTER.iter() {
         if prop == InputProp::INPUT_PROP_MAX {
@@ -127,6 +115,7 @@ fn clone_device_props(src: &Device, dst: &mut Device) {
 }
 
 fn clone_device_bits(src: &Device, dst: &Device) -> Result<()> {
+    clone_code_bits(src, dst, &EventCode::EV_SYN(EV_SYN::SYN_REPORT), &EventCode::EV_SYN(EV_SYN::SYN_MAX))?;
     clone_code_bits(src, dst, &EventCode::EV_KEY(EV_KEY::KEY_RESERVED), &EventCode::EV_KEY(EV_KEY::KEY_MAX))?;
     clone_code_bits(src, dst, &EventCode::EV_ABS(ABS_X), &EventCode::EV_ABS(ABS_MAX))?;
     clone_code_bits(src, dst, &EventCode::EV_REL(REL_X), &EventCode::EV_REL(REL_MAX))?;
@@ -143,12 +132,16 @@ pub(crate) fn init_virtual_device(mut dev: &mut Device, name: &str, capabilities
     Ok(())
 }
 
-pub(crate) fn clone_virtual_device(dev: &mut Device, existing_device_fd_path: &str) -> Result<()> {
-    let fd_file = fs::OpenOptions::new().read(true).open(existing_device_fd_path)?;
+pub(crate) fn clone_virtual_device(dev: &mut Device, fd_path: &str, name: Option<&str>) -> Result<()> {
+    let fd_file = fs::OpenOptions::new().read(true).open(fd_path)?;
     let device = Device::new_from_file(fd_file).unwrap();
 
     clone_device_props(&device, dev);
     clone_device_bits(&device, dev)?;
+
+    if let Some(name) = name {
+        dev.set_name(name);
+    }
 
     Ok(())
 }

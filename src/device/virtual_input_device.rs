@@ -249,7 +249,7 @@ pub fn watch_udev_inputs(
 
         let mut watcher: notify::RecommendedWatcher = notify::recommended_watcher(move |res| {
             futures::executor::block_on(async {
-                fs_ev_tx.send(res).await.unwrap();
+                let _ = fs_ev_tx.send(res).await;
             })
         })?;
         watcher.watch(Path::new("/dev/input"), notify::RecursiveMode::Recursive)?;
