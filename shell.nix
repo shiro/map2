@@ -45,6 +45,7 @@ pkgs.mkShell {
 
   shellHook = ''
     export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${lib-path}"
+    export LD_LIBRARY_PATH="${pkgs.hidapi}/lib:$LD_LIBRARY_PATH"
 
     # Setup the virtual environment if it doesn't already exist.
     VENV=venv

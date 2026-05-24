@@ -15,8 +15,8 @@ pub fn node_to_link_dst(target: &PyBound<PyAny>) -> Option<Arc<dyn LinkDst>> {
     if let Ok(target) = target.extract::<PyRefMut<ModifierMapper>>() {
         return Some(target.link.clone());
     }
-    if let Ok(target) = target.extract::<PyRefMut<Writer>>() {
-        return Some(target.get_link());
+    if let Ok(target) = target.extract::<Bound<Writer>>() {
+        return Some(Writer::get_link(target));
     }
     None
 }

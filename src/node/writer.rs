@@ -185,20 +185,20 @@ impl Writer {
         Ok(_self)
     }
 
-    pub fn link_from(&mut self, target: &PyBound<PyAny>) -> PyResult<()> {
-        self.get_link().py_link_from(target)
+    pub fn link_from(this: Bound<'_, Self>, target: &PyBound<PyAny>) -> PyResult<()> {
+        Writer::get_link(this).py_link_from(target)
     }
 
-    pub fn unlink_from(&mut self, target: &PyBound<PyAny>) -> PyResult<bool> {
-        self.get_link().py_unlink_from(target)
+    pub fn unlink_from(this: Bound<'_, Self>, target: &PyBound<PyAny>) -> PyResult<bool> {
+        Writer::get_link(this).py_unlink_from(target)
     }
 
-    pub fn unlink_from_all(&mut self) {
-        self.get_link().py_unlink_from_all();
+    pub fn unlink_from_all(this: Bound<'_, Self>) {
+        Writer::get_link(this).py_unlink_from_all();
     }
 
-    pub fn unlink_all(&mut self) {
-        self.unlink_from_all();
+    pub fn unlink_all(this: Bound<'_, Self>) {
+        Writer::unlink_from_all(this);
     }
 
     pub fn name(&self) -> String {
@@ -239,8 +239,10 @@ impl Writer {
 }
 
 impl Writer {
-    pub fn get_link(&self) -> Arc<dyn LinkDst> {
-        Arc::new(WriterLink::new(self.id, self.state.clone()))
+    pub fn get_link(this: Bound<'_, Self>) -> Arc<dyn LinkDst> {
+        let obj = Arc::new(this.clone().unbind().into_any());
+        let this = this.downcast::<Writer>().unwrap().borrow();
+        Arc::new(WriterLink::new(this.id, this.state.clone(), obj))
     }
 }
 
@@ -260,8 +262,7 @@ impl Drop for Writer {
 pub struct WriterLink {
     id: Uuid,
     state: Arc<Mutex<State>>,
-    #[new(default)]
-    py_object: OnceLock<Arc<PyObject>>,
+    py_object: Arc<PyObject>,
 }
 
 impl LinkDst for WriterLink {
@@ -281,7 +282,7 @@ impl LinkDst for WriterLink {
         Ok(())
     }
     fn py_object(&self) -> Arc<PyObject> {
-        self.py_object.get().unwrap().clone()
+        self.py_object.clone()
     }
     fn clear_prev(&self) -> Vec<Arc<dyn LinkSrc>> {
         let mut state = self.state.lock().unwrap();
