@@ -677,7 +677,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                     handler.clone(),
                     Some(python_callback_args(event_code, &state.modifiers, *value, &state.transformer)),
                     state.transformer.clone(),
-                    &state.modifiers.clone(),
+                    &KeyModifierFlags::default(),
                     state.next.values().cloned().collect(),
                     state,
                 )

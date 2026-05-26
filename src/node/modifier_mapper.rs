@@ -405,7 +405,6 @@ impl ModifierMapper {
 
 impl Drop for ModifierMapper {
     fn drop(&mut self) {
-        println!("bye");
         self.unlink_from_all();
         self.unlink_to_all();
     }
@@ -534,8 +533,13 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                         if let Some(runtime_action) = &state.click_action {
                             match runtime_action {
                                 RuntimeAction::ActionSequence(seq) => {
-                                    let mode = get_mode(&state.mappings, &from_key_action, seq);
-                                    handle_seq(seq, &state.modifiers, &state.next, mode);
+                                    // let mode = get_mode(&state.mappings, &from_key_action, seq);
+                                    // handle_seq(seq, &state.modifiers, &state.next, mode);
+
+                                    // let compatible = is_mapping_compatible(&state.mappings, &key_action, seq);
+                                    // println!("{:?}", (seq));
+
+                                    send_seq(seq, None, None, &state.next);
                                 }
                                 RuntimeAction::PythonCallback(handler) => {
                                     handle_callback(

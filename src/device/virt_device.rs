@@ -93,15 +93,17 @@ fn clone_device_props(src: &Device, dst: &mut Device) {
     if let Some(v) = src.name() {
         dst.set_name(v);
     }
-    if let Some(v) = src.phys() {
-        dst.set_phys(v);
-    }
-    if let Some(v) = src.uniq() {
-        dst.set_uniq(v);
-    }
-    dst.set_vendor_id(src.vendor_id());
-    dst.set_bustype(src.bustype());
-    dst.set_product_id(src.product_id());
+    
+    // TODO allow overriding them since some apps will treat them as a single device
+    // if let Some(v) = src.phys() {
+    //     dst.set_phys(v);
+    // }
+    // if let Some(v) = src.uniq() {
+    //     dst.set_uniq(v);
+    // }
+    // dst.set_vendor_id(src.vendor_id());
+    // dst.set_bustype(src.bustype());
+    // dst.set_product_id(src.product_id());
 
     for prop in InputProp::INPUT_PROP_POINTER.iter() {
         if prop == InputProp::INPUT_PROP_MAX {
