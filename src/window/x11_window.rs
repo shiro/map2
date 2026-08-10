@@ -1,14 +1,14 @@
 use crate::python::*;
-use crate::window::window_base::{ActiveWindowInfo, WindowControlMessage, WindowHandler};
+use crate::window::window_base::{ActiveWindowInfo, WindowControlMessage, WindowEventType, WindowHandler};
 use crate::*;
-use tokio::sync::oneshot;
 
 use anyhow::Result;
+use tokio::sync::oneshot;
 use x11rb::connection::Connection;
-use x11rb::protocol::Event::PropertyNotify;
 use x11rb::protocol::xproto::{
-    Atom, AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply, Screen, Window, intern_atom,
+    intern_atom, Atom, AtomEnum, ChangeWindowAttributesAux, ConnectionExt, EventMask, GetPropertyReply, Screen, Window,
 };
+use x11rb::protocol::Event::PropertyNotify;
 use x11rb::x11_utils::TryParse;
 
 pub fn x11_window_handler() -> WindowHandler {
@@ -18,6 +18,7 @@ pub fn x11_window_handler() -> WindowHandler {
          -> Result<()> {
             let x11_state = Arc::new(x11_initialize().unwrap());
             let subscriptions = Arc::new(Mutex::new(HashMap::new()));
+            let prev_window: Arc<Mutex<Option<ActiveWindowInfo>>> = Arc::new(Mutex::new(None));
 
             loop {
                 if exit_rx.try_recv().is_ok() {
@@ -26,8 +27,10 @@ pub fn x11_window_handler() -> WindowHandler {
 
                 while let Ok(msg) = subscription_rx.try_recv() {
                     match msg {
-                        WindowControlMessage::Subscribe(id, callback) => {
-                            subscriptions.lock().unwrap().insert(id, callback);
+                        WindowControlMessage::Subscribe(id, callback, event_type) => {
+                            Python::with_gil(|py| {
+                                subscriptions.lock().unwrap().insert(id, (callback.clone_ref(py), event_type));
+                            });
                         }
                         WindowControlMessage::Unsubscribe(id) => {
                             subscriptions.lock().unwrap().remove(&id);
@@ -39,23 +42,58 @@ pub fn x11_window_handler() -> WindowHandler {
 
                 if let Ok(Some(val)) = info {
                     Python::with_gil(|py| {
-                        for callback in subscriptions.lock().unwrap().values() {
+                        let mut prev = prev_window.lock().unwrap();
+                        
+                        // Handle focus event
+                        for (callback, event_type) in subscriptions.lock().unwrap().values() {
+                            if *event_type != WindowEventType::Focus {
+                                continue;
+                            }
                             let is_callable = callback.bind(py).is_callable();
                             if !is_callable {
                                 continue;
                             }
 
-                            let info = ActiveWindowInfo {
-                                class: val.class.clone(),
-                                instance: "".to_string(),
-                                title: val.title.clone(),
-                            };
+                            let window_dict = PyDict::new(py);
+                            let _ = window_dict.set_item("class", &val.class);
+                            let _ = window_dict.set_item("instance", &val.instance);
+                            let _ = window_dict.set_item("title", &val.title);
 
-                            let ret = callback.call(py, (info.clone(),), None);
+                            let ret = callback.call(py, (window_dict,), None);
 
                             if let Err(err) = ret {
                                 eprintln!("{err}");
                                 std::process::exit(1);
+                            }
+                        }
+                        
+                        *prev = Some(val);
+                    });
+                } else {
+                    // Handle blur event when window focus is lost
+                    Python::with_gil(|py| {
+                        let mut prev = prev_window.lock().unwrap();
+                        if let Some(old_window) = prev.take() {
+                            for (callback, event_type) in subscriptions.lock().unwrap().values() {
+                                if *event_type != WindowEventType::Blur {
+                                    continue;
+                                }
+                                let is_callable = callback.bind(py).is_callable();
+                                if !is_callable {
+                                    continue;
+                                }
+
+                                let window_dict = PyDict::new(py);
+                                let _ = window_dict.set_item("class", &old_window.class);
+                                let _ = window_dict.set_item("instance", &old_window.instance);
+                                let _ = window_dict.set_item("title", &old_window.title);
+
+                                let ret = callback.call(py, (window_dict,), None);
+
+                                if let Err(err) = ret {
+                                    eprintln!("{err}");
+                                    std::process::exit(1);
+                                }
                             }
                         }
                     });
@@ -124,9 +162,9 @@ pub(crate) fn x11_get_active_window() -> Result<ActiveWindowInfo> {
     let (_name, class) = (name.reply()?, class.reply()?);
     let (instance, class) = parse_wm_class(&class);
 
-    let name = parse_string_property(&_name);
+    let title = parse_string_property(&_name);
 
-    Ok(ActiveWindowInfo { class: class.to_string(), instance: instance.to_string(), title: name.to_string() })
+    Ok(ActiveWindowInfo { class: class.to_string(), instance: instance.to_string(), title: title.to_string() })
 }
 
 fn find_active_window(conn: &impl Connection, root: Window, net_active_window: Atom) -> Result<Window> {

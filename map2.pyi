@@ -10,6 +10,8 @@ type SrcNode = Reader | AnyMapper
 type DstNode = Writer | AnyMapper
 type AnyNode = SrcNode | DstNode
 
+WindowInfo = typing.TypedDict("WindowInfo", {"class": str, "instance": str, "title": str})
+
 class DeviceMatcher(typing.TypedDict):
     path: typing.NotRequired[str | re.Pattern]
     properties: typing.NotRequired[dict[str, str | re.Pattern]]
@@ -241,3 +243,34 @@ def exit() -> None:
     r"""
     Stops execution of the program
     """
+
+type WindowEventCallback = typing.Callable[[WindowInfo], None]
+
+class WindowSubscription:
+    r"""
+    Represents a subscription to window events
+    """
+
+class Window:
+    r"""
+    Monitors active window changes and emits focus/blur events
+    """
+
+    def __new__(cls) -> Window: ...
+    def on(self, event: typing.Literal["focus", "blur"], callback: WindowEventCallback) -> WindowSubscription:
+        r"""
+        Subscribe to window focus or blur events.
+        
+        Args:
+            event: Either "focus" or "blur"
+            callback: Function that receives WindowInfo with keys: class, instance, title
+                - For "focus": receives the newly focused window info
+                - For "blur": receives the previously focused window info (that just lost focus)
+        
+        Returns:
+            WindowSubscription object that can be passed to off()
+        """
+    def off(self, subscription: WindowSubscription) -> None:
+        r"""
+        Unsubscribe from a window event
+        """

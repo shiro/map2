@@ -16,6 +16,12 @@ pub struct ActiveWindowInfo {
     pub title: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowEventType {
+    Focus,
+    Blur,
+}
+
 pub type WindowHandler =
     Box<dyn Fn(oneshot::Receiver<()>, tokio::sync::mpsc::Receiver<WindowControlMessage>) -> Result<()> + Send + Sync>;
 
@@ -50,14 +56,35 @@ impl Window {
         }
     }
 
-    fn on_window_change(&mut self, callback: PyObject) -> WindowOnWindowChangeSubscription {
-        self.subscription_tx.try_send(WindowControlMessage::Subscribe(self.subscription_id_cnt, callback)).unwrap();
-        let subscription = WindowOnWindowChangeSubscription { id: self.subscription_id_cnt };
+    fn on(&mut self, event: &str, callback: PyObject) -> WindowSubscription {
+        let event_type = match event {
+            "focus" => WindowEventType::Focus,
+            "blur" => WindowEventType::Blur,
+            _ => {
+                panic!("Invalid event type: {}. Must be 'focus' or 'blur'", event);
+            }
+        };
+
+        self.subscription_tx
+            .try_send(WindowControlMessage::Subscribe(self.subscription_id_cnt, callback, event_type))
+            .unwrap();
+        let subscription = WindowSubscription { id: self.subscription_id_cnt };
         self.subscription_id_cnt += 1;
         subscription
     }
-    fn remove_on_window_change(&self, subscription: &WindowOnWindowChangeSubscription) {
+
+    fn off(&self, subscription: &WindowSubscription) {
         let _ = self.subscription_tx.send(WindowControlMessage::Unsubscribe(subscription.id));
+    }
+
+    #[deprecated(note = "use on('focus', handler) instead")]
+    fn on_window_change(&mut self, callback: PyObject) -> WindowSubscription {
+        self.on("focus", callback)
+    }
+
+    #[deprecated(note = "use off(subscription) instead")]
+    fn remove_on_window_change(&self, subscription: &WindowSubscription) {
+        self.off(subscription);
     }
 }
 
@@ -69,12 +96,12 @@ impl Drop for Window {
 }
 
 #[pyclass]
-struct WindowOnWindowChangeSubscription {
+struct WindowSubscription {
     id: u32,
 }
 
 pub enum WindowControlMessage {
-    Subscribe(u32, PyObject),
+    Subscribe(u32, PyObject, WindowEventType),
     Unsubscribe(u32),
 }
 
