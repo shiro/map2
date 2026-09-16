@@ -563,6 +563,7 @@ async fn handle(_state: Arc<Mutex<State>>, raw_ev: InputEvent) {
                             };
                         } else {
                             state.next.send_all(InputEvent::Raw(state.key.to_input_ev(1)));
+                            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
                             state.next.send_all(InputEvent::Raw(state.key.to_input_ev(0)));
                         }
                     }
