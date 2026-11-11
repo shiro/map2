@@ -27,14 +27,14 @@ jobs:
           # armv7, s390x, ppc64le
         ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Setup git config
         run: git config --global --add safe.directory '*'
       - name: Git submodule init
         run: git submodule sync --recursive && git submodule update --init --force
 
       # install python & rust
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v7
         with:
           python-version: 3.9
           architecture: x64
@@ -56,9 +56,9 @@ jobs:
           manylinux: auto
           before-script-linux: "./ci/prepare-ci-container.sh"
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
-          name: wheels
+          name: wheels-${{ matrix.target }}
           path: dist
 
   build-docs:
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: install, build and upload
         uses: withastro/action@v1
         with:
@@ -77,7 +77,7 @@ jobs:
     name: Changelog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Get changelog version
         id: changelog_version
         run: |
@@ -107,9 +107,10 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [linux, changelog]
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v8
         with:
-          name: wheels
+          pattern: wheels-*
+          merge-multiple: true
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -137,7 +138,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v5
 
   deploy-package-aur:
     name: Deploy packge AUR
@@ -146,10 +147,11 @@ jobs:
     needs: [deploy]
     steps:
       - name: Git checkout
-        uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+        uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
-          name: wheels
+          pattern: wheels-*
+          merge-multiple: true
           path: wheels
       - name: Generate PKGBUILD
         env:
